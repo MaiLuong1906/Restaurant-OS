@@ -11,6 +11,8 @@
     "type-check:frontend": "pnpm --filter frontend typecheck",
     "test:frontend": "pnpm --filter frontend test",
     "test:all": "pnpm test:frontend && pnpm test:backend",
+    "cicd:frontend": "pnpm typecheck:frontend && pnpm test:frontend",
+    "cicd:check": "pnpm cicd:frontend && pnpm test:backend",
     "dev:backend": "cd backend && mvnw spring-boot:run -Dspring-boot.run.profiles=local",
     "build:backend": "cd backend && mvnw clean package -DskipTests",
     "test:backend": "cd backend && mvnw test",

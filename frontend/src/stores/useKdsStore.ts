@@ -55,7 +55,7 @@ export const useKdsStore = create<KdsState>((set, get) => ({
       get().syncWithBackend();
 
       // Subscribe topic cập nhật đơn bếp
-      client.subscribe('/topic/kds/orders', (message) => {
+      client.subscribe('/topic/kds/orders', (message: { body: string }) => {
         try {
           const payload = JSON.parse(message.body);
           if (payload.action === 'CREATE_ITEM') {
