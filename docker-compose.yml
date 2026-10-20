@@ -1,0 +1,77 @@
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Database (PostgreSQL 16)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: restaurant-os-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-restaurant_os}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d restaurant_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 2. Backend Core Service (Spring Boot 3 + Java 21)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: restaurant-os-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-restaurant_os}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET_KEY: ${JWT_SECRET:-super_secret_jwt_key_restaurant_os_2026_minimum_256_bits_length_here}
+    ports:
+      - "8080:8080"
+
+  # ----------------------------------------------------------------------------
+  # 3. AI Voice Microservice (FastAPI + Whisper)
+  # ----------------------------------------------------------------------------
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: restaurant-os-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+  # ----------------------------------------------------------------------------
+  # 4. Frontend Web Client (Next.js 15 App Router)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: restaurant-os-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080/api/v1
+      NEXT_PUBLIC_WS_ENDPOINT: ws://localhost:8080/ws
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+    driver: local

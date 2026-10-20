@@ -1,0 +1,35 @@
+{
+  "name": "restaurant-os-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise Restaurant Operating System Monorepo (Next.js 15, Spring Boot 3, FastAPI, Supabase PostgreSQL, STOMP)",
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build:frontend": "pnpm --filter frontend build",
+    "lint:frontend": "pnpm --filter frontend lint",
+    "typecheck:frontend": "pnpm --filter frontend typecheck",
+    "type-check:frontend": "pnpm --filter frontend typecheck",
+    "test:frontend": "pnpm --filter frontend test",
+    "test:all": "pnpm test:frontend && pnpm test:backend",
+    "dev:backend": "cd backend && mvnw spring-boot:run -Dspring-boot.run.profiles=local",
+    "build:backend": "cd backend && mvnw clean package -DskipTests",
+    "test:backend": "cd backend && mvnw test",
+    "dev:ai": "cd ai-service && python -m uvicorn main:app --reload --port 8000",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:build": "docker compose build",
+    "docker:logs": "docker compose logs -f"
+  },
+  "keywords": [
+    "restaurant-os",
+    "nextjs15",
+    "springboot3",
+    "fastapi",
+    "stomp",
+    "websocket",
+    "kds",
+    "pos"
+  ],
+  "author": "Restaurant OS Engineering Team",
+  "license": "MIT"
+}

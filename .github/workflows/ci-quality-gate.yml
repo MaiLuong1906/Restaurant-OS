@@ -1,0 +1,137 @@
+name: CI Quality Gate
+
+on:
+  pull_request:
+    branches: [ dev, main ]
+  push:
+    branches: [ dev, main ]
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Quét Rò Rỉ Bí Mật & Cấm Commit File Rác
+  # ----------------------------------------------------------------------------
+  security-audit:
+    name: 🔒 Quét Bí Mật & File Rác
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Kiểm tra cấm commit file .env
+        run: |
+          if find . -type f \( -name "*.env" -o -name ".env.local" -o -name ".env.production" \) ! -name ".env.example" | grep -q .; then
+            echo "❌ PHÁT HIỆN FILE .ENV BỊ COMMIT LÊN REPO! Vui lòng xóa ngay."
+            exit 1
+          fi
+          echo "✅ Không phát hiện file .env bị rò rỉ."
+
+      - name: Kiểm tra file lock rác của Word (~$*)
+        run: |
+          if find . -name "~\$*" | grep -q .; then
+            echo "❌ PHÁT HIỆN FILE KHÓA RÁC CỦA MICROSOFT WORD (~$*). Vui lòng xóa."
+            exit 1
+          fi
+          echo "✅ Không phát hiện file khóa Word rác."
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Kiểm Tra Chất Lượng Frontend (Typecheck, Lint & Vitest)
+  # ----------------------------------------------------------------------------
+  frontend-gate:
+    name: 🌐 Frontend Quality Gate (Next.js 15 + Vitest)
+    runs-on: ubuntu-latest
+    needs: security-audit
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cài đặt pnpm 12
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - name: Cài đặt Dependencies Monorepo
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: TypeScript Typecheck
+        run: pnpm --filter frontend typecheck
+
+      - name: Unit & Store Test (Vitest)
+        run: pnpm --filter frontend test
+
+      - name: Kiểm tra Next.js Production Build
+        run: pnpm --filter frontend build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+  # ----------------------------------------------------------------------------
+  # Job 3: Kiểm Tra Chất Lượng Backend (JUnit 5 + Maven Wrapper)
+  # ----------------------------------------------------------------------------
+  backend-gate:
+    name: ⚙️ Backend Quality Gate (Spring Boot 3 + JUnit 5)
+    runs-on: ubuntu-latest
+    needs: security-audit
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Java 21 (Temurin JDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Cấp quyền thực thi cho Maven Wrapper
+        run: chmod +x backend/mvnw
+
+      - name: Biên dịch & Chạy Kiểm Thử Tự Động (JUnit 5)
+        run: |
+          cd backend
+          ./mvnw clean test
+
+  # ----------------------------------------------------------------------------
+  # Job 4: Kiểm Tra Chất Lượng Microservice AI (Python 3.11)
+  # ----------------------------------------------------------------------------
+  ai-service-gate:
+    name: 🧠 AI Microservice Gate (Python 3.11)
+    runs-on: ubuntu-latest
+    needs: security-audit
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cài đặt Dependencies AI Service
+        run: |
+          cd ai-service
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Kiểm tra Cú Pháp & Biên Dịch Python
+        run: |
+          cd ai-service
+          python -m py_compile main.py
+          echo "✅ Cú pháp Python FastAPI hợp lệ."
+
+  # ----------------------------------------------------------------------------
+  # Job 5: Kiểm Tra Đóng Gói Toàn Diện Docker Compose
+  # ----------------------------------------------------------------------------
+  docker-build-gate:
+    name: 🐳 Docker Compose Packaging Gate
+    runs-on: ubuntu-latest
+    needs: [frontend-gate, backend-gate, ai-service-gate]
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Kiểm tra Build Toàn Bộ Images
+        run: docker compose build
