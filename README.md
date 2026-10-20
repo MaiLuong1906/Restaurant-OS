@@ -1,34 +1,29 @@
 <div align="center">
 
 # 🍽️ Restaurant OS
-### Hệ Điều Hành Quản Trị & Vận Hành Nhà Hàng F&B Toàn Diện Thế Hệ Mới
+**Hệ Điều Hành Quản Trị & Vận Hành Nhà Hàng F&B Toàn Diện Thế Hệ Mới**
 
-[![CI Quality Gate](https://github.com/restaurant-os/restaurant-os/actions/workflows/ci-quality-gate.yml/badge.svg)](https://github.com/restaurant-os/restaurant-os/actions/workflows/ci-quality-gate.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15.1-black?logo=next.js)](https://nextjs.org/)
-[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Spring Boot 3](https://img.shields.io/badge/Spring_Boot-3.3.4-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![Java 21](https://img.shields.io/badge/Java-21_LTS-ED8B00?logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![pnpm 12](https://img.shields.io/badge/pnpm-12.14-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
-[![Docker Compose](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![CI Quality Gate](https://github.com/MaiLuong1906/Restaurant-OS/actions/workflows/ci-quality-gate.yml/badge.svg)](https://github.com/MaiLuong1906/Restaurant-OS/actions/workflows/ci-quality-gate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?style=flat-square&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 
 <p align="center">
-  <b>Monorepo chuẩn mực Enterprise tích hợp: QR Table Order &bull; Bếp KDS Realtime (&lt;50ms) &bull; Thu Ngân POS &bull; Tự Động Định Lượng Kho BOM &bull; Trợ Lý Giọng Nói Whisper AI</b>
+  Nền tảng Monorepo tích hợp toàn diện: <b>QR Table Order</b> &bull; <b>Bếp KDS Realtime (&lt;50ms)</b> &bull; <b>Thu Ngân POS</b> &bull; <b>Định Lượng Kho BOM</b> &bull; <b>AI Whisper</b>
 </p>
 
 [Khởi Chạy Nhanh](#-khởi-chạy-nhanh-quick-start) &bull;
-[Kiến Trúc Hệ Thống](#-kiến-trúc-hệ-thống--cấu-trúc-monorepo) &bull;
-[Các Phân Hệ Nghiệp Vụ](#-các-phân-hệ-nghiệp-vụ-chính) &bull;
-[Tài Liệu Swagger & API](#-cổng-dịch-vụ--tài-liệu-api) &bull;
-[Bộ Quy Chuẩn & CI/CD](#-bộ-quy-chuẩn-kỹ-thuật--cicd-quality-gates) &bull;
+[Kiến Trúc](#-kiến-trúc-hệ-thống--cấu-trúc-monorepo) &bull;
+[Cổng Dịch Vụ & Swagger](#-cổng-dịch-vụ--tài-liệu-api) &bull;
+[Kiểm Thử](#-bộ-lệnh-kiểm-thử-toàn-diện-testing) &bull;
+[Quy Chuẩn Kỹ Thuật](#-bộ-quy-chuẩn-kỹ-thuật-bất-biến-invariants) &bull;
 [Đóng Góp](#-quy-trình-đóng-góp-contributing)
 
----
-
 </div>
+
+---
 
 ## 📌 Giới Thiệu Tổng Quan
 
