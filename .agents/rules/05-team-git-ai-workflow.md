@@ -64,7 +64,8 @@ Khi được giao nhiệm vụ xây dựng một tính năng (Feature) hoặc Us
 Khi được lập trình viên yêu cầu hỗ trợ tạo nhánh hoặc commit mã nguồn:
 
 ### 4.1. Quy ước tạo nhánh (Bắt buộc từ nhánh `dev`):
-- Nhánh gốc duy nhất để tách nhánh: **`dev`** (không dùng `main`, không dùng tên cũ `develop`).
+- **Vị trí nhánh làm việc cốt lõi:** **Phần lớn thời gian (95% vòng đời dự án)**, toàn bộ lập trình viên và AI đều làm việc trên và xuất phát từ nhánh **`dev`**. Nhánh `main` chỉ dành cho Production Releases.
+- Nhánh gốc duy nhất để tách nhánh: **`dev`** (không tách từ `main`, không dùng tên cũ `develop`).
 - Định dạng bắt buộc: `<tiền-tố>/<tên-thành-viên>/<loại>-<tên-tính-năng>`
   - Nhánh Frontend: `fe/<tên-thành-viên>/feature-<tên>` hoặc `fe/<tên-thành-viên>/fix-<tên>`
   - Nhánh Backend: `be/<tên-thành-viên>/feature-<tên>` hoặc `be/<tên-thành-viên>/fix-<tên>`

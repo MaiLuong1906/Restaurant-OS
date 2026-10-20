@@ -8,7 +8,7 @@ Chào mừng bạn đến với Monorepo của dự án **Restaurant OS**. File 
 
 - **AI KHÔNG ĐƯỢC TỰ Ý HÀNH ĐỘNG:** Bắt buộc phải giải thích kế hoạch và **hỏi ý kiến xác nhận của người dùng trước** khi tạo nhánh, commit, sửa file cấu hình hoặc chạy lệnh terminal nhạy cảm.
 - **Tuân thủ vòng đời Agile bắt buộc:** Khi nhận task, AI phải đi qua 4 bước: (1) Trích xuất Acceptance Criteria (AC) từ `doc/` $\rightarrow$ (2) Lập plan chia nhỏ Sub-tasks bằng `/plan` chờ duyệt $\rightarrow$ (3) Thực thi từng phần nhỏ (Vertical Slicing) $\rightarrow$ (4) Tự nghiệm thu theo Definition of Done (DoD) & tạo PR.
-- **Quy tắc nhánh Git:** Mọi nhánh làm việc **bắt buộc phải tách từ nhánh `dev`**, định dạng bắt buộc: `<tiền-tố>/<tên-thành-viên>/<loại>-<tên>` (ví dụ: `fe/duy/feature-sprint1-menu-qr`, `be/nam/feature-sprint1-order-bom`).
+- **Vị trí nhánh làm việc chính thức (`dev`):** **Phần lớn thời gian (95%) AI và lập trình viên làm việc trên và xuất phát từ nhánh `dev`**. Nhánh `main` chỉ dành cho Production Release. Mọi nhánh tính năng **bắt buộc phải tách từ nhánh `dev`**, định dạng: `<tiền-tố>/<tên-thành-viên>/<loại>-<tên>` (ví dụ: `fe/duy/feature-sprint1-menu-qr`, `be/nam/feature-sprint1-order-bom`).
 - **Cấm file rác & bí mật:** Tuyệt đối không commit file `.env`, file ghi chú cá nhân, file `.md`, `.doc` rác, và không tự ý sửa file cấu hình hệ thống (`package.json`, `pom.xml`, `.agents/`).
 - **Mô tả Pull Request:** Mọi PR bắt buộc phải viết mô tả chi tiết theo 4 phần chuẩn trong [CONTRIBUTING.md](file:///d:/my-project/restaurant-os/CONTRIBUTING.md).
 - **Cấu trúc Monorepo:** `frontend/` (Next.js 15 App Router + Tailwind v4 + Zustand), `backend/` (Spring Boot 3 + Java 21 + Flyway), `ai-service/` (FastAPI + Whisper).

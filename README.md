@@ -231,6 +231,7 @@ Khi merge vào nhánh `main` hoặc gắn tag phát hành `v*.*.*`, pipeline [.g
 ## 🤝 Quy Trình Đóng Góp (Contributing)
 
 Chúng tôi luôn chào đón mọi sự đóng góp! Vui lòng đọc kỹ tài liệu [CONTRIBUTING.md](file:///d:/my-project/restaurant-os/CONTRIBUTING.md) để nắm rõ:
+- 🌿 **Vị trí làm việc chính (`dev`):** Hầu hết thời gian (95% vòng đời dự án), các lập trình viên sẽ làm việc và tách nhánh từ nhánh **`dev`**. Nhánh `main` chỉ dành cho các phiên bản phát hành chính thức (Production Releases).
 - Quy chuẩn đặt tên nhánh: `<tiền-tố>/<tên-thành-viên>/<loại>-<tên>` (Ví dụ: `fe/duy/feature-sprint1-menu-qr`, `be/nam/feature-sprint1-order-bom`).
 - Quy ước commit chuẩn Conventional Commits (`feat:`, `fix:`, `refactor:`, `perf:`).
 - Mẫu mô tả Pull Request bắt buộc 4 phần (Mô tả, Phạm vi ảnh hưởng, Bằng chứng kiểm thử, Checklist tự nghiệm thu).
