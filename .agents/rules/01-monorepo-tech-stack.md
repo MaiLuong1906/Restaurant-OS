@@ -21,6 +21,7 @@ Dự án được cấu trúc theo mô hình **Monorepo** phục vụ hệ thố
 - **Quản lý trạng thái (State Management):** **Zustand** theo mô hình Slice pattern.
 - **Kiểm thử Unit & Store (Testing):** **Vitest** kết hợp `@testing-library/react`.
 - **Hiệu ứng chuyển động (Animation):** **Framer Motion** cho tương tác vi mô và hiệu ứng xoay 3D thẻ món.
+- **Đồ họa 3D (POS/Nội bộ):** **Three.js** kết hợp **@react-three/fiber** (v9) và **@react-three/drei** (v10) cho sơ đồ bàn POS; bắt buộc nạp qua `next/dynamic` (`ssr: false`), nghiêm cấm kéo vào bundle route khách hàng.
 - **Realtime Client:** `@stomp/stompjs` + `sockjs-client` cho giao thức STOMP qua WebSocket (cam kết độ trễ $<50\text{ms}$).
 
 ### Các điều cấm tuyệt đối (Frontend):
