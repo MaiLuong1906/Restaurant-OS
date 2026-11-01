@@ -11,9 +11,10 @@ Kịch bản này hướng dẫn quy trình tạo, kiểm tra và chạy script 
    git checkout dev && git pull origin dev
    git checkout -b be/nam/feature-db-schema-vX
    ```
-2. **Kiểm tra phiên bản Flyway hiện tại:**
-   - Liệt kê các file trong `backend/src/main/resources/db/migration/`.
-   - Xác định phiên bản tiếp theo: ví dụ `V1__init.sql` $\rightarrow$ tạo tiếp `V2__add_orders_and_bom.sql`.
+2. **Sinh file migration mới chống trùng:**
+   - Chạy lệnh CLI sinh file: `pnpm db:migration:create <tên_mô_tả>` (Ví dụ: `pnpm db:migration:create add_kds_routing`).
+   - Hệ thống tự động tạo file `V<YYYYMMDDHHmmss>__<tên_mô_tả>.sql` trong `backend/src/main/resources/db/migration/`.
+   - Tránh 100% rủi ro xung đột version khi nhiều lập trình viên cùng tạo migration ở các nhánh khác nhau.
 
 ---
 

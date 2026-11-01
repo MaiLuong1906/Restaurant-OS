@@ -74,6 +74,15 @@ pnpm dev:ai
 # Hoặc: cd ai-service && uvicorn main:app --reload --port 8000
 ```
 
+### Cách 3: Quản Lý Database Migrations (Flyway)
+Khi thêm bảng, cột mới hoặc sửa đổi Schema PostgreSQL, để **tránh xung đột số thứ tự version giữa các thành viên khi merge nhánh**, bắt buộc sử dụng lệnh tự động sinh file kèm Timestamp:
+```bash
+# Tự động sinh file migration Flyway mới kèm Timestamp chống trùng
+pnpm db:migration:create <tên_mô_tả>
+# Ví dụ: pnpm db:migration:create add_kitchen_printer_table
+```
+File SQL mới sẽ tự động được tạo tại `backend/src/main/resources/db/migration/` với định dạng `V<YYYYMMDDHHmmss>__<tên_mô_tả>.sql` sẵn sàng để viết câu lệnh DDL.
+
 ---
 
 ## 2. Quy Trình Phát Triển Tính Năng Chuẩn Agile / Scrum (Feature Lifecycle)
