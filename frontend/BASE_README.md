@@ -103,7 +103,6 @@
 
 | URL | Nội dung |
 |---|---|
-| `/demo` | Hub liệt kê tất cả demo. |
 | `/customer-menu` | Menu khách: tab danh mục, thẻ món, bottom-sheet chi tiết món, thanh giỏ hàng. |
 | `/kds-board` | Bảng KDS: 3 cột Chờ nấu / Đang nấu / Xong, nút kds 64px, chỉ báo SLA. |
 | `/pos-demo` | POS: sơ đồ bàn CSS grid + rail chi tiết bàn. (Tên `/pos-demo` để tránh đụng route thật `/pos`.) |
