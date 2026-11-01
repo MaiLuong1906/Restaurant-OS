@@ -1,41 +1,152 @@
+@import url("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #fff7ed;
-  --color-primary-100: #ffedd5;
-  --color-primary-500: #f97316;
-  --color-primary-600: #ea580c;
-  --color-primary-700: #c2410c;
+  /* THEME QUYẾT ĐỊNH NGÀY 2026-11-01 (nhánh fe/huy/feature-ui-foundation), BẢN v2:
+     "Warm Earth Organic" THAY THẾ theme "Vietnamese Gastronomic OS" của Stitch ở bản v1.
+     Thay đổi có chủ đích, không lặng lẽ. Token nằm ở đúng block @theme này nên muốn
+     revert chỉ cần sửa lại block này.
+     NGOẠI LỆ KDS: shell/board KDS GIỮ nền tối #0B0F14 (đọc bếp), nhưng accent/nút
+     chuyển sang terracotta Warm Earth. Xem BASE_README.md. */
+  --font-display: "Lora", Georgia, "Times New Roman", serif;
+  --font-sans: "Source Sans 3", "Source Sans Pro", ui-sans-system, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
+  /* Cream backgrounds */
+  --color-cream: #faf7f2;
+  --color-cream-dark: #f8f4ec;
+  --color-story: #fdfcfa;
+
+  /* Primary: terracotta #C4714A, thang 50–900 suy ra từ màu gốc (500 = đúng màu gốc) */
+  --color-primary-50: #fbf3ef;
+  --color-primary-100: #f6e4da;
+  --color-primary-200: #ecc6b1;
+  --color-primary-300: #dfa284;
+  --color-primary-400: #d2825c;
+  --color-primary-500: #c4714a;
+  --color-primary-600: #a85a38;
+  --color-primary-700: #8a4a2f;
+  --color-primary-800: #713e28;
+  --color-primary-900: #5e3524;
+
+  /* Secondary: warm brown #6B4226 (600 = đúng màu gốc) + thang nâu */
+  --color-secondary: #6b4226;
+  --color-brown-50: #f7f1ea;
+  --color-brown-100: #ede0d1;
+  --color-brown-200: #d8bfa2;
+  --color-brown-300: #be9669;
+  --color-brown-400: #96714a;
+  --color-brown-500: #7a5535;
+  --color-brown-600: #6b4226;
+  --color-brown-700: #57371f;
+  --color-brown-800: #472e1b;
+  --color-brown-900: #3b2718;
+
+  /* Accent: sage #8FAF8F (500 = đúng màu gốc) */
+  --color-sage-100: #e7eee5;
+  --color-sage-200: #cfdfcc;
+  --color-sage-500: #8faf8f;
+  --color-sage-700: #5f7f5e;
+
+  /* Warm neutrals (thay cho slate xám lạnh) */
+  --color-sand-100: #f8f4ec;
+  --color-sand-200: #ede6d8;
+  --color-sand-300: #dccfb8;
+  --color-sand-400: #c9bca6;
+  --color-sand-500: #8a7a68;
+  --color-sand-600: #6b5d4e;
+
+  /* Ink: chữ chính (nâu đậm ấm) */
+  --color-ink: #33241a;
+  --color-muted: #7a6a5c;
+
+  /* Surface/Card */
+  --color-surface: #ffffff;
+
+  /* Danger (đỏ ấm, không dùng đỏ lạnh mặc định) */
+  --color-danger-200: #f3d9d0;
+  --color-danger-500: #bc4b32;
+  --color-danger-600: #9c3a26;
+
+  /* Honey: vàng ấm cho trạng thái "đang dùng" / cảnh báo nhẹ */
+  --color-honey-500: #d9a441;
+
+  /* Trạng thái bàn (dùng chung POS / KDS / dashboard) — tông ấm, vẫn phân biệt rõ */
+  --color-table-empty: #5f7f5e;
+  --color-table-inuse: #d9a441;
+  --color-table-overdue: #bc4b32;
+  --color-table-cleaning: #9a8f80;
+
+  /* KDS dark theme (GIỮ nền tối; accent chuyển sang terracotta ấm) */
   --color-kds-bg: #0b0f14;
   --color-kds-surface: #121820;
   --color-kds-card: #1a222d;
   --color-kds-border: #263342;
   --color-kds-text: #f1f5f9;
   --color-kds-muted: #94a3b8;
-  --color-kds-accent: #22c55e;
-  --color-kds-warning: #f59e0b;
-  --color-kds-danger: #ef4444;
+  --color-kds-accent: #d2825c;
+  --color-kds-warning: #d9a441;
+  --color-kds-danger: #d95f43;
+
+  /* Typography scale (clamp) — dùng kèm font-display cho heading, font-sans cho body */
+  --text-display: clamp(2.5rem, 6vw, 5rem);
+  --text-display--line-height: 1.1;
+  --text-h1: clamp(1.75rem, 4vw, 3rem);
+  --text-h1--line-height: 1.2;
+  --text-h2: clamp(1.25rem, 2.5vw, 2rem);
+  --text-h2--line-height: 1.3;
+  --text-h3: clamp(1rem, 2vw, 1.5rem);
+  --text-h3--line-height: 1.3;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5;
+
+  /* Shadows: CHỈ tông nâu ấm rgba(100,60,20,...) — cấm shadow xám/đen */
+  --shadow-warm-sm: 0 2px 8px rgba(100, 60, 20, 0.08);
+  --shadow-warm: 0 4px 16px rgba(100, 60, 20, 0.1);
+  --shadow-warm-lg: 0 12px 32px rgba(100, 60, 20, 0.14);
+
+  /* Radius: card 16px, nút playful, blob hữu cơ */
+  --radius-card: 16px;
+  --radius-playful: 24px 24px 2px 24px;
+  --radius-blob: 60% 40% 55% 45% / 50% 60% 40% 50%;
+
+  /* Nhấp nháy cho trạng thái quá SLA (dùng class animate-blink) */
+  --animate-blink: blink 1s ease-in-out infinite;
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
 }
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0b0f14;
-    --foreground: #f8fafc;
-  }
+  --background: #faf7f2;
+  --foreground: #33241a;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Noise texture phủ toàn bộ body: SVG feTurbulence, opacity 0.03, không chặn click */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--color-primary-500);
+  color: #ffffff;
 }
 
 /* Ngân sách hiệu năng: GPU-accelerated micro interactions */
@@ -44,7 +155,7 @@ body {
   will-change: transform, opacity;
 }
 
-/* Thanh cuộn tối giản cho KDS và POS */
+/* Thanh cuộn tối giản tông ấm cho KDS và POS */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -55,10 +166,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(107, 66, 38, 0.3);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
+  background: rgba(107, 66, 38, 0.5);
 }
