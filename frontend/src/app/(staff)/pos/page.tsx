@@ -1,9 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { formatVND } from '@/lib/utils';
-import { CreditCard, QrCode, ArrowLeft, CheckCircle2, UserCheck, Receipt, DollarSign } from 'lucide-react';
+import { CreditCard, QrCode, ArrowLeft, CheckCircle2, UserCheck, Receipt, DollarSign, Box, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
+import { FloorMap2D } from '@/components/pos/FloorMap2D';
+import { isWebGLAvailable } from '@/components/3d/isWebGLAvailable';
+
+const FloorMap3D = dynamic(() => import('@/components/3d/FloorMap3D'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[400px] sm:h-[480px] rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-center text-slate-400">
+      <div className="flex flex-col items-center space-y-2">
+        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs">Đang tải sơ đồ bàn 3D...</span>
+      </div>
+    </div>
+  ),
+});
 
 interface PosTable {
   id: string;
@@ -27,6 +42,19 @@ export default function PosCashierPage() {
   const [tables, setTables] = useState<PosTable[]>(TABLES_DATA);
   const [selectedTable, setSelectedTable] = useState<PosTable>(TABLES_DATA[0]);
   const [paidSuccess, setPaidSuccess] = useState(false);
+  const [viewMode, setViewMode] = useState<'3D' | '2D'>('3D');
+  const [webGlSupported, setWebGlSupported] = useState(true);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    const isWgl = isWebGLAvailable();
+    setWebGlSupported(isWgl);
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduceMotion(mediaQuery.matches);
+    if (!isWgl || mediaQuery.matches) {
+      setViewMode('2D');
+    }
+  }, []);
 
   const handleCheckout = () => {
     setPaidSuccess(true);
@@ -67,12 +95,12 @@ export default function PosCashierPage() {
             <span className="text-slate-400">Bàn trống</span>
           </div>
           <div className="flex items-center space-x-1.5">
-            <span className="h-3 w-3 rounded-md bg-orange-500/20 border border-orange-500/40" />
+            <span className="h-3 w-3 rounded-md bg-amber-500/20 border border-amber-500/40" />
             <span className="text-slate-400">Đang dùng bữa</span>
           </div>
           <div className="flex items-center space-x-1.5">
-            <span className="h-3 w-3 rounded-md bg-purple-500/20 border border-purple-500/40" />
-            <span className="text-slate-400">Chờ thanh toán</span>
+            <span className="h-3 w-3 rounded-md bg-red-500/20 border border-red-500/40" />
+            <span className="text-slate-400">Chờ thanh toán / Trễ SLA</span>
           </div>
         </div>
       </header>
@@ -81,45 +109,56 @@ export default function PosCashierPage() {
       <div className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
         {/* Table Map (2 cols) */}
         <div className="lg:col-span-2 flex flex-col rounded-2xl bg-slate-900/50 border border-slate-800 p-6">
-          <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center space-x-2">
-            <UserCheck className="h-4 w-4 text-blue-400" />
-            <span>Sơ Đồ Bàn Khu Vực Tầng 1</span>
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
+              <UserCheck className="h-4 w-4 text-blue-400" />
+              <span>Sơ Đồ Bàn Khu Vực Tầng 1</span>
+            </h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {tables.map((table) => {
-              const isSelected = selectedTable.id === table.id;
-              const statusStyles = {
-                IDLE: 'border-slate-800 bg-slate-900/40 hover:border-slate-700 text-slate-400',
-                OCCUPIED: 'border-orange-500/40 bg-orange-950/20 text-orange-300',
-                BILLING: 'border-purple-500/50 bg-purple-950/30 text-purple-200 animate-pulse',
-              }[table.status];
-
-              return (
+            {webGlSupported && !reduceMotion && (
+              <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
                 <button
-                  key={table.id}
-                  onClick={() => setSelectedTable(table)}
-                  className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all duration-200 ${statusStyles} ${
-                    isSelected ? 'ring-2 ring-blue-500 shadow-xl' : ''
+                  type="button"
+                  onClick={() => setViewMode('3D')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                    viewMode === '3D'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-base text-white">{table.number}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-400">
-                      {table.capacity} chỗ
-                    </span>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                    <span>{table.itemCount > 0 ? `${table.itemCount} món` : 'Trống'}</span>
-                    <span className="font-bold text-white">
-                      {table.currentTotal > 0 ? formatVND(table.currentTotal) : '---'}
-                    </span>
-                  </div>
+                  <Box className="h-3.5 w-3.5" />
+                  <span>Sơ đồ 3D</span>
                 </button>
-              );
-            })}
+                <button
+                  type="button"
+                  onClick={() => setViewMode('2D')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                    viewMode === '2D'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <span>Lưới 2D</span>
+                </button>
+              </div>
+            )}
           </div>
+
+          {viewMode === '3D' && webGlSupported && !reduceMotion ? (
+            <FloorMap3D
+              tables={tables}
+              selectedTableId={selectedTable.id}
+              onSelectTable={(table) => setSelectedTable(table as PosTable)}
+            />
+          ) : (
+            <FloorMap2D
+              tables={tables}
+              selectedTableId={selectedTable.id}
+              onSelectTable={(table) => setSelectedTable(table as PosTable)}
+              reduceMotion={reduceMotion}
+            />
+          )}
         </div>
 
         {/* Invoice & Payment Panel */}

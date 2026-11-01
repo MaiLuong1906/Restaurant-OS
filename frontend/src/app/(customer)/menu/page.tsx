@@ -6,6 +6,7 @@ import { formatVND, generateIdempotencyKey } from '@/lib/utils';
 import { Dish, Category } from '@/types';
 import { ShoppingBag, Plus, Minus, Check, ArrowLeft, Utensils, Coffee, Salad, Cake } from 'lucide-react';
 import Link from 'next/link';
+import { TiltCard } from '@/components/ui/TiltCard';
 
 const SAMPLE_DISHES: Dish[] = [
   {
@@ -147,13 +148,10 @@ export default function MenuCustomerPage() {
       <div className="px-4 py-2 grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredDishes.map((dish) => {
           return (
-            <div
+            <TiltCard
               key={dish.id}
+              maxTilt={7}
               className="flex items-center p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all duration-200"
-              style={{
-                // Ngân sách hiệu năng: GPU acceleration
-                transform: 'translateZ(0)',
-              }}
             >
               <div className="h-20 w-20 rounded-xl bg-slate-800 overflow-hidden flex-shrink-0 relative">
                 {dish.imageUrl ? (
@@ -189,7 +187,7 @@ export default function MenuCustomerPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </TiltCard>
           );
         })}
       </div>
