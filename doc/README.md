@@ -14,6 +14,7 @@ Chào mừng toàn thể đội ngũ phát triển (**Product Owner, BA, Tech Le
 | Tài liệu | Đường dẫn | Định dạng | Mục đích tra cứu & Áp dụng |
 | :--- | :--- | :--- | :--- |
 | **Bản Đặc Tả Master Use Cases (Chính thức)** | [Restaurant_OS_Master_UseCases.md](file:///d:/my-project/restaurant-os/doc/Restaurant_OS_Master_UseCases.md) | Markdown | **Tài liệu nghiệp vụ cốt lõi (SSOT):** Đặc tả chi tiết từng Use Case cho cả 6 tác nhân (Pre-conditions, Main Flow, Exceptions, Post-conditions, API & STOMP endpoint). |
+| **Báo Cáo Thiết Kế Database (Master DB Report)** | [Restaurant_OS_Database_Design_Report.md](file:///d:/my-project/restaurant-os/doc/Restaurant_OS_Database_Design_Report.md) | Markdown | **Báo cáo kỹ thuật CSDL toàn diện:** Báo cáo chính thức REP-ROS-DB-01, 28 thực thể phân 7 Module, Sơ đồ ERD, Sổ cái kho kép BOM, Trạm KDS và tối ưu hóa hiệu năng PostgreSQL 16. |
 
 *(Lưu ý: Tài liệu sơ đồ hình vẽ draw.io / diagram sẽ được nhóm cập nhật và bổ sung vào thư mục này sau khi hoàn thiện đồ họa).*
 
