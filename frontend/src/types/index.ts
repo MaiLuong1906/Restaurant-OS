@@ -40,6 +40,8 @@ export type OrderItemStatus = 'WAITING' | 'COOKING' | 'READY' | 'SERVED' | 'REJE
 export interface OrderItem {
   id: string;
   orderId: string;
+  tableId?: string;
+  tableNo?: string; // Số bàn hiển thị nổi bật trên thẻ KDS
   dishId: string;
   dishName: string;
   quantity: number;
@@ -49,6 +51,10 @@ export interface OrderItem {
     selected: string;
     extraPrice: number;
   }[];
+  notes?: string; // Ghi chú nấu nướng (ít ngọt, không cay...)
+  allergy?: string; // Cảnh báo dị ứng thực phẩm
+  slaDeadline?: string; // Mốc thời gian trễ SLA
+  stationId?: string; // Trạm bếp phụ trách
   status: OrderItemStatus;
   createdAt: string;
 }

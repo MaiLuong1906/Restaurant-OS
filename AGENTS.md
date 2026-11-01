@@ -71,6 +71,6 @@ Khi thực hiện các chuỗi tác vụ phức tạp, AI và lập trình viên
 
 👉 **[Thư Viện Tài Liệu Dự Án (doc/README.md)](file:///d:/my-project/restaurant-os/doc/README.md)**
 
-Khi cần tra cứu nghiệp vụ hoặc thiết kế, AI tra cứu mục lục tại file trên để đọc tài liệu chuyên biệt tương ứng (Kiến trúc v1.1, Sprint 1 Khách hàng, Màn hình nội bộ KDS/POS, Thiết kế Database).
+Khi cần tra cứu nghiệp vụ hoặc thiết kế, AI tra cứu mục lục tại file trên để đọc tài liệu đặc tả Use Cases chính thức ([Restaurant_OS_Master_UseCases.md](file:///d:/my-project/restaurant-os/doc/Restaurant_OS_Master_UseCases.md)).
 
 - **Quy trình làm việc nhóm & đóng góp code cho Developer:** [CONTRIBUTING.md](file:///d:/my-project/restaurant-os/CONTRIBUTING.md)

@@ -84,5 +84,5 @@ Khi được lập trình viên yêu cầu hỗ trợ tạo nhánh hoặc commit
 ---
 
 ## 5. Hàng Rào Chống Ảo Giác Dữ Liệu (Zero-Hallucination)
-- **CẤM** tự bịa đặt cột trong Database, thuộc tính JSONB hoặc REST endpoint không có trong thiết kế [Restaurant_OS_Tai_Lieu_Du_An_v1.1.docx](file:///d:/my-project/restaurant-os/doc/Restaurant_OS_Tai_Lieu_Du_An_v1.1.docx).
+- **CẤM** tự bịa đặt cột trong Database, thuộc tính JSONB hoặc REST endpoint không có trong thiết kế [Restaurant_OS_Master_UseCases.md](file:///d:/my-project/restaurant-os/doc/Restaurant_OS_Master_UseCases.md).
 - Nếu phát hiện thiếu thông tin, AI phải hỏi lại người dùng để làm rõ thay vì tự giả định.
