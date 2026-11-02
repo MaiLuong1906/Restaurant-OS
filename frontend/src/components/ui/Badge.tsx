@@ -2,8 +2,8 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Nhãn trạng thái dùng chung. Màu lấy từ token Warm Earth trong @theme:
- * trạng thái bàn dùng --color-table-*, SLA dùng sage/honey/danger ấm.
+ * Nhãn trạng thái dùng chung (v6). default = trung tính (ink), KHÔNG đỏ brand;
+ * đỏ chỉ xuất hiện ở sla-overdue/danger (cảnh báo) và trạng thái bàn quá SLA.
  */
 export type BadgeVariant =
   | 'table-empty'
@@ -32,7 +32,7 @@ const variants: Record<BadgeVariant, string> = {
   'sla-ok': 'bg-sage-700 text-white',
   'sla-warning': 'bg-honey-500 text-brown-900',
   'sla-overdue': 'bg-danger-500 text-white',
-  default: 'bg-primary-500 text-white',
+  default: 'bg-ops-ink text-white',
   success: 'bg-sage-700 text-white',
   warning: 'bg-honey-500 text-brown-900',
   danger: 'bg-danger-500 text-white',

@@ -32,7 +32,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
       >
         <div className="mx-auto h-1.5 w-12 rounded-full bg-sand-300" aria-hidden="true" />
         <div className="flex items-center justify-between gap-4">
-          {title ? <h2 className="font-display text-h3 font-semibold text-ink">{title}</h2> : <span />}
+          {title ? <h2 className="text-h3 font-semibold text-ink">{title}</h2> : <span />}
           <button
             type="button"
             aria-label="Đóng"

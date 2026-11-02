@@ -12,8 +12,9 @@ export interface KdsLayoutProps {
 }
 
 /**
- * Khung KDS — NGOẠI LỆ nền tối: giữ nền tối theo token kds-bg để đọc được trong bếp,
- * nhưng nút/accent đã chuyển sang terracotta Warm Earth qua Button/Button token.
+ * Khung KDS (v7.1) — nền sáng đồng bộ với web: nền giấy #F5F2EA, card trắng,
+ * font sans Be Vietnam Pro (font-ops). Ngoại lệ nền tối #0B0F14 ở v6/v7 đã bỏ
+ * theo quyết định của user: bếp cũng không dùng màu đen nữa.
  * Mọi nút hành động trong KDS dùng size "kds" (>= 64px).
  */
 export function KdsLayout({
@@ -25,10 +26,14 @@ export function KdsLayout({
   className,
 }: KdsLayoutProps) {
   return (
-    <div className={cn('flex min-h-screen flex-col bg-kds-bg text-kds-text', className)}>
+    <div className={cn('flex min-h-screen flex-col bg-kds-bg font-ops text-kds-text', className)}>
       <TopBar
-        dark
-        left={<span className="text-base font-bold">{title ?? 'KDS Bếp'}</span>}
+        left={
+          <span className="flex items-center gap-2">
+            <span className="shrink-0 text-base font-bold">{title ?? 'KDS Bếp'}</span>
+            <span className="shrink-0 border border-kds-border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-kds-muted">Demo</span>
+          </span>
+        }
         center={stationFilter}
         right={
           <>

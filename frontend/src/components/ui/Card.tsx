@@ -2,7 +2,8 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Thẻ nội dung dùng chung. Nền trắng, shadow nâu ấm, radius 16px, padding 24px.
+ * Thẻ nội dung dùng chung (v6). Nền trắng, bóng nhẹ 0 1px 3px, radius 8px, padding 24px.
+ * Tiêu đề dùng sans (Be Vietnam Pro) — serif chỉ còn ở tiêu đề website khách.
  * Hover nhấc lên nhẹ. Không đặt chiều cao cố định — nội dung tự giãn dọc.
  * Khoảng cách trong thẻ dùng gap 16px (flex column), không dùng margin rời rạc.
  */
@@ -20,7 +21,7 @@ export function Card({ title, description, children, className, ...props }: Card
       )}
       {...props}
     >
-      {title ? <h3 className="font-display text-h3 font-semibold text-ink">{title}</h3> : null}
+      {title ? <h3 className="text-h3 font-semibold text-ink">{title}</h3> : null}
       {description ? <p className="text-small text-sand-600">{description}</p> : null}
       <div>{children}</div>
     </div>

@@ -1,93 +1,130 @@
-@import url("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap");
 @import "tailwindcss";
 
 @theme {
-  /* THEME QUYẾT ĐỊNH NGÀY 2026-11-01 (nhánh fe/huy/feature-ui-foundation), BẢN v2:
-     "Warm Earth Organic" THAY THẾ theme "Vietnamese Gastronomic OS" của Stitch ở bản v1.
-     Thay đổi có chủ đích, không lặng lẽ. Token nằm ở đúng block @theme này nên muốn
-     revert chỉ cần sửa lại block này.
-     NGOẠI LỆ KDS: shell/board KDS GIỮ nền tối #0B0F14 (đọc bếp), nhưng accent/nút
-     chuyển sang terracotta Warm Earth. Xem BASE_README.md. */
-  --font-display: "Lora", Georgia, "Times New Roman", serif;
-  --font-sans: "Source Sans 3", "Source Sans Pro", ui-sans-system, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* DESIGN SYSTEM v6 (2026-11-02, nhánh fe/huy/feature-ui-foundation):
+     MỘT hệ thống cho mọi trang, thay cho 3 "sản phẩm" rời ở v5:
+     - Font: CHỈ 2 họ — Playfair Display cho tiêu đề website khách, Be Vietnam Pro
+       cho mọi thứ còn lại (body website, toàn bộ app vận hành, menu khách, staff).
+       Số luôn lining-nums + tabular-nums (class .ops-nums).
+     - Màu: MỘT đỏ brand #8C1D2C (nút chính duy nhất), MỘT đỏ cảnh báo #D14B3A
+       (chỉ lỗi / quá SLA / hủy). Nút phụ = viền xám + chữ ink, KHÔNG viền đỏ.
+       Sidebar active, tab đang chọn, badge vai trò = trung tính, không đỏ.
+       Vàng đồng (bronze) bị XÓA khỏi mọi trang.
+     - Nền: website kem #F5F2EA; app vận hành xám ấm rất nhạt #F6F4F0.
+     - Radius thống nhất 8px, bóng nhẹ 0 1px 3px rgba(0,0,0,.08).
+     - KDS là NGOẠI LỆ duy nhất: giữ nền tối #0B0F14, nút chính vẫn brand #8C1D2C
+       (đủ tương phản với chữ trắng), chữ nhấn trên nền tối dùng tint sáng của brand.
+     Cảm hứng website vẫn từ bombay-palace.co.uk (chỉ style, không chép ảnh/logo/văn
+     bản). Xem BASE_README.md. */
 
-  /* Cream backgrounds */
-  --color-cream: #faf7f2;
-  --color-cream-dark: #f8f4ec;
-  --color-story: #fdfcfa;
+  /* Font: nạp bằng next/font/google trong layout.tsx (self-hosted, không @import).
+     --font-display map từ biến --font-playfair, --font-sans và --font-ops cùng map
+     từ biến --font-be-vietnam. Tên biến PHẢI khác tên token để tránh tự tham chiếu. */
+  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-be-vietnam), "Be Vietnam Pro", Inter, ui-sans-system, system-ui, sans-serif;
+  --font-ops: var(--font-be-vietnam), "Be Vietnam Pro", Inter, ui-sans-system, system-ui, sans-serif;
+  --color-ops-bg: #f6f4f0;
+  --color-ops-border: #e9e4dc;
+  --color-ops-ink: #2b2118;
+  --color-ops-muted: #7a6a58;
+  --color-ops-brand: #8c1d2c;
+  --color-ops-brand-dark: #6f1623;
+  --color-ops-brand-light: #f7e8ea;
+  --color-ops-alert: #d14b3a;
+  --color-ops-tint-empty: #eaf2eb;
+  --color-ops-tint-inuse: #fdf3d7;
+  --color-ops-tint-overdue: #fdeae6;
+  --color-ops-tint-cleaning: #f0ede8;
 
-  /* Primary: terracotta #C4714A, thang 50–900 suy ra từ màu gốc (500 = đúng màu gốc) */
-  --color-primary-50: #fbf3ef;
-  --color-primary-100: #f6e4da;
-  --color-primary-200: #ecc6b1;
-  --color-primary-300: #dfa284;
-  --color-primary-400: #d2825c;
-  --color-primary-500: #c4714a;
-  --color-primary-600: #a85a38;
-  --color-primary-700: #8a4a2f;
-  --color-primary-800: #713e28;
-  --color-primary-900: #5e3524;
+  /* Paper backgrounds (giấy sáng, tông be) */
+  --color-cream: #f5f2ea;
+  --color-cream-dark: #ece7da;
+  --color-story: #faf8f3;
 
-  /* Secondary: warm brown #6B4226 (600 = đúng màu gốc) + thang nâu */
-  --color-secondary: #6b4226;
-  --color-brown-50: #f7f1ea;
-  --color-brown-100: #ede0d1;
-  --color-brown-200: #d8bfa2;
-  --color-brown-300: #be9669;
-  --color-brown-400: #96714a;
-  --color-brown-500: #7a5535;
-  --color-brown-600: #6b4226;
-  --color-brown-700: #57371f;
-  --color-brown-800: #472e1b;
-  --color-brown-900: #3b2718;
+  /* Primary = brand duy nhất #8C1D2C (v6): thang xây quanh brand, không còn đỏ gạch #C1272D. */
+  --color-primary-50: #fbedef;
+  --color-primary-100: #f5d2d6;
+  --color-primary-200: #eaa5ad;
+  --color-primary-300: #c65a68;
+  --color-primary-400: #a62e3e;
+  --color-primary-500: #8c1d2c;
+  --color-primary-600: #6f1623;
+  --color-primary-700: #591119;
+  --color-primary-800: #4a0e17;
+  --color-primary-900: #3d0b13;
 
-  /* Accent: sage #8FAF8F (500 = đúng màu gốc) */
+  /* Secondary: đen espresso (dùng cho các mảng tối, thay nâu ấm của v2) */
+  --color-secondary: #1a1713;
+
+  /* Espresso scale (thay thang nâu ấm v2; dùng cho header tối, backdrop, chữ đậm) */
+  --color-brown-50: #f4f1ec;
+  --color-brown-100: #e7e1d6;
+  --color-brown-200: #d0c6b3;
+  --color-brown-300: #b4a58c;
+  --color-brown-400: #8e7e64;
+  --color-brown-500: #6f6251;
+  --color-brown-600: #554a3d;
+  --color-brown-700: #433b31;
+  --color-brown-800: #332e27;
+  --color-brown-900: #241f1a;
+
+  /* Sage: CHỈ còn vai trò màu chức năng (thành công / SLA ổn), không phải accent brand */
   --color-sage-100: #e7eee5;
   --color-sage-200: #cfdfcc;
   --color-sage-500: #8faf8f;
   --color-sage-700: #5f7f5e;
 
-  /* Warm neutrals (thay cho slate xám lạnh) */
-  --color-sand-100: #f8f4ec;
-  --color-sand-200: #ede6d8;
-  --color-sand-300: #dccfb8;
-  --color-sand-400: #c9bca6;
-  --color-sand-500: #8a7a68;
-  --color-sand-600: #6b5d4e;
+  /* Warm neutrals (xám be cho chữ phụ, viền, nền phụ) */
+  --color-sand-100: #f2eee3;
+  --color-sand-200: #e4ddcc;
+  --color-sand-300: #d2c7ae;
+  --color-sand-400: #bfae8f;
+  --color-sand-500: #8a7a62;
+  --color-sand-600: #5f5546;
 
-  /* Ink: chữ chính (nâu đậm ấm) */
-  --color-ink: #33241a;
-  --color-muted: #7a6a5c;
+  /* Ink: chữ chính (gần đen) */
+  --color-ink: #141210;
+  --color-muted: #6f6659;
 
   /* Surface/Card */
   --color-surface: #ffffff;
 
-  /* Danger (đỏ ấm, không dùng đỏ lạnh mặc định) */
-  --color-danger-200: #f3d9d0;
-  --color-danger-500: #bc4b32;
-  --color-danger-600: #9c3a26;
+  /* Danger = đỏ cảnh báo duy nhất #D14B3A (v6), dùng cho hủy/xóa/lỗi/quá SLA. */
+  --color-danger-200: #fbe3de;
+  --color-danger-500: #d14b3a;
+  --color-danger-600: #b23a2e;
 
-  /* Honey: vàng ấm cho trạng thái "đang dùng" / cảnh báo nhẹ */
+  /* Honey: vàng ấm cho trạng thái "đang dùng" / cảnh báo nhẹ (chức năng) */
   --color-honey-500: #d9a441;
 
-  /* Trạng thái bàn (dùng chung POS / KDS / dashboard) — tông ấm, vẫn phân biệt rõ */
+  /* Trạng thái bàn (dùng chung POS / KDS / dashboard) — giữ nguyên ngữ nghĩa v2 */
   --color-table-empty: #5f7f5e;
   --color-table-inuse: #d9a441;
-  --color-table-overdue: #bc4b32;
+  --color-table-overdue: #d14b3a;
   --color-table-cleaning: #9a8f80;
 
-  /* KDS dark theme (GIỮ nền tối; accent chuyển sang terracotta ấm) */
-  --color-kds-bg: #0b0f14;
-  --color-kds-surface: #121820;
-  --color-kds-card: #1a222d;
-  --color-kds-border: #263342;
-  --color-kds-text: #f1f5f9;
-  --color-kds-muted: #94a3b8;
-  --color-kds-accent: #d2825c;
+  /* KDS dark theme (GIỮ nền tối; accent = tint sáng của brand để đọc được trên nền tối,
+     nút chính vẫn brand #8C1D2C, cảnh báo = alert #D14B3A) */
+  /* v7.1 KDS light: dong bo voi web (nen giay #F5F2EA, chu #141210) thay cho
+     nen toi #0B0F14 cu. Card trang, vien #E9E4DC, qua SLA nen do nhat #FDEAE6
+     (cung ops-tint-overdue). Vang "sap tre" dung kds-soon dam hon honey-500
+     de du tuong phan tren nen trang (honey-500 giu nguyen cho cac trang khac). */
+  --color-kds-bg: #f5f2ea;
+  --color-kds-surface: #ffffff;
+  --color-kds-card: #ffffff;
+  --color-kds-border: #e9e4dc;
+  --color-kds-text: #141210;
+  --color-kds-muted: #7a6a58;
+  --color-kds-accent: #8c1d2c;
   --color-kds-warning: #d9a441;
-  --color-kds-danger: #d95f43;
+  --color-kds-danger: #d14b3a;
+  --color-kds-soon: #9a6b12;
+  /* v7 KDS: nút Nhận món = xanh dương trung tính (không dùng đỏ brand cho hành động),
+     nền card quá SLA = đỏ tối (không phải nền card thường). */
+  --color-kds-action: #2563eb;
+  --color-kds-overdue-bg: #fdeae6;
 
-  /* Typography scale (clamp) — dùng kèm font-display cho heading, font-sans cho body */
+  /* Typography scale (clamp) — giữ nguyên thang v2, chỉ đổi họ font */
   --text-display: clamp(2.5rem, 6vw, 5rem);
   --text-display--line-height: 1.1;
   --text-h1: clamp(1.75rem, 4vw, 3rem);
@@ -101,15 +138,14 @@
   --text-small: 0.875rem;
   --text-small--line-height: 1.5;
 
-  /* Shadows: CHỈ tông nâu ấm rgba(100,60,20,...) — cấm shadow xám/đen */
-  --shadow-warm-sm: 0 2px 8px rgba(100, 60, 20, 0.08);
-  --shadow-warm: 0 4px 16px rgba(100, 60, 20, 0.1);
-  --shadow-warm-lg: 0 12px 32px rgba(100, 60, 20, 0.14);
+  /* Shadows v6: bóng nhẹ thống nhất — 0 1px 3px rgba(0,0,0,.08) làm chuẩn. */
+  --shadow-warm-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-warm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-warm-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
 
-  /* Radius: card 16px, nút playful, blob hữu cơ */
-  --radius-card: 16px;
-  --radius-playful: 24px 24px 2px 24px;
-  --radius-blob: 60% 40% 55% 45% / 50% 60% 40% 50%;
+  /* Radius v6: thống nhất 8px cho mọi nút, thẻ, modal, input. */
+  --radius-card: 8px;
+  --radius-playful: 8px;
 
   /* Nhấp nháy cho trạng thái quá SLA (dùng class animate-blink) */
   --animate-blink: blink 1s ease-in-out infinite;
@@ -120,8 +156,12 @@
 }
 
 :root {
-  --background: #faf7f2;
-  --foreground: #33241a;
+  --background: #f5f2ea;
+  --foreground: #141210;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -133,20 +173,14 @@ body {
   overflow-x: hidden;
 }
 
-/* Noise texture phủ toàn bộ body: SVG feTurbulence, opacity 0.03, không chặn click */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
 ::selection {
   background: var(--color-primary-500);
   color: #ffffff;
+}
+
+/* Số vận hành: chữ số thẳng hàng, không lên xuống kiểu old-style (Cormorant). */
+.ops-nums {
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 /* Ngân sách hiệu năng: GPU-accelerated micro interactions */
@@ -155,7 +189,7 @@ body::after {
   will-change: transform, opacity;
 }
 
-/* Thanh cuộn tối giản tông ấm cho KDS và POS */
+/* Thanh cuộn tối giản tông trung tính cho KDS và POS */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -166,10 +200,10 @@ body::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(107, 66, 38, 0.3);
+  background: rgba(20, 18, 16, 0.3);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 66, 38, 0.5);
+  background: rgba(20, 18, 16, 0.5);
 }

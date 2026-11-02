@@ -18,8 +18,8 @@ export interface TabsProps {
 }
 
 /**
- * Thanh tab ngang dùng chung (danh mục món, trạm KDS, kỳ báo cáo...).
- * Tab đang active: màu primary + gạch chân. Tab cao tối thiểu 48px.
+ * Thanh tab ngang dùng chung (v6). Tab đang active: chữ ink + gạch chân ink
+ * (bản tối: chữ trắng + gạch trắng) — KHÔNG dùng đỏ brand cho tab đang chọn.
  */
 export function Tabs({ items, value, onChange, dark = false, className }: TabsProps) {
   return (
@@ -44,8 +44,8 @@ export function Tabs({ items, value, onChange, dark = false, className }: TabsPr
               '-mb-px min-h-12 shrink-0 cursor-pointer border-b-2 px-4 text-sm font-semibold transition-[color,border-color] duration-200',
               active
                 ? dark
-                  ? 'border-kds-accent text-kds-text'
-                  : 'border-primary-500 text-primary-700'
+                  ? 'border-white text-kds-text'
+                  : 'border-ink text-ink'
                 : dark
                   ? 'border-transparent text-kds-muted hover:text-kds-text'
                   : 'border-transparent text-sand-600 hover:text-ink',

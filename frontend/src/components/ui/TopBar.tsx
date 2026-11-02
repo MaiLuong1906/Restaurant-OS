@@ -20,7 +20,7 @@ export function TopBar({ left, center, right, dark = false, className }: TopBarP
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">{left}</div>
-      <div className="flex items-center gap-2">{center}</div>
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">{center}</div>
       <div className="flex flex-1 items-center justify-end gap-2">{right}</div>
     </header>
   );

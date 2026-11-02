@@ -28,7 +28,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-4">
-          {title ? <h2 className="font-display text-h3 font-semibold text-ink">{title}</h2> : <span />}
+          {title ? <h2 className="text-h3 font-semibold text-ink">{title}</h2> : <span />}
           <button
             type="button"
             aria-label="Đóng"

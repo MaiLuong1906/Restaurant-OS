@@ -17,7 +17,7 @@ export interface StaffLayoutProps {
   className?: string;
 }
 
-/** Khung Staff Portal mobile + bottom navigation. */
+/** Khung Staff Portal (v6): mobile 1 cột, desktop mở rộng tới 2xl — không còn cột hẹp kẹt giữa màn hình. */
 export function StaffLayout({
   headerLeft,
   headerRight,
@@ -27,10 +27,10 @@ export function StaffLayout({
   className,
 }: StaffLayoutProps) {
   return (
-    <div className={cn('mx-auto flex min-h-screen w-full max-w-lg flex-col bg-cream', className)}>
+    <div className={cn('mx-auto flex min-h-screen w-full max-w-lg flex-col bg-cream md:max-w-2xl', className)}>
       <TopBar left={headerLeft} right={headerRight} />
       <main className="flex-1 px-6 py-6 pb-32">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto grid w-full max-w-lg grid-cols-4 border-t border-sand-200 bg-white">
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto grid w-full max-w-lg grid-cols-4 border-t border-sand-200 bg-white md:max-w-2xl">
         {navItems.map((item) => (
           <a
             key={item.id}
@@ -38,7 +38,7 @@ export function StaffLayout({
             aria-current={item.id === activeNavId ? 'page' : undefined}
             className={cn(
               'flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors',
-              item.id === activeNavId ? 'text-primary-600' : 'text-sand-600 hover:text-ink',
+              item.id === activeNavId ? 'text-ink' : 'text-sand-600 hover:text-ink',
             )}
           >
             {item.label}
