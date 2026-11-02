@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { TopBar } from '@/components/ui/TopBar';
 
@@ -32,7 +33,7 @@ export function StaffLayout({
       <main className="flex-1 px-6 py-6 pb-32">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto grid w-full max-w-lg grid-cols-4 border-t border-sand-200 bg-white md:max-w-2xl">
         {navItems.map((item) => (
-          <a
+          <Link
             key={item.id}
             href={item.href}
             aria-current={item.id === activeNavId ? 'page' : undefined}
@@ -42,7 +43,7 @@ export function StaffLayout({
             )}
           >
             {item.label}
-          </a>
+          </Link>
         ))}
       </nav>
     </div>

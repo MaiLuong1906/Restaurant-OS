@@ -11,8 +11,22 @@ export interface ModalProps {
   className?: string;
 }
 
-/** Hộp thoại modal dùng chung (xác nhận, form ngắn). Nền trắng, shadow nâu ấm. */
+/** Hộp thoại modal dùng chung (xác nhận, form ngắn). Nền trắng, shadow nâu ấm.
+ * Review 2026-11-01: bấm Escape để đóng + khóa cuộn body khi mở. */
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
+  React.useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
   if (!open) return null;
   return (
     <div

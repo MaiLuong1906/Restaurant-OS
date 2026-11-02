@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { DashboardLayout, OPS_NAV_ICONS } from '@/components/layouts/DashboardLayout';
@@ -124,9 +125,9 @@ export default function DemoDashboardPage() {
           <ul className="mt-3 flex flex-col gap-2">
             {ALERTS.map((alert) => (
               <li key={alert.text}>
-                <a href={alert.href} className="text-sm font-semibold text-ops-ink underline decoration-ops-alert underline-offset-4 hover:text-ops-alert">
+                <Link href={alert.href} className="text-sm font-semibold text-ops-ink underline decoration-ops-alert underline-offset-4 hover:text-ops-alert">
                   {alert.text} →
-                </a>
+                </Link>
               </li>
             ))}
           </ul>

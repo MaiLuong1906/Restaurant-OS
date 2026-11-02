@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { LayoutDashboard, LayoutGrid, Users, BarChart3, ChefHat, Menu, X, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TopBar } from '@/components/ui/TopBar';
@@ -50,7 +51,7 @@ export function DashboardLayout({
   const nav = navItems ? (
     <nav className="flex flex-col gap-1" aria-label="Quản lý">
       {navItems.map((item) => (
-        <a
+        <Link
           key={item.label}
           href={item.href}
           aria-current={item.active ? 'page' : undefined}
@@ -63,7 +64,7 @@ export function DashboardLayout({
         >
           {item.icon}
           <span className={cn(collapsed && 'hidden')}>{item.label}</span>
-        </a>
+        </Link>
       ))}
     </nav>
   ) : (

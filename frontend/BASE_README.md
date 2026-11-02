@@ -136,6 +136,19 @@
 > bóng nhẹ `shadow-warm-sm` để nổi trên nền giấy. Nút, banner dị ứng, timer và
 > logic SLA/timer/nhóm ticket giữ nguyên như v7.
 >
+> > **QUYẾT ĐỊNH v7.2 — VÁ 2 MỤC CÒN DỞ CỦA REVIEW 2026-11-01 (trước khi push bản tổng):**
+> Review hôm đó có 3 mục, font đã xong ở v3/v6, còn 2 mục chưa từng được áp
+> (prompt cho Anti chưa chạy) nên vá ở đây: (1) Điều hướng nội bộ dùng
+> `<Link>` thay `<a>`: sidebar `DashboardLayout`, bottom nav `StaffLayout` và
+> link cảnh báo ở `dashboard-demo` (trỏ `/kds-board`) chuyển sang Link; link
+> hash `#menu`/`#story`/`#reservation` ở `restaurant-website` giữ `<a>` theo
+> đúng quy tắc review (external/hash giữ nguyên). (2) `BottomSheet` và
+> `Modal` thêm bấm Escape để đóng + khóa cuộn body khi mở (lưu và khôi phục
+> `overflow` cũ khi đóng); `Modal` hiện không còn chỗ nào dùng nhưng vẫn vá
+> để không còn component lỗi đã biết. Đã kiểm chứng bằng trình duyệt thật:
+> mở sheet món ở `customer-menu` thì body bị khóa cuộn, bấm Escape thì sheet
+> đóng và cuộn được trả lại.
+>
 > Trang demo của base nằm ở route group `(demo)` — xem mục 5.
 
 ## 1. Quy tắc bắt buộc của base

@@ -11,8 +11,22 @@ export interface BottomSheetProps {
   className?: string;
 }
 
-/** Bottom-sheet dùng chung phía khách (chi tiết món, giỏ hàng). Trượt từ dưới lên. */
+/** Bottom-sheet dùng chung phía khách (chi tiết món, giỏ hàng). Trượt từ dưới lên.
+ * Review 2026-11-01: bấm Escape để đóng + khóa cuộn body khi mở. */
 export function BottomSheet({ open, onClose, title, children, className }: BottomSheetProps) {
+  React.useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
   if (!open) return null;
   return (
     <div
