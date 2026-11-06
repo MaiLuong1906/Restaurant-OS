@@ -18,6 +18,8 @@ import {
   CreateShiftSwapRequest,
   SwapPeerCandidate,
   DaySchedule,
+  CreateLeaveRequest,
+  WithdrawLeaveRequest,
 } from '../../types';
 import {
   MOCK_SHIFTS,
@@ -48,6 +50,8 @@ export interface StaffService {
   getTips(params?: { from?: string; to?: string }): Promise<TipRecord[]>;
   getLeaveBalance(): Promise<LeaveBalance>;
   getLeaveRequests(): Promise<LeaveRequest[]>;
+  createLeaveRequest(req: CreateLeaveRequest): Promise<LeaveRequest>;
+  withdrawLeaveRequest(req: WithdrawLeaveRequest): Promise<{ ok: boolean }>;
   getTodayAttendance(): Promise<TodayAttendance>;
   verifyFaceScan(idempotencyKey: string): Promise<CheckInResponse>;
   verifyAttendancePin(pin: string): Promise<{ ok: boolean }>;
@@ -149,6 +153,98 @@ export class MockStaffService implements StaffService {
   async getLeaveRequests(): Promise<LeaveRequest[]> {
     await simulateLatency(120);
     return deepClone(this.leaveRequests);
+  }
+
+  async createLeaveRequest(req: CreateLeaveRequest): Promise<LeaveRequest> {
+    if (!req.idempotencyKey) {
+      throw createValidationError('idempotencyKey là bắt buộc');
+    }
+
+    const existing = this.leaveRequests.find((r) => r.idempotencyKey === req.idempotencyKey);
+    if (existing) {
+      return deepClone(existing);
+    }
+
+    if (!req.type) {
+      throw createValidationError('Vui lòng chọn loại nghỉ');
+    }
+
+    if (!req.startDate || !req.endDate) {
+      throw createValidationError('Vui lòng chọn khoảng thời gian nghỉ');
+    }
+
+    if (req.endDate < req.startDate) {
+      throw createValidationError('Ngày kết thúc không được trước ngày bắt đầu');
+    }
+
+    const trimmedReason = req.reason ? req.reason.trim() : '';
+    if (!trimmedReason) {
+      throw createValidationError('Vui lòng nhập lý do xin nghỉ');
+    }
+
+    if (trimmedReason.length > 500) {
+      throw createValidationError('Lý do xin nghỉ không được vượt quá 500 ký tự');
+    }
+
+    // Tính calendarDays và affectedShifts
+    const startObj = parseDateKey(req.startDate);
+    const endObj = parseDateKey(req.endDate);
+    const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
+    const calendarDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    // Check quota với ANNUAL
+    if (req.type === 'ANNUAL') {
+      if (calendarDays > this.leaveBalance.remainingDays) {
+        throw createValidationError(
+          `Số ngày nghỉ (${calendarDays} ngày) vượt quá quỹ phép năm còn lại (${this.leaveBalance.remainingDays} ngày)`
+        );
+      }
+    }
+
+    const affectedShifts = this.shifts.filter(
+      (s) => s.date >= req.startDate && s.date <= req.endDate
+    ).length;
+
+    await simulateLatency(150);
+
+    const newLeave: LeaveRequest = {
+      id: `leave-${Date.now()}`,
+      staffId: 'staff-1',
+      staffName: 'Nhân Viên Vận Hành',
+      type: req.type,
+      startDate: req.startDate,
+      endDate: req.endDate,
+      reason: trimmedReason,
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+      calendarDays,
+      affectedShifts,
+      idempotencyKey: req.idempotencyKey,
+    };
+
+    this.leaveRequests.unshift(newLeave);
+    this.leaveBalance.pendingRequestsCount += 1;
+
+    return deepClone(newLeave);
+  }
+
+  async withdrawLeaveRequest(req: WithdrawLeaveRequest): Promise<{ ok: boolean }> {
+    await simulateLatency(120);
+    const leave = this.leaveRequests.find((r) => r.id === req.id);
+    if (!leave) {
+      throw createNotFoundError('LeaveRequest', req.id);
+    }
+
+    if (leave.status !== 'PENDING') {
+      throw createValidationError('Chỉ có thể rút đơn đang ở trạng thái Chờ duyệt');
+    }
+
+    leave.status = 'CANCELLED';
+    if (this.leaveBalance.pendingRequestsCount > 0) {
+      this.leaveBalance.pendingRequestsCount -= 1;
+    }
+
+    return { ok: true };
   }
 
   async getTodayAttendance(): Promise<TodayAttendance> {

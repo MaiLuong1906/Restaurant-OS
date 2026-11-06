@@ -102,5 +102,43 @@ describe('MockStaffService', () => {
     });
     expect(swap.status).toBe('PENDING_PEER');
   });
+
+  it('xử lý đơn xin nghỉ B9-B10: getLeaveBalance, getLeaveRequests, createLeaveRequest, withdrawLeaveRequest', async () => {
+    const balance = await service.getLeaveBalance();
+    expect(balance.totalDays).toBe(12);
+
+    const initialRequests = await service.getLeaveRequests();
+    expect(initialRequests.length).toBeGreaterThanOrEqual(1);
+
+    // Gửi đơn xin nghỉ phép năm
+    const idemKey = 'idem-leave-test-1';
+    const newLeave = await service.createLeaveRequest({
+      type: 'ANNUAL',
+      startDate: '2026-11-20',
+      endDate: '2026-11-21',
+      reason: 'Đi du lịch',
+      idempotencyKey: idemKey,
+    });
+    expect(newLeave.status).toBe('PENDING');
+    expect(newLeave.calendarDays).toBe(2);
+
+    // Replay idempotency
+    const leaveReplay = await service.createLeaveRequest({
+      type: 'ANNUAL',
+      startDate: '2026-11-20',
+      endDate: '2026-11-21',
+      reason: 'Đi du lịch',
+      idempotencyKey: idemKey,
+    });
+    expect(leaveReplay.id).toBe(newLeave.id);
+
+    // Rút đơn PENDING
+    const withdrawRes = await service.withdrawLeaveRequest({ id: newLeave.id });
+    expect(withdrawRes.ok).toBe(true);
+
+    // Không cho rút đơn đã rút hoặc không phải PENDING
+    await expect(service.withdrawLeaveRequest({ id: newLeave.id })).rejects.toThrow();
+  });
 });
+
 

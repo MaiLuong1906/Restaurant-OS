@@ -136,8 +136,10 @@ export const MOCK_LEAVE_REQUESTS: readonly import('../../../types').LeaveRequest
     endDate: '2026-11-12',
     reason: 'Việc gia đình',
     status: 'APPROVED',
-    approvedBy: 'Quản lý Hoàng',
+    approvedBy: 'Quản lý',
     createdAt: '2026-11-03T08:30:00.000Z',
+    calendarDays: 1,
+    affectedShifts: 1,
   },
   {
     id: 'leave-2',
@@ -149,6 +151,8 @@ export const MOCK_LEAVE_REQUESTS: readonly import('../../../types').LeaveRequest
     reason: 'Khám sức khỏe định kỳ',
     status: 'PENDING',
     createdAt: '2026-11-05T09:00:00.000Z',
+    calendarDays: 2,
+    affectedShifts: 2,
   },
   {
     id: 'leave-3',
@@ -160,6 +164,8 @@ export const MOCK_LEAVE_REQUESTS: readonly import('../../../types').LeaveRequest
     reason: 'Nghỉ ốm',
     status: 'PENDING',
     createdAt: '2026-11-05T14:15:00.000Z',
+    calendarDays: 1,
+    affectedShifts: 1,
   },
 ]);
 

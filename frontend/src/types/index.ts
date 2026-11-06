@@ -144,7 +144,7 @@ export interface AttendanceRecord {
   note?: string;
 }
 
-export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type LeaveType = 'ANNUAL' | 'SICK' | 'UNPAID';
 
 export interface LeaveRequest {
@@ -158,6 +158,21 @@ export interface LeaveRequest {
   status: LeaveStatus;
   approvedBy?: string;
   createdAt: string;
+  calendarDays?: number;
+  affectedShifts?: number;
+  idempotencyKey?: string;
+}
+
+export interface CreateLeaveRequest {
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  idempotencyKey: string;
+}
+
+export interface WithdrawLeaveRequest {
+  id: string;
 }
 
 export interface LeaveBalance {
