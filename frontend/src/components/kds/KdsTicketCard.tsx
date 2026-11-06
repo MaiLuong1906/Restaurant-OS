@@ -9,10 +9,11 @@ import { Check } from 'lucide-react';
 interface KdsTicketCardProps {
   ticket: Ticket;
   onComplete: (ticketId: string) => void;
+  onSelect?: (ticket: Ticket) => void;
   isCompleting?: boolean;
 }
 
-export function KdsTicketCard({ ticket, onComplete, isCompleting }: KdsTicketCardProps) {
+export function KdsTicketCard({ ticket, onComplete, onSelect, isCompleting }: KdsTicketCardProps) {
   // Tìm cảnh báo dị ứng chung của ticket nếu có
   const allergy = ticket.items.find((i) => i.allergy)?.allergy;
 
@@ -20,7 +21,10 @@ export function KdsTicketCard({ ticket, onComplete, isCompleting }: KdsTicketCar
   const allReady = actionableItems.every((i) => i.status === 'READY');
 
   return (
-    <div className="bg-white rounded-lg border border-ops-border shadow-warm p-4 flex flex-col justify-between transition-all">
+    <div
+      onClick={() => onSelect && onSelect(ticket)}
+      className="bg-white rounded-lg border border-ops-border shadow-warm p-4 flex flex-col justify-between transition-all cursor-pointer hover:border-ops-brand/40"
+    >
       <div>
         <AllergyBanner allergy={allergy} />
 
@@ -73,7 +77,10 @@ export function KdsTicketCard({ ticket, onComplete, isCompleting }: KdsTicketCar
       <button
         type="button"
         disabled={isCompleting || allReady}
-        onClick={() => onComplete(ticket.id)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onComplete(ticket.id);
+        }}
         className="w-full h-12 rounded-lg bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Check className="h-5 w-5" />

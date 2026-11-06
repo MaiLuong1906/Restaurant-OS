@@ -5,6 +5,7 @@ import { Ticket, Batch } from '@/types';
 import { kdsService } from '@/services/mock';
 import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
 import { KdsBatchCard } from '@/components/kds/KdsBatchCard';
+import { TicketDetailDrawer } from '@/components/kds/TicketDetailDrawer';
 import { RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function KitchenDisplayScreen() {
@@ -12,6 +13,7 @@ export default function KitchenDisplayScreen() {
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
   const [viewMode, setViewMode] = React.useState<'ticket' | 'batch'>('ticket');
+  const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(null);
 
   // Quản lý Toast và Hoàn tác 5 giây
   const [undoToast, setUndoToast] = React.useState<{
@@ -231,6 +233,7 @@ export default function KitchenDisplayScreen() {
               <KdsTicketCard
                 key={ticket.id}
                 ticket={ticket}
+                onSelect={(t) => setSelectedTicketId(t.id)}
                 onComplete={handleCompleteTicket}
               />
             ))}
@@ -262,6 +265,17 @@ export default function KitchenDisplayScreen() {
           </button>
         </div>
       )}
+
+      {/* A5 Ticket Detail Drawer */}
+      <TicketDetailDrawer
+        ticket={tickets.find((t) => t.id === selectedTicketId) || null}
+        open={Boolean(selectedTicketId)}
+        onClose={() => setSelectedTicketId(null)}
+        onComplete={(ticketId) => {
+          handleCompleteTicket(ticketId);
+          setSelectedTicketId(null);
+        }}
+      />
     </div>
   );
 }
