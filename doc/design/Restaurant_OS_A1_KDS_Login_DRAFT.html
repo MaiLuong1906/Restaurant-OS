@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A1 — KDS PIN Login (bỏ trạm)</title>
+<style>
+  /* Ngôn ngữ A3 v3 đã duyệt ngày 2026-11-05, cập nhật bỏ trạm ngày 2026-11-05:
+     nền ops #F6F4F0 · card #FFFFFF · chữ chính #141210 · chữ vận hành #2B2118
+     chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C (nút chính duy nhất) · danger #D14B3A
+     xanh chức năng #5F7F5E (chỉ trạng thái, không phải màu nút) · bo 8px · bóng nhẹ
+     Ngoại lệ có lý do: phím bàn phím PIN cao 64px (thay vì nút chuẩn 48px) vì bấm trên
+     tablet dùng chung tại bếp, tay ướt/bận — phím phải lớn hơn nút hành động thường. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .kds-header { height: 56px; background: #fff; border-bottom: 1px solid #E9E4DC; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; gap: 16px; }
+  .kds-header h1 { margin: 0; font-size: 20px; color: #2B2118; }
+  .kds-header .right { display: flex; align-items: center; gap: 20px; font-size: 15px; color: #2B2118; }
+  .conn { display: flex; align-items: center; gap: 6px; }
+  .conn svg { color: #5F7F5E; }
+  #clock { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 24px 24px; }
+  /* ===== Flow: chỉ còn A1 → A3 ===== */
+  .flow { margin-top: 20px; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; }
+  .flow h2 { margin: 0 0 12px; font-size: 17px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .flow-row { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+  .fbox { border: 1px solid #E9E4DC; border-radius: 8px; padding: 10px 14px; background: #F6F4F0; font-size: 15px; }
+  .fbox strong { display: block; font-size: 16px; }
+  .fbox.hot { border-color: #8C1D2C; background: #fff; }
+  .farrow { display: flex; align-items: center; font-size: 18px; color: #7A6A58; }
+  .flow p { color: #7A6A58; font-size: 14px; margin: 12px 0 0; }
+  /* ===== A1 card ===== */
+  .screen { margin-top: 24px; }
+  .screen h2 { font-size: 19px; margin: 0 0 4px; }
+  .screen .lede { color: #7A6A58; margin: 0 0 16px; }
+  .pin-card { max-width: 480px; margin: 0 auto; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 24px; text-align: center; }
+  .pin-card h3 { margin: 0; font-size: 22px; }
+  .pin-card .sub { color: #7A6A58; margin: 8px 0 20px; }
+  .dots { display: flex; justify-content: center; gap: 12px; margin: 0 0 12px; }
+  .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #E9E4DC; background: #fff; }
+  .dot.on { background: #141210; border-color: #141210; }
+  .pin-err { min-height: 24px; color: #D14B3A; font-weight: 700; font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .keypad button { height: 64px; font-size: 22px; font-weight: 700; cursor: pointer; border-radius: 8px; background: #fff; border: 1px solid #E9E4DC; color: #141210; display: flex; align-items: center; justify-content: center; }
+  .keypad button:active { background: #F6F4F0; }
+  .keypad button.fn { font-size: 16px; }
+  .pin-foot { color: #7A6A58; font-size: 14px; margin: 20px 0 0; }
+  .success { border: 1px solid #E9E4DC; border-radius: 8px; padding: 16px; margin-top: 20px; text-align: left; }
+  .success .ok { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+  .success .ok svg { color: #5F7F5E; }
+  .success p { color: #7A6A58; font-size: 14px; margin: 8px 0 12px; }
+  .link-btn { background: none; border: none; color: #7A6A58; font-size: 14px; text-decoration: underline; cursor: pointer; padding: 4px 0; }
+  .icon { width: 18px; height: 18px; flex: none; }
+  .icon-big { width: 22px; height: 22px; flex: none; }
+  .hidden { display: none !important; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin-top: 20px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .demo-strip { border-style: dashed; }
+</style>
+</head>
+<body>
+<div class="draftbar"><strong>NHÁP A1 (bỏ trạm — theo yêu cầu ngày 2026-11-05)</strong> · Không còn A2 · A1 xong vào thẳng A3 · Ngôn ngữ A3 v3/v4 · Bản A1–A2 cũ giữ nguyên · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+
+<header class="kds-header">
+  <h1>KDS Bếp</h1>
+  <div class="right">
+    <span class="conn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>Đã kết nối</span>
+    <span>🕐 <span id="clock">--:--:--</span></span>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ===== FLOW: A1 → A3 ===== -->
+  <div class="flow">
+    <h2>Luồng vào KDS (sau khi bỏ trạm)</h2>
+    <div class="flow-row">
+      <div class="fbox hot"><strong>A1 — Nhập PIN</strong>Đầu bếp nhập PIN trên tablet dùng chung</div>
+      <span class="farrow">→</span>
+      <div class="fbox hot"><strong>A3 — Hàng đợi (v4, bỏ trạm)</strong>Toàn bộ ticket của bếp, không chia theo trạm</div>
+    </div>
+    <p>Không còn màn chọn trạm, không dropdown chuyển trạm, header không hiện tên trạm. Một ticket là toàn bộ món của một bàn.</p>
+  </div>
+
+  <!-- ===== A1 ===== -->
+  <section class="screen" id="sec-a1">
+    <h2>A1 — Nhập PIN</h2>
+    <p class="lede">Tablet dùng chung tại bếp. PIN 4 số (giữ theo wireframe cũ: nhập đủ 4 số mới vào được). Phím cao 64px để bấm khi tay bận — ngoại lệ có lý do so với nút chuẩn 48px.</p>
+    <div class="pin-card">
+      <h3>Nhập PIN để vào bếp</h3>
+      <p class="sub">PIN xác định đầu bếp đang làm việc trên tablet này.</p>
+      <div id="pin-area">
+        <div class="dots" id="dots" aria-label="PIN đã nhập">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+        <p class="pin-err" id="pin-err"><span id="pin-err-text" class="hidden">Sai PIN. Thử lại.</span></p>
+        <div class="keypad" id="keypad">
+          <button type="button" data-digit="1">1</button>
+          <button type="button" data-digit="2">2</button>
+          <button type="button" data-digit="3">3</button>
+          <button type="button" data-digit="4">4</button>
+          <button type="button" data-digit="5">5</button>
+          <button type="button" data-digit="6">6</button>
+          <button type="button" data-digit="7">7</button>
+          <button type="button" data-digit="8">8</button>
+          <button type="button" data-digit="9">9</button>
+          <button type="button" class="fn" id="key-clear">Xóa</button>
+          <button type="button" data-digit="0">0</button>
+          <button type="button" id="key-back" aria-label="Xóa một số"><svg class="icon-big" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5H9L2 12l7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><line x1="18" x2="12" y1="9" y2="15"/><line x1="12" x2="18" y1="9" y2="15"/></svg></button>
+        </div>
+      </div>
+      <div id="pin-success" class="success hidden">
+        <div class="ok"><svg class="icon-big" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="20 6 9 17 4 12"/></svg><span>PIN đúng (bản nháp)</span></div>
+        <p>Trong app thật, từ đây vào thẳng màn KDS — hàng đợi toàn bộ ticket của bếp, không chia theo trạm (bản A3 v4).</p>
+        <button type="button" class="link-btn" id="btn-repin">Nhập lại PIN khác</button>
+      </div>
+      <p class="pin-foot">PIN do quản lý cấp. Quên PIN? Liên hệ Bếp trưởng hoặc Quản lý.</p>
+    </div>
+  </section>
+
+  <!-- ===== DEMO STRIP ===== -->
+  <section class="block demo-strip">
+    <h2>Khu vực demo — không thuộc màn A1</h2>
+    <p style="color:#7A6A58">Bản nháp này không kiểm tra PIN thật. Cách thử: nhập <strong style="color:#141210">0000</strong> để xem trạng thái sai PIN; nhập 4 số khác bất kỳ để xem trạng thái đúng và đường vào thẳng A3.</p>
+  </section>
+
+  <!-- ===== NOTES ===== -->
+  <section class="block">
+    <h2>Ghi chú thiết kế A1 (sau khi bỏ trạm)</h2>
+    <ul>
+      <li><strong>Đã bỏ:</strong> toàn bộ màn A2 chọn trạm, dropdown chuyển trạm, tên trạm ở header. Bản A1–A2 cũ giữ nguyên để đối chiếu, không sửa.</li>
+      <li><strong>PIN 4 số:</strong> giữ theo wireframe cũ (nhập đủ 4 số mới vào được).</li>
+      <li><strong>Không có nút "Quên PIN" tự đặt lại:</strong> đầu bếp quên PIN thì gặp Bếp trưởng/Quản lý cấp lại — không tự reset trên tablet dùng chung.</li>
+      <li><strong>Không có nút đăng ký, đổi mật khẩu hay menu điều hướng trên A1:</strong> màn này chỉ làm một việc là đưa đầu bếp vào màn KDS.</li>
+      <li><strong>Một ticket là toàn bộ món của một bàn:</strong> không còn chia ticket theo trạm; nếu quán mở rộng nhiều bếp sau này thì mới xem lại khái niệm trạm.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <h2>Điểm còn mở (chưa tự quyết)</h2>
+    <ul>
+      <li><strong>PIN chính thức mấy số?</strong> Nháp dùng 4 số theo wireframe cũ; chốt theo quy định quản lý khi code.</li>
+      <li><strong>PIN KDS có đồng thời chấm công không?</strong> Câu hỏi mở từ giai đoạn 0: chấm công dùng PIN/QR hay Geofence + FaceID — nếu PIN KDS cũng là chấm công thì A1 kiêm luôn điểm danh vào ca, nếu không thì chấm công nằm riêng ở Staff Portal (B-side).</li>
+      <li><strong>Sai PIN bao nhiêu lần thì khóa?</strong> Chưa chốt — nháp không tự đặt số lần, không tự khóa tài khoản.</li>
+      <li><strong>Mất kết nối thì kiểm tra PIN thế nào?</strong> Chưa chốt: chỉ kiểm tra online, hay có kiểm tra offline dự phòng trên tablet?</li>
+    </ul>
+    <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP A1 (bỏ trạm), chưa phải thiết kế chốt. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A3 v1/v2/v3 và bản A1–A2 cũ.</p>
+  </section>
+</div>
+
+<script>
+  function tickClock() {
+    var el = document.getElementById("clock");
+    if (el) el.textContent = new Date().toLocaleTimeString("vi-VN");
+  }
+  tickClock(); setInterval(tickClock, 1000);
+  var pin = "";
+  var dotsEl = document.getElementById("dots");
+  var errText = document.getElementById("pin-err-text");
+  function renderDots() {
+    var dots = dotsEl.querySelectorAll(".dot");
+    dots.forEach(function (d, i) { d.classList.toggle("on", i < pin.length); });
+  }
+  function resetPin(showKeypad) {
+    pin = "";
+    renderDots();
+    errText.classList.add("hidden");
+    if (showKeypad) {
+      document.getElementById("pin-area").classList.remove("hidden");
+      document.getElementById("pin-success").classList.add("hidden");
+    }
+  }
+  document.getElementById("keypad").addEventListener("click", function (e) {
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    if (btn.id === "key-clear") { resetPin(false); return; }
+    if (btn.id === "key-back") { pin = pin.slice(0, -1); renderDots(); return; }
+    var d = btn.getAttribute("data-digit");
+    if (d === null || pin.length >= 4) return;
+    errText.classList.add("hidden");
+    pin += d;
+    renderDots();
+    if (pin.length === 4) {
+      if (pin === "0000") {
+        errText.classList.remove("hidden");
+        pin = "";
+        renderDots();
+      } else {
+        document.getElementById("pin-area").classList.add("hidden");
+        document.getElementById("pin-success").classList.remove("hidden");
+      }
+    }
+  });
+  document.getElementById("btn-repin").addEventListener("click", function () { resetPin(true); });
+</script>
+</body>
+</html>

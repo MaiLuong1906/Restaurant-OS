@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B11–B13 v2 — Phiếu lương / Chi tiết / Tip (theo review)</title>
+<style>
+  /* Ngôn ngữ vận hành đã khóa:
+     nền ops #F6F4F0 · card #FFFFFF · chữ chính #141210 · chữ vận hành #2B2118
+     chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C · brand-dark #6F1623
+     danger #D14B3A (chỉ số tiền khấu trừ / cảnh báo, không dùng làm màu nút)
+     bo 8px thống nhất · bóng nhẹ · spacing bội số 4px · nút chính 48px
+     icon một bộ outline Lucide, stroke 2 · số tiền luôn tabular-nums
+     B11–B13 đi theo luồng từ B2 (thẻ lương "Xem phiếu lương" / tab "Lương & Tip"),
+     không thêm tab mới. Điện thoại cá nhân là chính; bản laptop cùng nội dung.
+     v2 theo review: thêm kỳ lương + ngày thanh toán; tách trạng thái phiếu
+     (Tạm tính/Đã chốt) khỏi trạng thái thanh toán (Chưa/Dự kiến/Đã thanh toán);
+     ghi rõ căn cứ tính phiếu tạm tính; thêm trạng thái trả tip.
+     Font Be Vietnam Pro chưa tải trong nháp — khi lên code thật dùng
+     next/font; nháp dùng font hệ thống dự phòng. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .democtl { background: #fff; border-bottom: 1px solid #E9E4DC; padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: #7A6A58; }
+  .democtl .seg { display: flex; background: #F6F4F0; border: 1px solid #E9E4DC; border-radius: 8px; padding: 4px; gap: 4px; }
+  .democtl .seg button { border: none; background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 8px; color: #2B2118; }
+  .democtl .seg button.active { background: #8C1D2C; color: #fff; }
+  /* ===== Khung app ===== */
+  .app { margin: 0 auto; background: #F6F4F0; border-left: 1px solid #E9E4DC; border-right: 1px solid #E9E4DC; min-height: 100vh; display: flex; flex-direction: column; }
+  body.layout-phone .app { max-width: 480px; }
+  body.layout-laptop .app { max-width: 720px; }
+  .content { flex: 1; padding: 16px 20px 32px; }
+  .backlink { background: none; border: none; cursor: pointer; padding: 4px 0 12px; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  .screen-head h1 { margin: 0; font-size: 20px; font-weight: 600; color: #2B2118; }
+  .screen-head p { margin: 4px 0 0; font-size: 12px; color: #7A6A58; }
+  .card { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px; margin-top: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: #2B2118; }
+  .card .sub { font-size: 12px; color: #7A6A58; margin: 0; }
+  .rows { margin-top: 8px; }
+  .rows .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 15px; }
+  .rows .row span:first-child { color: #7A6A58; }
+  .rows .row b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .rows .row .meta { color: #7A6A58; font-weight: 400; }
+  .rows .row.total { border-top: 1px solid #E9E4DC; margin-top: 6px; padding-top: 12px; }
+  .rows .row.total span:first-child { color: #2B2118; font-weight: 600; }
+  .rows .row .neg { color: #D14B3A; }
+  .bignum { font-size: 20px; font-weight: 700; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .netnum { font-size: 28px; font-weight: 700; color: #8C1D2C; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .linklike { background: none; border: none; cursor: pointer; padding: 12px 0 0; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  .statuschip { display: inline-block; flex: none; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px; border: 1px solid #7A6A58; color: #2B2118; background: #F6F4F0; white-space: nowrap; }
+  .statuschip.final { border-color: #8C1D2C; color: #8C1D2C; background: rgba(140, 29, 44, 0.08); }
+  .statuschip.paid { border-color: #8C1D2C; color: #8C1D2C; background: rgba(140, 29, 44, 0.08); }
+  .banner { margin-top: 16px; padding: 12px 16px; font-size: 14px; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .banner b { color: #8C1D2C; }
+  .hint { margin-top: 8px; font-size: 12px; color: #7A6A58; }
+  .empty { text-align: center; padding: 24px 16px; }
+  .empty h2 { font-size: 18px; margin: 0 0 4px; }
+  .empty p { font-size: 14px; color: #7A6A58; margin: 4px 0 0; }
+  /* Hàng phiếu lương */
+  .slip { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-top: 12px; }
+  .slip-head { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px; background: none; border: none; cursor: pointer; text-align: left; font-size: 15px; color: #141210; }
+  .slip-head b { display: block; font-size: 15px; }
+  .slip-head span { font-size: 12px; color: #7A6A58; display: block; }
+  .slip-head .amt { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: #141210; }
+  .slip-head .amt-wrap { text-align: right; }
+  .slip-head .amt-wrap .statuschip { margin-top: 6px; }
+  /* Hàng tip theo ngày */
+  .tip-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; font-size: 15px; border-bottom: 1px solid #E9E4DC; }
+  .tip-row:last-child { border-bottom: none; }
+  .tip-row b { font-weight: 600; display: block; }
+  .tip-row span { font-size: 12px; color: #7A6A58; }
+  .tip-row .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hidden { display: none !important; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin: 20px auto 0; max-width: 1024px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .map-table th, .map-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #E9E4DC; vertical-align: top; }
+  .map-table th { color: #7A6A58; font-size: 13px; }
+</style>
+</head>
+<body class="layout-phone">
+<div class="draftbar"><strong>NHÁP B11–B13 v2 — Phiếu lương / Chi tiết / Tip (theo review)</strong> · Kỳ lương + ngày thanh toán · Tách trạng thái phiếu khỏi trạng thái thanh toán · Chỉ làm UI trước, chưa nối API · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+<div class="democtl">
+  <span>Xem màn (nút này chỉ để soi, không thuộc màn hình):</span>
+  <div class="seg">
+    <button type="button" id="seg-b11" class="active">Phiếu lương</button>
+    <button type="button" id="seg-b12">Chi tiết</button>
+    <button type="button" id="seg-b13">Tip</button>
+  </div>
+  <div class="seg">
+    <button type="button" id="seg-phone" class="active">Điện thoại</button>
+    <button type="button" id="seg-laptop">Laptop</button>
+  </div>
+  <span>Phiếu lương:</span>
+  <div class="seg">
+    <button type="button" id="seg-has" class="active">Có phiếu</button>
+    <button type="button" id="seg-empty">Không có phiếu</button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="content">
+
+    <!-- ============ B11: Danh sách phiếu lương ============ -->
+    <section id="screen-b11">
+      <div class="screen-head">
+        <h1>Phiếu lương</h1>
+        <p>Phiếu lương theo tháng của bạn</p>
+      </div>
+      <div class="card">
+        <h2>Tip tháng 11</h2>
+        <div class="bignum">320.000đ</div>
+        <p class="sub">Tính đến 05/11 · Tip tách riêng khỏi lương</p>
+        <p class="hint">Tip được quản lý độc lập — không phụ thuộc vào việc có phiếu lương hay không.</p>
+        <button type="button" class="linklike" id="btn-tip-from-b11">Xem chi tiết tip →</button>
+      </div>
+      <div id="b11-list"></div>
+      <div class="card hidden" id="b11-empty">
+        <div class="empty">
+          <h2>Bạn chưa có phiếu lương nào</h2>
+          <p>Phiếu lương tháng đầu tiên sẽ hiện ở đây sau khi quản lý chốt.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ B12: Chi tiết phiếu lương ============ -->
+    <section id="screen-b12" class="hidden">
+      <button type="button" class="backlink" id="back-b12">← Phiếu lương</button>
+      <div class="screen-head">
+        <h1 id="b12-title">Phiếu lương tháng 11/2026</h1>
+        <p><span class="statuschip" id="b12-status">Tạm tính</span></p>
+      </div>
+      <div class="banner hidden" id="b12-banner"><b>Phiếu tạm tính</b> — tính theo lịch ca đã xếp cả tháng (100 giờ × 40.000đ), chưa phải giờ làm thực tế. Số liệu sẽ thay đổi khi hết tháng.</div>
+      <div class="card">
+        <h2>Thực nhận</h2>
+        <div class="netnum" id="b12-net">4.250.000đ</div>
+        <p class="sub" id="b12-net-sub">Đã trừ các khoản khấu trừ bên dưới</p>
+      </div>
+      <div class="card">
+        <h2>Thu nhập</h2>
+        <div class="rows" id="b12-income"></div>
+      </div>
+      <div class="card">
+        <h2>Khấu trừ</h2>
+        <div class="rows" id="b12-deduct"></div>
+        <p class="hint">Tỷ lệ BHXH và giới hạn tạm ứng do quán quy định — số tiền trong phiếu là ví dụ.</p>
+      </div>
+      <div class="card">
+        <h2>Thanh toán</h2>
+        <div class="rows" id="b12-pay"></div>
+      </div>
+    </section>
+
+    <!-- ============ B13: Chi tiết tip ============ -->
+    <section id="screen-b13" class="hidden">
+      <button type="button" class="backlink" id="back-b13">← Phiếu lương</button>
+      <div class="screen-head">
+        <h1>Tip tháng 11</h1>
+        <p>Tip tách riêng khỏi lương, không tính vào phiếu lương</p>
+      </div>
+      <div class="card">
+        <h2>Tổng tip tháng 11</h2>
+        <div class="bignum">320.000đ</div>
+        <p class="sub">Tính đến 05/11</p>
+        <p><span class="statuschip" id="b13-pay-status">Chưa thanh toán</span></p>
+        <p class="hint" id="b13-pay-note">Dự kiến trả cùng kỳ lương tháng 11 (10/12/2026).</p>
+      </div>
+      <div class="card">
+        <h2>Tip theo ngày</h2>
+        <p class="sub">Tip được chia theo ca làm việc — số tiền mỗi ngày là tổng tip của các ca trong ngày đó.</p>
+        <div id="b13-days"></div>
+      </div>
+      <div class="card">
+        <h2>Các tháng trước</h2>
+        <p class="sub">Chỉ xem tổng theo tháng — chi tiết theo ngày chỉ có cho tháng hiện tại.</p>
+        <div class="rows" id="b13-months"></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<section class="block">
+  <h2>Thay đổi v1 → v2 (theo review)</h2>
+  <ul>
+    <li><strong>Kỳ lương hiện rõ ở B11:</strong> mỗi phiếu có dòng kỳ tính lương ("01/11 – 30/11/2026") dưới tên tháng; tháng tạm tính thêm dòng "Tạm tính đến 05/11/2026" — nhân viên biết số liệu tính đến hôm nay hay dự kiến hết tháng.</li>
+    <li><strong>Tách trạng thái phiếu khỏi trạng thái thanh toán:</strong> "Đã chốt" chỉ nghĩa là phiếu đã được xác nhận, không đồng nghĩa đã nhận tiền. B11 hiện thêm ngày thanh toán ("Dự kiến trả 10/12/2026" với tháng tạm tính, "Đã thanh toán 10/11/2026" với tháng đã chốt). B12 có thêm card "Thanh toán" ở cuối màn.</li>
+    <li><strong>Ghi rõ căn cứ tính phiếu tạm tính:</strong> banner B12 tháng 11 ghi rõ "tính theo lịch ca đã xếp cả tháng (100 giờ × 40.000đ), chưa phải giờ làm thực tế" — không hiển thị số tiền tạm tính mà không giải thích căn cứ. Quy tắc này là giả định trong nháp, chờ team chốt (xem điểm mở).</li>
+    <li><strong>Trạng thái trả tip ở B13:</strong> tổng tip tháng 11 có chip "Chưa thanh toán" + ghi chú "Dự kiến trả cùng kỳ lương tháng 11 (10/12/2026)". Các tháng trước đã thanh toán (hiện trong danh sách tổng theo tháng).</li>
+    <li><strong>Thẻ tip độc lập với phiếu lương:</strong> thêm dòng giải thích dưới thẻ tip ở B11 — "Tip được quản lý độc lập — không phụ thuộc vào việc có phiếu lương hay không." Khi bật trạng thái rỗng "Không có phiếu", thẻ tip vẫn hiện là đúng theo quy tắc này.</li>
+    <li><strong>Các tháng trước ở B13 chỉ đọc:</strong> thêm ghi chú "Chỉ xem tổng theo tháng — chi tiết theo ngày chỉ có cho tháng hiện tại" để không tạo cảm giác các dòng này bấm được.</li>
+    <li><strong>Chip có nền nhạt:</strong> chip "Tạm tính" nền xám nhạt, chip "Đã chốt"/"Đã thanh toán" nền đỏ nhạt — phân biệt trạng thái dễ hơn, không chỉ dựa vào viền.</li>
+    <li><strong>Laptop nới lên 720px</strong> (v1 là 640px) để tận dụng không gian laptop khi đối chiếu các khoản tiền.</li>
+    <li><strong>Trợ năng:</strong> nút từng tháng ở B11 có aria-label "Xem phiếu lương tháng …".</li>
+    <li><strong>Quy tắc điều hướng:</strong> nút quay lại ở B12/B13 luôn về B11 (màn trước đó trong luồng). Nếu sau này mở B13 trực tiếp từ B2 thì nút quay lại về B2 — đã ghi vào điểm mở, chưa vẽ vì trong nháp B13 chỉ mở được từ B11.</li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>5 câu hỏi nghiệp vụ cần team chốt (theo review, mục 7)</h2>
+  <table class="map-table">
+    <tr><th>#</th><th>Câu hỏi</th><th>Nháp đang giả định (chưa phải quyết định)</th></tr>
+    <tr><td>1</td><td>Số tiền ở B2/B11: thực nhận hay tổng thu nhập?</td><td>Thực nhận sau khấu trừ — đã ghi rõ nhãn "Thực nhận" ở B11/B12.</td></tr>
+    <tr><td>2</td><td>Lương tạm tính: theo giờ đã làm hay dự kiến theo lịch ca cả tháng?</td><td>Theo lịch ca đã xếp cả tháng — đã ghi rõ trong banner B12.</td></tr>
+    <tr><td>3</td><td>Tip chia theo giờ làm, theo ca hay theo vai trò?</td><td>Chưa giả định cách chia — nháp chỉ hiện tổng tiền theo ngày.</td></tr>
+    <tr><td>4</td><td>Tip trả riêng hay trả cùng kỳ lương?</td><td>Cùng kỳ lương (dự kiến 10/12/2026) — đã ghi trong ghi chú B13.</td></tr>
+    <tr><td>5</td><td>Phiếu lương có cần tải PDF không?</td><td>Chưa vẽ nút tải — chờ quyết định có cần không.</td></tr>
+  </table>
+  <p>Điểm quan trọng nhất theo review: nhân viên phải hiểu rõ số tiền đang nhìn thấy là <strong>tiền đã nhận, tiền chắc chắn sẽ nhận hay chỉ là số liệu tạm tính</strong>. V2 tách 3 trạng thái đó ra thành: chip phiếu (Tạm tính/Đã chốt) + ngày/dòng thanh toán (Dự kiến trả/Đã thanh toán) + banner căn cứ tính (với phiếu tạm tính).</p>
+</section>
+
+<section class="block">
+  <h2>Điểm mở còn lại (v2 chưa tự quyết)</h2>
+  <ul>
+    <li><strong>Ngày trả lương (10 hàng tháng) là giả định trong nháp</strong> — chờ team chốt kỳ lương (trả ngày mấy, phiếu tháng nào được chốt khi nào).</li>
+    <li><strong>Tỷ lệ khấu trừ:</strong> BHXH tính theo tỷ lệ % lương nào, có thuế TNCN không, tạm ứng giới hạn bao nhiêu? Nháp đang dùng số tiền cố định ví dụ.</li>
+    <li><strong>Tháng không có phiếu:</strong> nhân viên nghỉ cả tháng (nghỉ phép dài, nghỉ việc) thì phiếu tháng đó hiện thế nào — 0đ hay không có phiếu? Nháp chưa vẽ.</li>
+    <li><strong>Nút quay lại B13 từ B2:</strong> nếu sau này mở B13 trực tiếp từ B2 thì nút quay lại về B2 thay vì B11 (quy tắc: về màn trước đó trong luồng).</li>
+    <li><strong>Số liệu trong nháp là ví dụ:</strong> giờ làm, KPI, phụ cấp, BHXH, tạm ứng, tip các tháng trước chỉ để soi bố cục, không phải dữ liệu thật.</li>
+  </ul>
+  <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP B11–B13 v2 (theo review), chưa phải thiết kế chốt. Bản v1 giữ nguyên. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A1 / A3 v1–v5 / A5 v1–v2 / B2 v1–v2 / B3–B5 v1–v2 / B6–B8 v1–v2 / B9–B10 v1–v2.</p>
+</section>
+
+<script>
+  function fmt(n) { return n.toLocaleString("vi-VN") + "đ"; }
+  var PAYSLIPS = [
+    { key: "2026-11", label: "Tháng 11/2026", status: "provisional", period: "01/11 – 30/11/2026", payNote: "Tạm tính đến 05/11/2026 · Dự kiến trả 10/12/2026", payLabel: "Dự kiến thanh toán", payValue: "10/12/2026", paySub: "Trả cùng kỳ lương tháng 11", hours: 100, rate: 40000, kpi: 300000, allowance: 200000, bhxh: 200000, advance: 50000 },
+    { key: "2026-10", label: "Tháng 10/2026", status: "final", period: "01/10 – 31/10/2026", payNote: "Đã thanh toán 10/11/2026", payLabel: "Đã thanh toán ngày", payValue: "10/11/2026", paySub: "Đã nhận đủ thực nhận tháng 10", hours: 110, rate: 40000, kpi: 500000, allowance: 400000, bhxh: 350000, advance: 500000 },
+    { key: "2026-09", label: "Tháng 09/2026", status: "final", period: "01/09 – 30/09/2026", payNote: "Đã thanh toán 10/10/2026", payLabel: "Đã thanh toán ngày", payValue: "10/10/2026", paySub: "Đã nhận đủ thực nhận tháng 9", hours: 105, rate: 40000, kpi: 400000, allowance: 350000, bhxh: 320000, advance: 450000 },
+    { key: "2026-08", label: "Tháng 08/2026", status: "final", period: "01/08 – 31/08/2026", payNote: "Đã thanh toán 10/08/2026", payLabel: "Đã thanh toán ngày", payValue: "10/08/2026", paySub: "Đã nhận đủ thực nhận tháng 8", hours: 100, rate: 40000, kpi: 300000, allowance: 300000, bhxh: 300000, advance: 200000 }
+  ];
+  function incomeOf(p) { return p.hours * p.rate + p.kpi + p.allowance; }
+  function deductOf(p) { return p.bhxh + p.advance; }
+  function netOf(p) { return incomeOf(p) - deductOf(p); }
+  var TIP_DAYS = [
+    { date: "Thứ Năm 05/11", amount: 95000 },
+    { date: "Thứ Tư 04/11", amount: 85000 },
+    { date: "Thứ Ba 03/11", amount: 70000 },
+    { date: "Thứ Hai 02/11", amount: 70000 }
+  ];
+  var TIP_MONTHS = [
+    { label: "Tháng 10/2026", amount: 1180000, paid: true },
+    { label: "Tháng 09/2026", amount: 950000, paid: true },
+    { label: "Tháng 08/2026", amount: 870000, paid: true }
+  ];
+  var showEmpty = false;
+
+  function showScreen(id) {
+    ["screen-b11", "screen-b12", "screen-b13"].forEach(function (s) {
+      document.getElementById(s).classList.toggle("hidden", s !== id);
+    });
+    document.getElementById("seg-b11").classList.toggle("active", id === "screen-b11");
+    document.getElementById("seg-b12").classList.toggle("active", id === "screen-b12");
+    document.getElementById("seg-b13").classList.toggle("active", id === "screen-b13");
+    window.scrollTo(0, 0);
+  }
+  function renderB11() {
+    var list = document.getElementById("b11-list");
+    list.innerHTML = "";
+    var empty = document.getElementById("b11-empty");
+    var visible = showEmpty ? [] : PAYSLIPS;
+    empty.classList.toggle("hidden", visible.length > 0);
+    visible.forEach(function (p) {
+      var box = document.createElement("div");
+      box.className = "slip";
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "slip-head";
+      b.setAttribute("aria-label", "Xem phiếu lương tháng " + p.label.replace("Tháng ", ""));
+      b.innerHTML = '<span><b>' + p.label + '</b><span>' + p.period + '</span><span>' + p.payNote + '</span></span>' +
+        '<span class="amt-wrap"><span class="amt">' + fmt(netOf(p)) + '</span>' +
+        '<span class="statuschip' + (p.status === "final" ? " final" : "") + '">' +
+        (p.status === "final" ? "Đã chốt" : "Tạm tính") + '</span></span>';
+      b.addEventListener("click", function () { renderB12(p.key); showScreen("screen-b12"); });
+      box.appendChild(b);
+      list.appendChild(box);
+    });
+  }
+  function renderB12(key) {
+    var p = PAYSLIPS.find(function (x) { return x.key === key; }) || PAYSLIPS[0];
+    document.getElementById("b12-title").textContent = "Phiếu lương tháng " + p.label.replace("Tháng ", "");
+    var chip = document.getElementById("b12-status");
+    chip.textContent = p.status === "final" ? "Đã chốt" : "Tạm tính";
+    chip.className = "statuschip" + (p.status === "final" ? " final" : "");
+    document.getElementById("b12-banner").classList.toggle("hidden", p.status === "final");
+    document.getElementById("b12-net").textContent = fmt(netOf(p));
+    document.getElementById("b12-income").innerHTML =
+      '<div class="row"><span>Lương giờ</span><b>' + p.hours + ' giờ × ' + fmt(p.rate) + '</b></div>' +
+      '<div class="row"><span></span><b class="meta">' + fmt(p.hours * p.rate) + '</b></div>' +
+      '<div class="row"><span>Thưởng KPI</span><b>+' + fmt(p.kpi) + '</b></div>' +
+      '<div class="row"><span>Phụ cấp ăn ca</span><b>+' + fmt(p.allowance) + '</b></div>' +
+      '<div class="row total"><span>Tổng thu nhập</span><b>' + fmt(incomeOf(p)) + '</b></div>';
+    document.getElementById("b12-deduct").innerHTML =
+      '<div class="row"><span>BHXH</span><b class="neg">−' + fmt(p.bhxh) + '</b></div>' +
+      '<div class="row"><span>Tạm ứng</span><b class="neg">−' + fmt(p.advance) + '</b></div>' +
+      '<div class="row total"><span>Tổng khấu trừ</span><b class="neg">−' + fmt(deductOf(p)) + '</b></div>';
+    document.getElementById("b12-pay").innerHTML =
+      '<div class="row"><span>' + p.payLabel + '</span><b>' + p.payValue + '</b></div>' +
+      '<div class="row"><span></span><b class="meta">' + p.paySub + '</b></div>';
+  }
+  function renderB13() {
+    var days = document.getElementById("b13-days");
+    days.innerHTML = "";
+    TIP_DAYS.forEach(function (t) {
+      var row = document.createElement("div");
+      row.className = "tip-row";
+      row.innerHTML = '<span><b>' + t.date + '</b><span>Tip trong ngày</span></span><span class="amt">' + fmt(t.amount) + '</span>';
+      days.appendChild(row);
+    });
+    var months = document.getElementById("b13-months");
+    months.innerHTML = "";
+    TIP_MONTHS.forEach(function (t) {
+      var row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = '<span>' + t.label + '</span><b>' + fmt(t.amount) + ' · Đã thanh toán</b>';
+      months.appendChild(row);
+    });
+  }
+
+  document.getElementById("btn-tip-from-b11").addEventListener("click", function () { showScreen("screen-b13"); });
+  document.getElementById("back-b12").addEventListener("click", function () { showScreen("screen-b11"); });
+  document.getElementById("back-b13").addEventListener("click", function () { showScreen("screen-b11"); });
+  document.getElementById("seg-has").addEventListener("click", function () {
+    showEmpty = false;
+    this.classList.add("active");
+    document.getElementById("seg-empty").classList.remove("active");
+    renderB11();
+  });
+  document.getElementById("seg-empty").addEventListener("click", function () {
+    showEmpty = true;
+    this.classList.add("active");
+    document.getElementById("seg-has").classList.remove("active");
+    renderB11();
+  });
+  document.getElementById("seg-b11").addEventListener("click", function () { showScreen("screen-b11"); });
+  document.getElementById("seg-b12").addEventListener("click", function () { renderB12("2026-11"); showScreen("screen-b12"); });
+  document.getElementById("seg-b13").addEventListener("click", function () { showScreen("screen-b13"); });
+  document.getElementById("seg-phone").addEventListener("click", function () {
+    document.body.classList.remove("layout-laptop");
+    document.body.classList.add("layout-phone");
+    this.classList.add("active");
+    document.getElementById("seg-laptop").classList.remove("active");
+  });
+  document.getElementById("seg-laptop").addEventListener("click", function () {
+    document.body.classList.remove("layout-phone");
+    document.body.classList.add("layout-laptop");
+    this.classList.add("active");
+    document.getElementById("seg-phone").classList.remove("active");
+  });
+  renderB11();
+  renderB12("2026-11");
+  renderB13();
+</script>
+</body>
+</html>

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B3–B5 v2 — Chấm công: quét mặt + PIN dự phòng (theo UX Audit)</title>
+<style>
+  /* Ngôn ngữ vận hành đã khóa:
+     nền ops #F6F4F0 · card #FFFFFF · chữ chính #141210 · chữ vận hành #2B2118
+     chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C · brand-dark #6F1623
+     danger #D14B3A (chỉ lỗi/cảnh báo nguy hiểm, không tô đỏ cả khu vực)
+     bo 8px · bóng nhẹ · spacing bội số 4px · nút chính 48px
+     icon một bộ outline Lucide, stroke 2
+     B3–B5 là luồng từ B2 (thao tác nhanh "Chấm công"), không chiếm tab riêng,
+     không có bottom nav. Điện thoại cá nhân là chính; bản laptop cùng nội dung.
+     v2 theo UX Audit + quyết định của cậu: BỎ Geofence hẳn, PIN chấm công tách
+     riêng khỏi PIN KDS (A1), quản lý đăng ký khuôn mặt cho nhân viên. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .democtl { background: #fff; border-bottom: 1px solid #E9E4DC; padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: #7A6A58; }
+  .democtl .seg { display: flex; background: #F6F4F0; border: 1px solid #E9E4DC; border-radius: 8px; padding: 4px; gap: 4px; }
+  .democtl .seg button { border: none; background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 6px; color: #2B2118; }
+  .democtl .seg button.active { background: #8C1D2C; color: #fff; }
+  .democtl .demo-btn { border: 1px solid #E9E4DC; background: #fff; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 8px; color: #2B2118; }
+  /* ===== Khung app ===== */
+  .app { margin: 0 auto; background: #F6F4F0; border-left: 1px solid #E9E4DC; border-right: 1px solid #E9E4DC; min-height: 100vh; display: flex; flex-direction: column; }
+  body.layout-phone .app { max-width: 480px; }
+  body.layout-laptop .app { max-width: 640px; }
+  .content { flex: 1; padding: 16px 20px 32px; }
+  .backlink { background: none; border: none; cursor: pointer; padding: 4px 0 12px; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  .screen-head h1 { margin: 0; font-size: 20px; font-weight: 600; color: #2B2118; }
+  .screen-head p { margin: 4px 0 0; font-size: 12px; color: #7A6A58; }
+  .step { font-size: 12px; font-weight: 700; color: #8C1D2C; margin: 0 0 4px; }
+  .card { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px; margin-top: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: #2B2118; }
+  .card .sub { font-size: 12px; color: #7A6A58; margin: 0; }
+  .shift-title { font-size: 18px; font-weight: 600; color: #2B2118; margin: 0 0 4px; }
+  .shift-hours { font-size: 20px; font-weight: 700; margin: 8px 0 4px; }
+  .rows { margin-top: 8px; }
+  .rows .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 15px; }
+  .rows .row span:first-child { color: #7A6A58; }
+  .rows .row b { font-weight: 600; text-align: right; }
+  .rows .row .meta { color: #7A6A58; font-weight: 400; }
+  .rows .row .now { font-size: 20px; font-weight: 700; }
+  .statusline { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 15px; font-weight: 600; }
+  .statusline svg { color: #8C1D2C; flex: none; }
+  /* Nút */
+  .btn-brand { width: 100%; height: 48px; margin-top: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .btn-brand:hover { background: #6F1623; }
+  .btn-brand:disabled { opacity: 0.6; cursor: default; }
+  .btn-big { height: 64px; font-size: 18px; }
+  .btn-ghost { width: 100%; height: 48px; margin-top: 12px; font-size: 16px; font-weight: 600; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .linklike { background: none; border: none; cursor: pointer; padding: 12px 0 0; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  /* Khung camera (placeholder — nháp không truy cập camera thật) */
+  .cameraframe { margin-top: 16px; border: 1px solid #E9E4DC; border-radius: 8px; background: #F6F4F0; min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+  .cameraframe svg { color: #7A6A58; }
+  .cameraframe p { margin: 0; font-size: 15px; color: #2B2118; font-weight: 600; }
+  .cameraframe span { font-size: 12px; color: #7A6A58; }
+  .cameraframe.scanning { border-color: #8C1D2C; }
+  .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #E9E4DC; border-top-color: #8C1D2C; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Bàn phím PIN — giống A1: phím cao 64px, đủ 4 số mới xác nhận */
+  .pindots { display: flex; justify-content: center; gap: 12px; margin: 16px 0 4px; }
+  .pindots .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #7A6A58; }
+  .pindots .dot.filled { background: #8C1D2C; border-color: #8C1D2C; }
+  .pinerror { text-align: center; color: #D14B3A; font-size: 14px; font-weight: 600; min-height: 20px; margin: 4px 0 0; }
+  .pinpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .pinpad button { height: 64px; font-size: 24px; font-weight: 600; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .pinpad button:active { background: #F6F4F0; }
+  .pinpad button:disabled { opacity: 0.4; cursor: default; }
+  .lockmsg { text-align: center; padding: 16px 8px 4px; }
+  .lockmsg svg { color: #D14B3A; }
+  .lockmsg p { font-size: 15px; font-weight: 600; margin: 8px 0 4px; }
+  .lockmsg span { font-size: 12px; color: #7A6A58; }
+  /* Kết quả B5 */
+  .result { text-align: center; padding: 24px 16px 8px; }
+  .result svg { color: #8C1D2C; }
+  .result svg.danger { color: #D14B3A; }
+  .result h2 { font-size: 20px; margin: 12px 0 4px; }
+  .result .time { font-size: 32px; font-weight: 700; margin: 8px 0 0; }
+  .result .verdict { font-size: 16px; font-weight: 600; margin: 4px 0 0; }
+  .result .meta { font-size: 12px; color: #7A6A58; margin: 8px 0 0; }
+  .result .note { font-size: 15px; color: #2B2118; margin: 8px 0 0; }
+  .icon { width: 20px; height: 20px; }
+  .icon-lg { width: 48px; height: 48px; }
+  .icon-sm { width: 18px; height: 18px; flex: none; }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; background: #141210; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 100; max-width: 92vw; text-align: center; }
+  .hidden { display: none !important; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin: 20px auto 0; max-width: 1024px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .map-table th, .map-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #E9E4DC; vertical-align: top; }
+  .map-table th { color: #7A6A58; font-size: 13px; }
+</style>
+</head>
+<body class="layout-phone">
+<div class="draftbar"><strong>NHÁP B3–B5 v2 — Chấm công: quét mặt + PIN dự phòng (theo UX Audit)</strong> · Đã bỏ Geofence · PIN chấm công tách riêng khỏi PIN KDS · Chỉ làm UI trước, chưa nối API/camera thật · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+<div class="democtl">
+  <span>Xem màn (nút này chỉ để soi, không thuộc màn hình):</span>
+  <div class="seg">
+    <button type="button" id="seg-b3" class="active">Chấm công</button>
+    <button type="button" id="seg-b4">Xác minh</button>
+    <button type="button" id="seg-b5">Kết quả</button>
+  </div>
+  <div class="seg">
+    <button type="button" id="seg-phone" class="active">Điện thoại</button>
+    <button type="button" id="seg-laptop">Laptop</button>
+  </div>
+  <span>Thử ở màn Xác minh:</span>
+  <button type="button" class="demo-btn" id="demo-scan-ok">Quét thành công</button>
+  <button type="button" class="demo-btn" id="demo-scan-fail">Quét thất bại</button>
+  <span>Thử ở màn Kết quả:</span>
+  <button type="button" class="demo-btn" id="demo-b5-ok">Thành công</button>
+  <button type="button" class="demo-btn" id="demo-b5-dup">Đã vào ca</button>
+  <button type="button" class="demo-btn" id="demo-b5-err">Lỗi kết nối</button>
+  <button type="button" class="demo-btn" id="demo-reset">Đặt lại trạng thái chấm công</button>
+</div>
+
+<div class="app">
+  <div class="content">
+
+    <!-- ============ B3: Chấm công ============ -->
+    <section id="screen-b3">
+      <button type="button" class="backlink" data-dest="Mở Trang chủ">← Trang chủ</button>
+      <div class="screen-head">
+        <h1>Chấm công</h1>
+        <p>Thứ Năm, 05/11/2026</p>
+      </div>
+      <div class="card">
+        <p class="shift-title">Ca sáng</p>
+        <p class="sub">Nhà hàng chính</p>
+        <div class="shift-hours">08:00 – 14:00</div>
+        <div class="rows">
+          <div class="row"><span>Khu vực</span><b>Bếp chính</b></div>
+          <div class="row"><span>Giờ hiện tại</span><b class="now">07:58</b></div>
+          <div class="row"><span>Trạng thái</span><b id="b3-status" class="meta">Chưa vào ca</b></div>
+        </div>
+        <div class="statusline hidden" id="b3-checkedin">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Đã vào ca lúc 07:58
+        </div>
+      </div>
+      <button type="button" class="btn-brand btn-big" id="btn-clockin">Chấm công</button>
+      <button type="button" class="linklike" data-dest="Mở Lịch ca">Xem lịch ca →</button>
+    </section>
+
+    <!-- ============ B4: Xác minh ============ -->
+    <section id="screen-b4" class="hidden">
+      <button type="button" class="backlink" id="back-b4">← Chấm công</button>
+      <div class="screen-head">
+        <p class="step">Bước 2 / 3</p>
+        <h1>Xác minh</h1>
+        <p>Xác minh khuôn mặt để chấm công</p>
+      </div>
+
+      <!-- Trạng thái quét mặt -->
+      <div id="scan-area">
+        <div class="cameraframe" id="cameraframe">
+          <svg class="icon-lg" id="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></svg>
+          <div class="spinner hidden" id="scan-spinner"></div>
+          <p id="scan-title">Đưa mặt vào khung hình</p>
+          <span>Giữ điện thoại ngang tầm mắt, đủ sáng</span>
+        </div>
+        <p class="pinerror" id="scan-error"></p>
+        <button type="button" class="btn-brand" id="btn-scan">Quét khuôn mặt</button>
+        <button type="button" class="btn-ghost hidden" id="btn-rescan">Quét lại</button>
+        <button type="button" class="btn-ghost hidden" id="btn-use-pin">Nhập mã PIN thay thế</button>
+      </div>
+
+      <!-- Nhập PIN dự phòng — hiện khi quét thất bại -->
+      <div id="pin-area" class="hidden">
+        <div class="card">
+          <h2>Nhập mã PIN</h2>
+          <p class="sub">Dùng khi không quét được khuôn mặt</p>
+          <div id="pin-input">
+            <div class="pindots" id="pindots">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </div>
+            <p class="pinerror" id="pin-error"></p>
+            <div class="pinpad" id="pinpad">
+              <button type="button" data-digit="1">1</button>
+              <button type="button" data-digit="2">2</button>
+              <button type="button" data-digit="3">3</button>
+              <button type="button" data-digit="4">4</button>
+              <button type="button" data-digit="5">5</button>
+              <button type="button" data-digit="6">6</button>
+              <button type="button" data-digit="7">7</button>
+              <button type="button" data-digit="8">8</button>
+              <button type="button" data-digit="9">9</button>
+              <button type="button" id="pin-clear">Xóa</button>
+              <button type="button" data-digit="0">0</button>
+              <button type="button" id="pin-back">⌫</button>
+            </div>
+            <button type="button" class="linklike" id="btn-forgot-pin">Quên mã PIN? Gặp quản lý để đặt lại →</button>
+          </div>
+          <div id="pin-locked" class="lockmsg hidden">
+            <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <p>Đã nhập sai mã PIN 3 lần</p>
+            <span>Mã PIN tạm khóa — gặp quản lý để mở khóa, hoặc quét lại khuôn mặt.</span>
+          </div>
+        </div>
+        <button type="button" class="btn-ghost" id="btn-back-scan">← Quay lại quét mặt</button>
+      </div>
+    </section>
+
+    <!-- ============ B5: Kết quả ============ -->
+    <section id="screen-b5" class="hidden">
+      <div class="screen-head">
+        <p class="step">Bước 3 / 3</p>
+        <h1>Kết quả chấm công</h1>
+        <p>Thứ Năm, 05/11/2026</p>
+      </div>
+
+      <!-- Thành công -->
+      <div id="b5-success">
+        <div class="card">
+          <div class="result">
+            <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <h2>Đã chấm công</h2>
+            <p class="time">07:58</p>
+            <p class="verdict">Đúng giờ</p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Thông tin ca</h2>
+          <div class="rows">
+            <div class="row"><span>Ca làm việc</span><b>Ca sáng · 08:00 – 14:00</b></div>
+            <div class="row"><span>Khu vực</span><b>Bếp chính</b></div>
+            <div class="row"><span>Phương thức xác minh</span><b id="b5-method">Khuôn mặt</b></div>
+          </div>
+        </div>
+        <button type="button" class="btn-brand" data-dest="Mở Trang chủ">Về trang chủ</button>
+      </div>
+
+      <!-- Đã vào ca trước đó -->
+      <div id="b5-duplicate" class="hidden">
+        <div class="card">
+          <div class="result">
+            <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <h2>Bạn đã vào ca lúc 07:58</h2>
+            <p class="note">Không tạo thêm bản ghi chấm công.</p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Thông tin ca</h2>
+          <div class="rows">
+            <div class="row"><span>Ca làm việc</span><b>Ca sáng · 08:00 – 14:00</b></div>
+            <div class="row"><span>Khu vực</span><b>Bếp chính</b></div>
+          </div>
+        </div>
+        <button type="button" class="btn-brand" data-dest="Mở Trang chủ">Về trang chủ</button>
+      </div>
+
+      <!-- Lỗi kết nối -->
+      <div id="b5-error" class="hidden">
+        <div class="card">
+          <div class="result">
+            <svg class="icon-lg danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.86a10 10 0 0 1 14 0"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+            <h2>Chưa thể xác nhận chấm công</h2>
+            <p class="note">Kiểm tra kết nối mạng rồi thử lại.</p>
+          </div>
+        </div>
+        <button type="button" class="btn-brand" id="btn-retry">Thử lại</button>
+        <button type="button" class="btn-ghost" data-dest="Mở Trang chủ">Về trang chủ</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<section class="block">
+  <h2>Thay đổi v1 → v2 (theo UX Audit + quyết định của cậu)</h2>
+  <ul>
+    <li><strong>Must fix — bỏ Geofence hẳn:</strong> gỡ toàn bộ thẻ vị trí khỏi màn Xác minh và dòng vị trí khỏi màn Kết quả. Luồng v2 chỉ còn quét mặt → PIN dự phòng. Nhánh ngoài vùng không còn, nên câu hỏi "ngoài vùng xử lý sao" cũng không còn.</li>
+    <li><strong>Must fix — trạng thái đã vào ca ở B3 (chống chấm trùng):</strong> sau khi chấm công thành công, quay lại màn Chấm công sẽ thấy "Đã vào ca lúc 07:58" kèm icon check màu brand, nút "Chấm công" chuyển thành "Đã chấm công" và bị vô hiệu hóa. Thử bằng cách: chấm xong rồi bấm nút soi "Chấm công" trên thanh soi; nút "Đặt lại trạng thái chấm công" để soi lại từ đầu.</li>
+    <li><strong>Must fix — quy tắc PIN dự phòng:</strong> nhập sai hiện "Mã PIN chưa đúng — còn X lần thử"; sai 3 lần thì khóa mã PIN (ẩn bàn phím, hiện thông báo khóa + gặp quản lý để mở khóa), vẫn cho quay lại quét mặt. Số 3 lần là đề xuất trong nháp, chờ cậu chốt (xem điểm mở).</li>
+    <li><strong>Must fix — B5 thêm trạng thái không thành công:</strong> ngoài "Đã chấm công" còn 2 trạng thái soi bằng nút trên thanh soi: "Bạn đã vào ca lúc 07:58" (không tạo thêm bản ghi) và "Chưa thể xác nhận chấm công" (lỗi kết nối, nút "Thử lại" quay về màn Xác minh).</li>
+    <li><strong>Should improve — B3 thêm giờ hiện tại:</strong> dòng "Giờ hiện tại 07:58" (giờ to 20px) trong thẻ ca, để nhân viên biết mình đang chấm sớm, đúng giờ hay muộn. Không thêm card riêng.</li>
+    <li><strong>Should improve — hierarchy thẻ ca:</strong> "Ca sáng" thành tiêu đề 18px, giờ ca 08:00 – 14:00 to 20px, khu vực/giờ hiện tại/trạng thái xếp theo hàng label–value như cũ.</li>
+    <li><strong>Should improve — icon camera:</strong> đổi icon con mắt sang icon quét mặt (scan-face, đúng ngữ nghĩa nhận diện khuôn mặt).</li>
+    <li><strong>Should improve — loading rõ ràng:</strong> lúc quét hiện vòng xoay + chữ "Đang quét…", nút quét bị vô hiệu hóa trong lúc xử lý.</li>
+    <li><strong>Should improve — nhóm thông tin kết quả ở B5:</strong> ca/khu vực/phương thức xác minh gom vào một card "Thông tin ca" có cấu trúc, thay vì các dòng metadata rời.</li>
+    <li><strong>Responsive:</strong> bản laptop nới từ 560px lên 640px, vẫn một cột căn giữa (theo audit: 560–640px là đủ cho tác vụ chấm công, không cần dashboard riêng).</li>
+    <li><strong>Quên mã PIN:</strong> thêm dòng "Quên mã PIN? Gặp quản lý để đặt lại" dưới bàn phím (hiện toast đích đến trong nháp).</li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>Quyết định đã chốt trong v2</h2>
+  <table class="map-table">
+    <tr><th>Vấn đề</th><th>Quyết định</th></tr>
+    <tr><td>Geofence</td><td><strong>Bỏ hẳn.</strong> Không kiểm tra vị trí trong B4, không có nhánh ngoài vùng. Audit khuyến nghị giữ nếu nhà hàng yêu cầu chấm tại địa điểm — cậu chọn bỏ.</td></tr>
+    <tr><td>PIN chấm công vs PIN KDS (A1)</td><td><strong>Tách riêng.</strong> Hai mã khác nhau: PIN vào bếp trên tablet dùng chung (A1) và PIN dự phòng chấm công trên điện thoại cá nhân (B4). Nháp không gộp hai mã này.</td></tr>
+    <tr><td>Đăng ký khuôn mặt</td><td><strong>Quản lý đăng ký cho nhân viên.</strong> Nhân viên không tự đăng ký. Màn đăng ký thuộc phía quản lý, ngoài phạm vi B3–B5 nên chưa vẽ trong nháp này (xem điểm mở).</td></tr>
+    <tr><td>Quét thất bại mấy lần thì cho PIN</td><td><strong>Thất bại 1 lần là hiện nút PIN</strong> (giữ như v1, theo khuyến nghị của audit).</td></tr>
+  </table>
+</section>
+
+<section class="block">
+  <h2>Điểm mở còn lại (v2 chưa tự quyết)</h2>
+  <ul>
+    <li><strong>Số lần nhập PIN sai và thời gian khóa:</strong> nháp đang để sai 3 lần thì khóa mã PIN; chưa chốt khóa đến khi quản lý mở hay tự mở sau bao nhiêu phút, và có cần báo cho quản lý khi bị khóa không.</li>
+    <li><strong>Mã giao dịch chấm công:</strong> audit để tùy chọn (hỗ trợ tra cứu khi sai lệch). Nháp chưa thêm — nếu cần thì thêm dòng mã nhỏ vào card "Thông tin ca" ở B5.</li>
+    <li><strong>Màn đăng ký khuôn mặt (phía quản lý):</strong> chưa vẽ — thuộc module quản lý, ngoài phạm vi B3–B5. Cần chốt màn đó nằm ở đâu (trong Staff Portal góc quản lý hay màn quản trị riêng) trước khi vẽ.</li>
+    <li><strong>Chống giả mạo bằng ảnh (liveness):</strong> production cần cơ chế kiểm tra tính sống; nháp không xử lý.</li>
+    <li><strong>Trạng thái "Ca đã kết thúc":</strong> audit nhắc màn B3 có thể cần trạng thái này; nháp chỉ vẽ "Chưa vào ca" và "Đã vào ca".</li>
+    <li><strong>Đồng bộ trạng thái với B2:</strong> thẻ ca ở B2 cũng hiện "Đã vào ca lúc 07:58" — hai màn phải cùng một dữ liệu thật khi nối API; nháp chỉ mô phỏng bằng trạng thái nội bộ của file.</li>
+    <li><strong>Số liệu trong nháp là ví dụ:</strong> giờ ca 08:00–14:00, giờ chấm 07:58, "Đúng giờ" chỉ để soi bố cục, không phải dữ liệu thật.</li>
+  </ul>
+  <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP B3–B5 v2 (theo UX Audit + quyết định đã chốt), chưa phải thiết kế chốt. Bản v1 giữ nguyên. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A1 / A3 v1–v5 / A5 v1–v2 / B2 v1–v2.</p>
+</section>
+
+<script>
+  var toastTimer = null;
+  var scanAttempts = 0;
+  var pinValue = "";
+  var pinFails = 0;
+  var pinLocked = false;
+  var checkedIn = false;
+  var methodUsed = "face";
+  var PIN_MAX_FAILS = 3;
+
+  function showDest(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = "→ " + msg;
+    t.classList.remove("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.add("hidden"); }, 4000);
+  }
+  function showScreen(id) {
+    ["screen-b3", "screen-b4", "screen-b5"].forEach(function (s) {
+      document.getElementById(s).classList.toggle("hidden", s !== id);
+    });
+    var map = { "screen-b3": "seg-b3", "screen-b4": "seg-b4", "screen-b5": "seg-b5" };
+    ["seg-b3", "seg-b4", "seg-b5"].forEach(function (s) {
+      document.getElementById(s).classList.toggle("active", s === map[id]);
+    });
+    if (id === "screen-b3") renderB3();
+    window.scrollTo(0, 0);
+  }
+  function renderB3() {
+    var status = document.getElementById("b3-status");
+    var line = document.getElementById("b3-checkedin");
+    var btn = document.getElementById("btn-clockin");
+    if (checkedIn) {
+      status.textContent = "Đã vào ca lúc 07:58";
+      line.classList.remove("hidden");
+      btn.disabled = true;
+      btn.textContent = "Đã chấm công";
+    } else {
+      status.textContent = "Chưa vào ca";
+      line.classList.add("hidden");
+      btn.disabled = false;
+      btn.textContent = "Chấm công";
+    }
+  }
+  function showB5(variant) {
+    ["b5-success", "b5-duplicate", "b5-error"].forEach(function (v) {
+      document.getElementById(v).classList.toggle("hidden", v !== "b5-" + variant);
+    });
+    if (variant === "success") {
+      document.getElementById("b5-method").textContent =
+        methodUsed === "face" ? "Khuôn mặt" : "Mã PIN";
+    }
+    showScreen("screen-b5");
+  }
+  function setScanState(state) {
+    var frame = document.getElementById("cameraframe");
+    var icon = document.getElementById("scan-icon");
+    var spinner = document.getElementById("scan-spinner");
+    var title = document.getElementById("scan-title");
+    var err = document.getElementById("scan-error");
+    var btnScan = document.getElementById("btn-scan");
+    var btnRescan = document.getElementById("btn-rescan");
+    var btnPin = document.getElementById("btn-use-pin");
+    frame.classList.remove("scanning");
+    spinner.classList.add("hidden");
+    icon.classList.remove("hidden");
+    if (state === "idle") {
+      title.textContent = "Đưa mặt vào khung hình";
+      err.textContent = "";
+      btnScan.classList.remove("hidden");
+      btnScan.disabled = false;
+      btnScan.textContent = "Quét khuôn mặt";
+      btnRescan.classList.add("hidden");
+      btnPin.classList.add("hidden");
+    } else if (state === "scanning") {
+      frame.classList.add("scanning");
+      icon.classList.add("hidden");
+      spinner.classList.remove("hidden");
+      title.textContent = "Đang quét…";
+      err.textContent = "";
+      btnScan.classList.remove("hidden");
+      btnScan.disabled = true;
+      btnScan.textContent = "Đang quét…";
+      btnRescan.classList.add("hidden");
+      btnPin.classList.add("hidden");
+    } else if (state === "fail") {
+      title.textContent = "Không nhận diện được khuôn mặt";
+      err.textContent = "Vui lòng thử lại hoặc sử dụng mã PIN dự phòng.";
+      btnScan.classList.add("hidden");
+      btnRescan.classList.remove("hidden");
+      btnPin.classList.remove("hidden");
+    }
+  }
+  function doScan() {
+    scanAttempts++;
+    setScanState("scanning");
+    setTimeout(function () {
+      if (scanAttempts === 1) {
+        setScanState("fail");
+      } else {
+        finishCheckIn("face");
+      }
+    }, 1200);
+  }
+  function finishCheckIn(method) {
+    methodUsed = method;
+    checkedIn = true;
+    pinFails = 0;
+    pinLocked = false;
+    showB5("success");
+  }
+  function renderPin() {
+    var dots = document.querySelectorAll("#pindots .dot");
+    dots.forEach(function (d, i) { d.classList.toggle("filled", i < pinValue.length); });
+    if (pinValue.length === 4) {
+      if (pinValue === "0000") {
+        pinFails++;
+        pinValue = "";
+        if (pinFails >= PIN_MAX_FAILS) {
+          pinLocked = true;
+          document.getElementById("pin-input").classList.add("hidden");
+          document.getElementById("pin-locked").classList.remove("hidden");
+        } else {
+          document.getElementById("pin-error").textContent =
+            "Mã PIN chưa đúng — còn " + (PIN_MAX_FAILS - pinFails) + " lần thử.";
+          renderPin();
+        }
+      } else {
+        document.getElementById("pin-error").textContent = "";
+        pinValue = "";
+        renderPin();
+        finishCheckIn("pin");
+      }
+    }
+  }
+  function resetPinArea() {
+    pinValue = "";
+    document.getElementById("pin-error").textContent = "";
+    document.getElementById("pin-input").classList.remove("hidden");
+    document.getElementById("pin-locked").classList.add("hidden");
+    renderPin();
+  }
+
+  document.getElementById("btn-clockin").addEventListener("click", function () {
+    if (checkedIn) { showB5("duplicate"); return; }
+    scanAttempts = 0;
+    setScanState("idle");
+    document.getElementById("pin-area").classList.add("hidden");
+    document.getElementById("scan-area").classList.remove("hidden");
+    resetPinArea();
+    showScreen("screen-b4");
+  });
+  document.getElementById("back-b4").addEventListener("click", function () { showScreen("screen-b3"); });
+  document.getElementById("btn-scan").addEventListener("click", doScan);
+  document.getElementById("btn-rescan").addEventListener("click", doScan);
+  document.getElementById("btn-use-pin").addEventListener("click", function () {
+    if (pinLocked) return;
+    document.getElementById("scan-area").classList.add("hidden");
+    document.getElementById("pin-area").classList.remove("hidden");
+    pinValue = "";
+    document.getElementById("pin-error").textContent = "";
+    renderPin();
+  });
+  document.getElementById("btn-back-scan").addEventListener("click", function () {
+    document.getElementById("pin-area").classList.add("hidden");
+    document.getElementById("scan-area").classList.remove("hidden");
+    setScanState("fail");
+  });
+  document.getElementById("btn-forgot-pin").addEventListener("click", function () {
+    showDest("Gặp quản lý để đặt lại mã PIN");
+  });
+  document.getElementById("pinpad").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b || pinLocked) return;
+    if (b.dataset.digit !== undefined) {
+      if (pinValue.length < 4) { pinValue += b.dataset.digit; renderPin(); }
+    } else if (b.id === "pin-back") {
+      pinValue = pinValue.slice(0, -1);
+      document.getElementById("pin-error").textContent = "";
+      renderPin();
+    } else if (b.id === "pin-clear") {
+      pinValue = "";
+      document.getElementById("pin-error").textContent = "";
+      renderPin();
+    }
+  });
+  document.getElementById("btn-retry").addEventListener("click", function () {
+    scanAttempts = 0;
+    setScanState("idle");
+    document.getElementById("pin-area").classList.add("hidden");
+    document.getElementById("scan-area").classList.remove("hidden");
+    resetPinArea();
+    showScreen("screen-b4");
+  });
+  document.getElementById("demo-scan-ok").addEventListener("click", function () {
+    showScreen("screen-b4");
+    finishCheckIn("face");
+  });
+  document.getElementById("demo-scan-fail").addEventListener("click", function () {
+    showScreen("screen-b4");
+    document.getElementById("pin-area").classList.add("hidden");
+    document.getElementById("scan-area").classList.remove("hidden");
+    setScanState("fail");
+  });
+  document.getElementById("demo-b5-ok").addEventListener("click", function () {
+    checkedIn = true;
+    methodUsed = "face";
+    showB5("success");
+  });
+  document.getElementById("demo-b5-dup").addEventListener("click", function () {
+    checkedIn = true;
+    showB5("duplicate");
+  });
+  document.getElementById("demo-b5-err").addEventListener("click", function () {
+    showB5("error");
+  });
+  document.getElementById("demo-reset").addEventListener("click", function () {
+    checkedIn = false;
+    pinFails = 0;
+    pinLocked = false;
+    scanAttempts = 0;
+    showScreen("screen-b3");
+  });
+  ["seg-b3", "seg-b4", "seg-b5"].forEach(function (id, i) {
+    document.getElementById(id).addEventListener("click", function () {
+      showScreen("screen-b" + (i + 3));
+    });
+  });
+  document.getElementById("seg-phone").addEventListener("click", function () {
+    document.body.classList.remove("layout-laptop");
+    document.body.classList.add("layout-phone");
+    this.classList.add("active");
+    document.getElementById("seg-laptop").classList.remove("active");
+  });
+  document.getElementById("seg-laptop").addEventListener("click", function () {
+    document.body.classList.remove("layout-phone");
+    document.body.classList.add("layout-laptop");
+    this.classList.add("active");
+    document.getElementById("seg-phone").classList.remove("active");
+  });
+  document.querySelectorAll("[data-dest]").forEach(function (el) {
+    el.addEventListener("click", function () { showDest(el.getAttribute("data-dest")); });
+  });
+  renderB3();
+</script>
+</body>
+</html>

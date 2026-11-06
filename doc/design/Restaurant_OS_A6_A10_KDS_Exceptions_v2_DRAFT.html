@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A6–A10 v2 — Cảnh báo hủy/sửa / Hết món / Ghi hủy (NHÁP UI)</title>
+<style>
+  /* Ngôn ngữ vận hành đã khóa (KDS — Minimal Operations UI):
+     nền ops #F6F4F0 · card #FFFFFF · chữ chính #141210 · chữ vận hành #2B2118
+     chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C · brand-dark #6F1623
+     danger #D14B3A (chỉ lỗi/cảnh báo nguy hiểm, nút phá hủy) · bo 8px thống nhất
+     bóng nhẹ · spacing bội số 4px · nút chính 48px
+     icon một bộ outline Lucide, stroke 2 · số vận hành luôn tabular-nums
+     A6–A10 là các màn ngoại lệ trên KDS (tablet trong bếp): A6 phủ lên hàng
+     đợi A3, A7–A8 quản lý món hết, A9–A10 ghi hủy (chỉ Bếp trưởng).
+     v2 theo review: tiêu đề màn 22px/700, mô tả 13px, tên món 16px/600,
+     metadata 13px; sửa lỗi snapshot A10; A8 giữ ticket chờ xử lý;
+     A6 rõ Trước/Sau + chip CHỜ XÁC NHẬN + reset demo; A9 "Lý do khác"
+     bắt buộc ghi chú + giới hạn số lượng theo tồn kho; A7 mở bán lại
+     nhập số phần.
+     Font Be Vietnam Pro chưa tải trong nháp — khi lên code thật dùng
+     next/font; nháp dùng font hệ thống dự phòng. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .democtl { background: #fff; border-bottom: 1px solid #E9E4DC; padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: #7A6A58; }
+  .democtl .seg { display: flex; background: #F6F4F0; border: 1px solid #E9E4DC; border-radius: 8px; padding: 4px; gap: 4px; }
+  .democtl .seg button { border: none; background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 8px; color: #2B2118; }
+  .democtl .seg button.active { background: #8C1D2C; color: #fff; }
+  .democtl .resetbtn { border: 1px solid #E9E4DC; background: #fff; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 8px; color: #2B2118; }
+  /* ===== Khung app (tablet bếp) ===== */
+  .app { margin: 0 auto; background: #F6F4F0; border-left: 1px solid #E9E4DC; border-right: 1px solid #E9E4DC; min-height: 100vh; display: flex; flex-direction: column; }
+  body.layout-land .app { max-width: 1024px; }
+  body.layout-port .app { max-width: 640px; }
+  .content { flex: 1; padding: 16px 20px 32px; }
+  .backlink { background: none; border: none; cursor: pointer; padding: 4px 0 12px; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  .screen-head h1 { margin: 0; font-size: 22px; font-weight: 700; color: #2B2118; }
+  .screen-head p { margin: 4px 0 0; font-size: 13px; color: #7A6A58; }
+  /* Header KDS: đường vào A6/A7/A9 theo plan */
+  .kds-head { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 12px 16px; margin-bottom: 16px; }
+  .kds-head b { font-size: 16px; }
+  .kds-head .clock { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: auto; }
+  .kds-head .hbtn { position: relative; min-height: 40px; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .kds-head .hbtn .badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #D14B3A; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .card { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px; margin-top: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; color: #2B2118; }
+  .card .sub { font-size: 13px; color: #7A6A58; margin: 0; }
+  .rows { margin-top: 8px; }
+  .rows .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 15px; }
+  .rows .row span:first-child { color: #7A6A58; }
+  .rows .row b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .rows .row .meta { color: #7A6A58; font-weight: 400; }
+  .btn-brand { width: 100%; height: 48px; margin-top: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .btn-brand:hover { background: #6F1623; }
+  .btn-brand:disabled { opacity: 0.5; cursor: default; }
+  .btn-danger { width: 100%; height: 48px; margin-top: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #D14B3A; color: #fff; }
+  .btn-danger:disabled { opacity: 0.5; cursor: default; }
+  .btn-ghost { width: 100%; height: 48px; margin-top: 12px; font-size: 16px; font-weight: 600; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .linklike { background: none; border: none; cursor: pointer; padding: 12px 0 0; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  .statuschip { display: inline-block; flex: none; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px; border: 1px solid #7A6A58; color: #2B2118; background: #F6F4F0; white-space: nowrap; }
+  .statuschip.danger { border-color: #D14B3A; color: #D14B3A; background: rgba(209, 75, 58, 0.08); }
+  .statuschip.brand { border-color: #8C1D2C; color: #8C1D2C; background: rgba(140, 29, 44, 0.08); }
+  .banner { margin-top: 16px; padding: 12px 16px; font-size: 14px; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .banner b { color: #8C1D2C; }
+  .banner.danger { border-color: #D14B3A; background: rgba(209, 75, 58, 0.06); }
+  .banner.danger b { color: #D14B3A; }
+  .hint { margin-top: 8px; font-size: 13px; color: #7A6A58; }
+  .err { margin-top: 8px; font-size: 13px; font-weight: 600; color: #D14B3A; }
+  .role-line { margin: 12px 0 0; font-size: 13px; color: #7A6A58; }
+  .role-line b { color: #2B2118; }
+  .empty { text-align: center; padding: 24px 16px; }
+  .empty h2 { font-size: 18px; margin: 0 0 4px; }
+  .empty p { font-size: 14px; color: #7A6A58; margin: 4px 0 0; }
+  /* Ticket mini (hàng đợi A3 thu gọn) */
+  .tickets { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  body.layout-port .tickets { grid-template-columns: 1fr; }
+  .ticket { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px; }
+  .ticket.flagged { border-color: #D14B3A; box-shadow: 0 0 0 1px #D14B3A; }
+  .ticket.done { opacity: 0.55; }
+  .ticket .t-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ticket .t-head b { font-size: 16px; }
+  .ticket .dish { font-size: 16px; margin-top: 8px; }
+  .ticket .dish s { color: #7A6A58; }
+  .ticket .dish .note { font-size: 13px; color: #7A6A58; display: block; margin-top: 2px; }
+  .ticket .flag { margin-top: 8px; font-size: 13px; font-weight: 600; color: #D14B3A; }
+  .lock-ic { width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; }
+  /* Modal cảnh báo */
+  .modal-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(20, 18, 16, 0.55); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal { width: 100%; max-width: 480px; background: #fff; border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,0.25); padding: 20px; }
+  .modal .m-head { display: flex; gap: 12px; align-items: flex-start; }
+  .modal .m-head svg { flex: none; width: 28px; height: 28px; color: #D14B3A; margin-top: 2px; }
+  .modal h2 { margin: 0; font-size: 22px; font-weight: 700; color: #2B2118; }
+  .modal p { font-size: 15px; margin: 12px 0 0; }
+  .modal .impact { margin-top: 12px; padding: 12px; font-size: 14px; border: 1px solid #E9E4DC; border-radius: 8px; background: #F6F4F0; }
+  .ba-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 15px; }
+  .ba-row span { color: #7A6A58; }
+  .ba-row b { font-weight: 600; }
+  .ba-row b.brand { color: #8C1D2C; }
+  /* Danh sách món */
+  .dish-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; font-size: 15px; border-bottom: 1px solid #E9E4DC; }
+  .dish-row:last-child { border-bottom: none; }
+  .dish-row b { font-size: 16px; font-weight: 600; display: block; }
+  .dish-row span { font-size: 13px; color: #7A6A58; }
+  .dish-row .amt { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .mini-btn { flex: none; min-height: 40px; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .mini-btn.brand { border-color: #8C1D2C; color: #8C1D2C; }
+  .dish-edit { padding: 12px 0; border-bottom: 1px solid #E9E4DC; }
+  .dish-edit:last-child { border-bottom: none; }
+  .dish-edit .rowline { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+  .dish-edit b { font-size: 16px; font-weight: 600; }
+  .dish-edit .edit-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .dish-edit .edit-actions .mini-btn { flex: 1; }
+  /* Form ghi hủy */
+  .field-label { font-size: 15px; font-weight: 600; margin: 16px 0 8px; }
+  select, textarea { width: 100%; margin-top: 8px; padding: 12px; font-family: inherit; font-size: 15px; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #141210; }
+  textarea { min-height: 72px; resize: vertical; }
+  .stepper { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .stepper button { width: 48px; height: 48px; font-size: 20px; font-weight: 700; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .stepper button:disabled { opacity: 0.4; cursor: default; }
+  .stepper b { font-size: 20px; font-variant-numeric: tabular-nums; min-width: 48px; text-align: center; }
+  .radio-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 16px; margin-top: 6px; min-height: 52px; font-size: 15px; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #141210; }
+  .radio-card.selected { border-color: #8C1D2C; box-shadow: 0 0 0 1px #8C1D2C; }
+  .radio-dot { width: 20px; height: 20px; flex: none; border-radius: 50%; border: 2px solid #7A6A58; }
+  .radio-card.selected .radio-dot { border-color: #8C1D2C; background: #8C1D2C; box-shadow: inset 0 0 0 3px #fff; }
+  .perm-box { margin-top: 16px; padding: 24px 16px; text-align: center; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; }
+  .perm-box svg { color: #7A6A58; width: 48px; height: 48px; }
+  .perm-box h2 { font-size: 20px; margin: 12px 0 4px; }
+  .perm-box p { font-size: 15px; color: #2B2118; margin: 4px 0 0; }
+  .success-head { text-align: center; padding: 24px 16px 8px; }
+  .success-head svg { color: #8C1D2C; }
+  .success-head h2 { font-size: 20px; margin: 12px 0 4px; }
+  .success-head p { font-size: 15px; color: #2B2118; margin: 4px 0 0; }
+  .icon-lg { width: 48px; height: 48px; }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; background: #141210; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 100; max-width: 92vw; text-align: center; }
+  .hidden { display: none !important; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin: 20px auto 0; max-width: 1024px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .map-table th, .map-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #E9E4DC; vertical-align: top; }
+  .map-table th { color: #7A6A58; font-size: 13px; }
+</style>
+</head>
+<body class="layout-land">
+<div class="draftbar"><strong>NHÁP A6–A10 v2 — Cảnh báo hủy/sửa · Hết món · Ghi hủy (KDS, theo review)</strong> · Chỉ làm UI trước, chưa nối API · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+<div class="democtl">
+  <span>Xem màn (nút này chỉ để soi, không thuộc màn hình):</span>
+  <div class="seg">
+    <button type="button" id="seg-a6" class="active">Cảnh báo hủy/sửa</button>
+    <button type="button" id="seg-a7">Danh sách hết món</button>
+    <button type="button" id="seg-a8">Xác nhận hết món</button>
+    <button type="button" id="seg-a9">Ghi hủy</button>
+    <button type="button" id="seg-a10">Xác nhận ghi hủy</button>
+  </div>
+  <div class="seg">
+    <button type="button" id="seg-land" class="active">Tablet ngang</button>
+    <button type="button" id="seg-port">Tablet dọc</button>
+  </div>
+  <span>Cảnh báo:</span>
+  <div class="seg">
+    <button type="button" id="seg-cancel" class="active">Món bị hủy</button>
+    <button type="button" id="seg-edit">Đơn bị sửa</button>
+  </div>
+  <button type="button" class="resetbtn" id="btn-reset-a6">Đặt lại cảnh báo</button>
+  <span>Hết món:</span>
+  <div class="seg">
+    <button type="button" id="seg-has" class="active">Có món hết</button>
+    <button type="button" id="seg-empty">Không có món hết</button>
+  </div>
+  <span>Ghi hủy:</span>
+  <div class="seg">
+    <button type="button" id="seg-chef" class="active">Bếp trưởng</button>
+    <button type="button" id="seg-staff">Nhân viên thường</button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="content">
+
+    <!-- ============ A6: Cảnh báo hủy/sửa đơn ============ -->
+    <section id="screen-a6">
+      <div class="kds-head">
+        <b>KDS · Bếp chính</b>
+        <span class="clock">11:35</span>
+        <button type="button" class="hbtn" id="btn-bell">Chuông <span class="badge" id="bell-badge">1</span></button>
+        <button type="button" class="hbtn" id="btn-head-soldout">Hết món</button>
+        <button type="button" class="hbtn" id="btn-head-waste">Ghi hủy</button>
+      </div>
+      <div class="screen-head">
+        <h1>Hàng đợi bếp</h1>
+        <p>Ticket Bàn 04 có thay đổi chưa xác nhận — nút hoàn tất đang bị khóa</p>
+      </div>
+      <div class="tickets">
+        <div class="ticket flagged" id="ticket-t04">
+          <div class="t-head"><b>Bàn 04</b><span class="statuschip danger">CHỜ XÁC NHẬN</span></div>
+          <div class="dish" id="t04-pho">Phở Bò Thăn ×1<span class="note" id="t04-note">Ghi chú: Không hành</span></div>
+          <div class="dish">Nem Rán Phố Cổ ×1<span class="note">Dị ứng đậu phộng</span></div>
+          <p class="flag" id="t04-flag">Có thay đổi chưa xác nhận — hoàn tất đang bị khóa.</p>
+          <button type="button" class="btn-brand" id="btn-t04-done" disabled><svg class="lock-ic" id="t04-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Hoàn tất ticket</button>
+          <button type="button" class="btn-ghost hidden" id="btn-t04-alert">Xem cảnh báo</button>
+        </div>
+        <div class="ticket" id="ticket-t07">
+          <div class="t-head"><b>Bàn 07</b><span class="statuschip">Đang chờ</span></div>
+          <div class="dish">Gỏi Ngó Sen Tôm Thịt ×2</div>
+          <button type="button" class="btn-brand" id="btn-t07-done">Hoàn tất ticket</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ A7: Danh sách hết món ============ -->
+    <section id="screen-a7" class="hidden">
+      <div class="kds-head">
+        <b>KDS · Bếp chính</b>
+        <span class="clock">11:35</span>
+        <button type="button" class="hbtn" id="btn-bell-a7">Chuông <span class="badge hidden" id="bell-badge-a7">1</span></button>
+        <button type="button" class="hbtn" id="btn-head-waste-a7">Ghi hủy</button>
+      </div>
+      <div class="screen-head">
+        <h1>Món hết</h1>
+        <p>Món hết sẽ ẩn khỏi menu khách và POS ngay sau khi xác nhận</p>
+      </div>
+      <div id="a7-has">
+        <div class="card">
+          <h2>Đang hết món</h2>
+          <div id="a7-soldout"></div>
+        </div>
+      </div>
+      <div class="card hidden" id="a7-empty">
+        <div class="empty">
+          <h2>Chưa có món nào hết</h2>
+          <p>Khi bếp báo hết món, món đó sẽ hiện ở đây.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Món còn bán</h2>
+        <p class="sub">Bấm "Báo hết" để chuyển sang màn xác nhận.</p>
+        <div id="a7-available"></div>
+      </div>
+    </section>
+
+    <!-- ============ A8: Xác nhận hết món ============ -->
+    <section id="screen-a8" class="hidden">
+      <button type="button" class="backlink" id="back-a8">← Danh sách hết món</button>
+      <div class="screen-head">
+        <h1 id="a8-title">Báo hết món Nem Rán Phố Cổ?</h1>
+        <p>Xác nhận trước khi công bố cho khách và POS</p>
+      </div>
+      <div id="a8-confirm">
+        <div class="card">
+          <div class="rows">
+            <div class="row"><span>Món</span><b id="a8-dish">Nem Rán Phố Cổ</b></div>
+            <div class="row"><span>Còn lại</span><b id="a8-stock">12 phần</b></div>
+            <div class="row"><span>Bàn đang chờ món này</span><b id="a8-waiting">Bàn 02, Bàn 07</b></div>
+          </div>
+        </div>
+        <div class="banner danger" id="a8-impact"><b>Lưu ý:</b> món này sẽ ẩn khỏi menu khách và POS ngay sau khi xác nhận. Bàn 02, Bàn 07 đang chờ món này sẽ giữ nguyên trên ticket — món không bị tự xóa. Phục vụ sẽ được báo để liên hệ khách và đổi món.</div>
+        <button type="button" class="btn-danger" id="btn-a8-confirm">Xác nhận hết món</button>
+        <button type="button" class="btn-ghost" id="btn-a8-back">Quay lại</button>
+      </div>
+      <div id="a8-success" class="hidden">
+        <div class="card">
+          <div class="success-head">
+            <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <h2 id="a8-success-title">Đã báo hết món Nem Rán Phố Cổ</h2>
+            <p>Món đã ẩn khỏi menu khách và POS.</p>
+          </div>
+        </div>
+        <div class="card" id="a8-waiting-card">
+          <h2>Bàn đang chờ món này</h2>
+          <p class="sub">Các bàn này giữ nguyên trên ticket — món không bị tự xóa.</p>
+          <div id="a8-waiting-rows"></div>
+        </div>
+        <div class="banner" id="a8-alert-note"><b>Đã tạo cảnh báo cho phục vụ/quản lý</b> để liên hệ khách và đổi món.</div>
+        <div class="card" id="a8-mini-wrap">
+          <h2>Trên hàng đợi bếp, món này hiện ra sao</h2>
+          <div class="ticket" style="margin-top:12px">
+            <div class="t-head"><b id="a8-mini-table">Bàn 02</b><span class="statuschip danger">HẾT</span></div>
+            <div class="dish" id="a8-mini-dish">Nem Rán Phố Cổ</div>
+            <p class="flag">Chờ phục vụ xử lý — liên hệ khách đổi món.</p>
+          </div>
+        </div>
+        <button type="button" class="btn-brand" id="btn-a8-to-list">Xem danh sách hết món</button>
+        <button type="button" class="btn-ghost" id="btn-a8-to-board">Về bếp</button>
+      </div>
+    </section>
+
+    <!-- ============ A9: Ghi hủy (chỉ Bếp trưởng) ============ -->
+    <section id="screen-a9" class="hidden">
+      <button type="button" class="backlink" id="back-a9">← Về bếp</button>
+      <div class="screen-head">
+        <h1>Ghi hủy món</h1>
+        <p>Chỉ Bếp trưởng ghi hủy — món hủy sẽ trừ kho và ghi vào nhật ký</p>
+      </div>
+      <p class="role-line">Đang ghi với vai trò: <b>Bếp trưởng</b></p>
+      <div id="a9-chef">
+        <div class="card">
+          <div class="rows">
+            <div class="row"><span>Hôm nay đã ghi hủy</span><b id="a9-today">3 lượt · 5 phần</b></div>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label" for="a9-dish">Món</label>
+          <select id="a9-dish"></select>
+          <p class="field-label">Số lượng</p>
+          <div class="stepper">
+            <button type="button" id="a9-minus" aria-label="Giảm số lượng">−</button>
+            <b id="a9-qty">2</b>
+            <button type="button" id="a9-plus" aria-label="Tăng số lượng">+</button>
+            <span class="hint">phần</span>
+          </div>
+          <p class="hint" id="a9-max-hint">Tối đa 12 phần (theo tồn kho).</p>
+          <p class="field-label">Lý do</p>
+          <div id="a9-reasons"></div>
+          <label class="field-label" for="a9-note" id="a9-note-label">Ghi chú (không bắt buộc)</label>
+          <textarea id="a9-note" maxlength="200" placeholder="Ví dụ: Nấu quá lửa, khách đổi món"></textarea>
+          <p class="err hidden" id="a9-note-err">Vui lòng ghi rõ lý do khi chọn "Lý do khác".</p>
+          <button type="button" class="btn-brand" id="btn-a9-next">Xem lại và xác nhận</button>
+        </div>
+      </div>
+      <div id="a9-staff" class="hidden">
+        <div class="perm-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <h2>Chỉ Bếp trưởng mới ghi hủy món</h2>
+          <p>Bạn đang đăng nhập với vai trò Đầu bếp. Nếu cần ghi hủy, nhờ Bếp trưởng thực hiện.</p>
+          <button type="button" class="btn-brand" id="btn-a9-back-board">Quay lại bếp</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ A10: Xác nhận ghi hủy ============ -->
+    <section id="screen-a10" class="hidden">
+      <button type="button" class="backlink" id="back-a10">← Quay lại sửa</button>
+      <div class="screen-head">
+        <h1>Xác nhận ghi hủy</h1>
+        <p>Kiểm tra lại trước khi ghi vào nhật ký</p>
+      </div>
+      <div id="a10-review">
+        <div class="card">
+          <div class="rows" id="a10-rows"></div>
+        </div>
+        <button type="button" class="btn-danger" id="btn-a10-confirm">Xác nhận ghi hủy</button>
+        <button type="button" class="btn-ghost" id="btn-a10-edit">Quay lại sửa</button>
+      </div>
+      <div id="a10-success" class="hidden">
+        <div class="card">
+          <div class="success-head">
+            <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <h2>Đã ghi hủy món</h2>
+            <p id="a10-success-text">Nem Rán Phố Cổ · 2 phần · Nấu hỏng</p>
+            <p class="hint">Bếp trưởng Minh · 11:35 · Đã trừ kho.</p>
+            <p class="hint" id="a10-today-line">Hôm nay đã ghi hủy: 4 lượt · 7 phần.</p>
+          </div>
+        </div>
+        <button type="button" class="btn-brand" id="btn-a10-again">Ghi hủy món khác</button>
+        <button type="button" class="btn-ghost" id="btn-a10-board">Về bếp</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- Modal A6: cảnh báo hủy/sửa đơn -->
+<div class="modal-overlay hidden" id="a6-modal" role="dialog" aria-label="Đơn đã thay đổi">
+  <div class="modal">
+    <div class="m-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      <h2 id="a6-title">Đơn Bàn 04 đã thay đổi</h2>
+    </div>
+    <p id="a6-body">Phở Bò Thăn ×1 đã bị hủy — khách đổi ý.</p>
+    <div class="impact hidden" id="a6-diff">
+      <div class="ba-row"><span>Trước</span><b>Không hành</b></div>
+      <div class="ba-row"><span>Sau</span><b class="brand">Ít hành</b></div>
+    </div>
+    <div class="impact" id="a6-impact">Món này đang nấu. Dừng lại ngay, đừng hoàn tất ticket.</div>
+    <button type="button" class="btn-brand" id="btn-a6-confirm">Xác nhận ngừng món</button>
+    <button type="button" class="btn-ghost" id="btn-a6-later">Để sau</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<section class="block">
+  <h2>Thay đổi v1 → v2 (theo review — thứ tự ưu tiên của review)</h2>
+  <ol>
+    <li><strong>A10 — sửa lỗi snapshot dữ liệu:</strong> khi chuyển A9 → A10, nháp lưu một bản dữ liệu xác nhận riêng (<code>wasteConfirm</code>); A10 chỉ đọc bản đó để hiển thị và xác nhận, nút "Xác nhận ghi hủy" không đọc lại form nữa. Bấm "Quay lại sửa" rồi mở A10 lần tiếp theo thì snapshot mới được tạo lại từ form. Nút xác nhận có trạng thái "Đang ghi…" (khóa nút 600ms) chống bấm hai lần tạo hai bản ghi; màn thành công hiện luôn số liệu hôm nay mới ("Hôm nay đã ghi hủy: 4 lượt · 7 phần"). Nút xác nhận chuyển sang màu danger (theo review: A8 và A10 giữ nút xác nhận danger, nút quay lại trắng).</li>
+    <li><strong>A8 — xử lý bàn đang chờ món hết:</strong> món không bị tự xóa khỏi ticket đã gửi bếp; các bàn chờ giữ nguyên trên ticket với trạng thái "Chờ phục vụ xử lý"; màn thành công có khu vực "Bàn đang chờ món này" (từng bàn + trạng thái) và dòng "Đã tạo cảnh báo cho phục vụ/quản lý để liên hệ khách và đổi món". Ticket mẫu hiện badge HẾT + cờ chờ xử lý, <strong>không gạch ngang</strong> — gạch ngang giờ chỉ dùng cho món bị hủy ở A6, để phân biệt "món đã hủy" với "món hết, đang chờ xử lý". Màn xác nhận đã ghi rõ hậu quả với các bàn chờ trước khi bấm nút.</li>
+    <li><strong>A6 — rõ trạng thái chờ xác nhận và phần thay đổi:</strong> biến thể sửa hiện hai dòng Trước/Sau ("Trước: Không hành" / "Sau: Ít hành" — phần Sau in đậm màu brand); nhãn nút xác nhận rõ ("Xác nhận ngừng món" / "Xác nhận cập nhật ghi chú") và dòng "Xác nhận này chỉ đổi ghi chú, không hủy món" ở biến thể sửa; ticket có chip "CHỜ XÁC NHẬN" (thay "Có thay đổi") + nút hoàn tất bị khóa kèm icon khóa. Chuyển biến thể bằng nút soi hoặc bấm "Đặt lại cảnh báo" sẽ reset trạng thái demo về ban đầu (mở lại modal, ticket về trạng thái chờ xác nhận) — sửa lỗi demo không nhất quán ở v1.</li>
+    <li><strong>A9 — "Lý do khác", giới hạn số lượng, vai trò:</strong> chọn "Lý do khác" thì ghi chú chuyển thành bắt buộc — để trống mà bấm tiếp thì báo lỗi inline "Vui lòng ghi rõ lý do khi chọn 'Lý do khác'". Số lượng giới hạn theo tồn kho của món đã chọn (hiện "Tối đa X phần (theo tồn kho)"); món đang hết thì khóa số lượng và nút tiếp tục ("Món đang hết — không còn phần nào để ghi hủy"). Thêm dòng "Đang ghi với vai trò: Bếp trưởng" phía trên form. Radio-card gọn lại một chút (padding 10px, khoảng cách 6px).</li>
+    <li><strong>A7 — số lượng khi mở bán lại + phân cấp thông tin:</strong> bấm "Mở bán lại" mở trình sửa số lượng ngay trên dòng (mặc định = số phần còn lại lúc báo hết, bếp chỉnh theo thực tế) rồi mới chuyển món sang nhóm còn bán với số phần đó. Nút "Mở bán lại" giữ viền brand (không dùng đỏ). Tên món 16px weight 600, metadata 13px.</li>
+    <li><strong>Chung:</strong> tiêu đề màn 22px weight 700, mô tả 13px, tên món 16px weight 600, metadata 13px — theo đề xuất của review.</li>
+  </ol>
+</section>
+
+<section class="block">
+  <h2>Luồng đã vẽ (A6 → A7 → A8 / A9 → A10)</h2>
+  <table class="map-table">
+    <tr><th>Màn</th><th>Nội dung</th><th>Bấm thử trong nháp</th></tr>
+    <tr><td><strong>Cảnh báo hủy/sửa</strong></td><td>Đơn Bàn 04 thay đổi khi món đang nấu → cảnh báo phủ lên hàng đợi. Ticket Bàn 04 có chip "CHỜ XÁC NHẬN" và bị khóa nút "Hoàn tất ticket" (kèm icon khóa) cho đến khi xác nhận. Nút xác nhận (brand) khác hẳn nút "Để sau" (trắng viền xám). Biến thể sửa hiện Trước/Sau.</td><td>Mở màn là thấy cảnh báo. Bấm "Xác nhận ngừng món": món bị gạch ngang + badge "ĐÃ HỦY", nút hoàn tất mở lại, chuông hết badge. Bấm "Để sau": cảnh báo đóng nhưng ticket vẫn bị khóa — bấm chuông hoặc "Xem cảnh báo" để mở lại. Nút soi "Đơn bị sửa" / "Đặt lại cảnh báo" để thử lại từ đầu.</td></tr>
+    <tr><td><strong>Danh sách hết món</strong></td><td>Hai nhóm: "Đang hết món" (tên món nổi bật, dòng phụ giờ hết + người đánh dấu, nút "Mở bán lại" viền brand) và "Món còn bán" (số phần còn lại, nút "Báo hết" dẫn sang màn xác nhận). Header KDS có nút "Hết món" làm đường vào.</td><td>Bấm "Báo hết" ở món Nem Rán để sang màn xác nhận. Bấm "Mở bán lại" ở Phở Bò: nhập số phần còn lại rồi bấm "Xác nhận mở bán" để xem món quay lại nhóm còn bán với số phần đó. Nút soi "Không có món hết" để xem trạng thái rỗng.</td></tr>
+    <tr><td><strong>Xác nhận hết món</strong></td><td>Hiện món, số phần còn lại, các bàn đang chờ món này + cảnh báo tác động (ẩn khỏi menu khách/POS; các bàn chờ giữ nguyên trên ticket, không tự xóa; phục vụ sẽ được báo). Nút "Xác nhận hết món" dùng màu cảnh báo, khác hẳn nút "Quay lại" trắng.</td><td>Bấm "Xác nhận hết món": xem màn thành công + khu vực "Bàn đang chờ món này" (Bàn 02, Bàn 07 — Chờ phục vụ xử lý) + ticket Bàn 02 mẫu với badge "HẾT" và cờ chờ xử lý. Bấm "Xem danh sách hết món": món vừa báo đã nằm trong nhóm đang hết.</td></tr>
+    <tr><td><strong>Ghi hủy</strong></td><td>Form tối giản: món (kèm số phần còn lại), số lượng (+/−, tối đa theo tồn kho), lý do (5 lựa chọn), ghi chú (bắt buộc khi chọn "Lý do khác") + dòng vai trò "Đang ghi với vai trò: Bếp trưởng" và "Hôm nay đã ghi hủy: 3 lượt · 5 phần". Chỉ Bếp trưởng thấy form; nhân viên thường vào nhầm thì thấy màn "Chỉ Bếp trưởng mới ghi hủy món".</td><td>Nút soi "Nhân viên thường" để xem màn chặn quyền. Chọn "Lý do khác" rồi bấm tiếp mà không ghi chú để xem lỗi chặn. Chọn món đang hết (Phở Bò Thăn) để xem khóa số lượng. Đổi số lượng/lý do rồi bấm "Xem lại và xác nhận" để sang màn xác nhận.</td></tr>
+    <tr><td><strong>Xác nhận ghi hủy</strong></td><td>Xem lại toàn bộ từ bản snapshot (món, số lượng, lý do, ghi chú, người ghi, giờ ghi) rồi mới xác nhận. Nút "Xác nhận ghi hủy" màu danger; xác nhận xong có trạng thái "Đang ghi…" chống bấm hai lần, rồi màn thành công hiện số liệu hôm nay mới.</td><td>Bấm "Xác nhận ghi hủy" rồi quay lại màn ghi hủy để thấy "Hôm nay đã ghi hủy" đã tăng (3 lượt · 5 phần → 4 lượt · 7 phần). Thử "Quay lại sửa", đổi số lượng, mở lại màn xác nhận: snapshot mới theo đúng số liệu vừa sửa.</td></tr>
+  </table>
+</section>
+
+<section class="block">
+  <h2>Giả định đã vẽ trong nháp (chưa phải quyết định)</h2>
+  <ul>
+    <li><strong>Dữ liệu món dùng chung một nguồn:</strong> danh sách món hết/còn bán (A7), món báo hết (A8) và món ghi hủy (A9) đọc chung một bảng món — số phần còn lại, trạng thái hết/còn và các bàn đang chờ là một dữ liệu, không phải ba bản copy. Nháp dùng số liệu ví dụ: Nem Rán còn 12 phần, Bánh Xèo 8, Cơm Gà 15, Canh Chua 6; Phở Bò Thăn và Gỏi Ngó Sen đang hết.</li>
+    <li><strong>Đường vào từ header KDS:</strong> chuông (cảnh báo chưa xác nhận), nút "Hết món", nút "Ghi hủy" — theo plan (bổ sung đường vào A6, A7, A9 trên header KDS). Nút "Ghi hủy" chỉ hiện với vai trò Bếp trưởng; trong nháp hiện luôn để soi.</li>
+    <li><strong>Ai được báo hết món:</strong> nháp cho mọi đầu bếp bấm "Báo hết" (người nấu biết trước tiên). Người đánh dấu được ghi tên + giờ. Chưa chốt có cần Bếp trưởng duyệt không — xem điểm mở.</li>
+    <li><strong>Mở bán lại:</strong> bếp nhập số phần còn lại khi mở bán lại (mặc định = số phần còn lại lúc báo hết: Phở Bò Thăn 5, Gỏi Ngó Sen 3 — số ví dụ, bếp chỉnh theo thực tế). Không cần xác nhận lại sau bước này.</li>
+    <li><strong>Bàn chờ món hết:</strong> giữ nguyên trên ticket với trạng thái "Chờ phục vụ xử lý"; nháp ghi "đã tạo cảnh báo cho phục vụ/quản lý" nhưng kênh báo cụ thể (thông báo trên app phục vụ, chuông, hay quản lý xử lý tay) vẫn chờ chốt.</li>
+    <li><strong>Ghi hủy = trừ kho ngay:</strong> xác nhận xong thì món hủy được trừ kho và ghi vào nhật ký (ghi trong màn thành công). Chưa chốt có cần quản lý duyệt sau không.</li>
+    <li><strong>"Lý do khác" bắt buộc ghi chú:</strong> đã vẽ theo đề xuất của review — chờ team chốt thành quy tắc.</li>
+    <li><strong>Quyền Bếp trưởng:</strong> nháp chỉ chặn bằng UI (biến demo). Khi làm thật, API ghi hủy phải tự xác minh người thực hiện có quyền Bếp trưởng — không được chỉ dựa vào biến ở phía trình duyệt.</li>
+    <li><strong>Giờ và người ghi trong nháp:</strong> đồng hồ KDS hiện 11:35; "Bếp trưởng Minh", giờ hết món/ghi hủy là số liệu ví dụ. Khi làm thật lấy từ tài khoản đăng nhập và thời gian hệ thống.</li>
+    <li><strong>Tên món dùng lại từ A3 v5:</strong> Phở Bò Thăn, Nem Rán Phố Cổ, Gỏi Ngó Sen Tôm Thịt + Bánh Xèo, Cơm Gà Xối Mỡ, Canh Chua Cá (món mới chỉ để soi danh sách).</li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>Điểm mở còn lại (nháp chưa tự quyết)</h2>
+  <ul>
+    <li><strong>1. Bếp trưởng vắng mặt thì ai duyệt? (P0)</strong> Câu hỏi giai đoạn 0 vẫn mở: ai duyệt ghi hủy (A9) và hết món (A7–A8) khi Bếp trưởng vắng — quản lý ca, bếp phó, hay đầu bếp tự xử lý?</li>
+    <li><strong>2. Ghi hủy trừ kho nào, thời điểm nào? (P0)</strong> Nháp giả định trừ kho ngay khi xác nhận. Cần chốt loại tồn kho bị trừ (tồn kho món, tồn kho nguyên liệu, hay cả hai) và thời điểm ghi nhận.</li>
+    <li><strong>3. "Hết món" và "hết nguyên liệu" có phải một khái niệm không? (mới từ review)</strong> Nếu hệ thống quản lý tồn kho nguyên liệu, hai khái niệm này có thể khác nhau — cần thống nhất trước khi nối API.</li>
+    <li><strong>4. Hủy một món có ảnh hưởng toàn ticket không? (P1)</strong> Câu hỏi từ A5 vẫn mở — hủy 1 món thì ticket còn lại xử lý sao.</li>
+    <li><strong>5. Ai được báo hết món? (P1)</strong> Nháp cho mọi đầu bếp bấm "Báo hết" — cần chốt đầu bếp được tự báo hay phải có Bếp trưởng duyệt.</li>
+    <li><strong>6. Ticket "Báo sự cố" xử lý ở đâu? (P2)</strong> Xung đột nguồn: A5 v2 ghi ticket "Báo sự cố" xử lý ở A7/A8, nhưng A7/A8 theo inventory là màn hết món. Nháp này theo inventory (A7/A8 chỉ làm hết món) — cần chốt ticket báo sự cố xử lý ở đâu (màn riêng, hay chung với A7).</li>
+    <li><strong>7. Hủy ticket thuộc A9? (P2)</strong> A5 v2 ghi "hủy ticket thuộc màn A9, quyền Bếp trưởng" — hủy ticket đã nấu dở có ghi vào waste log luôn không, hay hủy ticket và ghi hủy món là hai luồng riêng?</li>
+    <li><strong>8. Waste log có cần duyệt không? (P2)</strong> Bếp trưởng ghi là xong, hay quản lý duyệt sau (đối chiếu kho)? Nháp đang để ghi xong là xong.</li>
+    <li><strong>9. Kênh báo phục vụ khi có bàn chờ món hết: (P2)</strong> nháp ghi "đã tạo cảnh báo cho phục vụ/quản lý" nhưng kênh cụ thể vẫn chờ chốt (thông báo trên app phục vụ, chuông KDS, hay quản lý xử lý tay).</li>
+    <li><strong>Số liệu trong nháp là ví dụ:</strong> giờ hết món, số phần còn lại, số lượt ghi hủy chỉ để soi bố cục, không phải dữ liệu thật.</li>
+  </ul>
+  <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP A6–A10 v2 (theo review), chưa phải thiết kế chốt. Bản v1 giữ nguyên. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A1 / A3 v1–v5 / A5 v1–v2 / B1 v1–v3 / B2 v1–v2 / B3–B5 v1–v2 / B6–B8 v1–v2 / B9–B10 v1–v2 / B11–B13 v1–v2.</p>
+</section>
+
+<script>
+  var toastTimer = null;
+  var a6 = { variant: "cancel", confirmed: false };
+  /* Một nguồn dữ liệu món dùng chung cho A7/A8/A9 — tránh ba bản copy lệch nhau */
+  var DISHES = [
+    { id: "pho", name: "Phở Bò Thăn", stock: 0, soldOut: true, since: "11:20", by: "Bếp trưởng Minh", lastStock: 5, waiting: "—" },
+    { id: "goi", name: "Gỏi Ngó Sen Tôm Thịt", stock: 0, soldOut: true, since: "10:45", by: "Đầu bếp Lan", lastStock: 3, waiting: "—" },
+    { id: "nem", name: "Nem Rán Phố Cổ", stock: 12, soldOut: false, waiting: "Bàn 02, Bàn 07" },
+    { id: "banhxeo", name: "Bánh Xèo", stock: 8, soldOut: false, waiting: "Bàn 09" },
+    { id: "comga", name: "Cơm Gà Xối Mỡ", stock: 15, soldOut: false, waiting: "Bàn 04" },
+    { id: "canhchua", name: "Canh Chua Cá", stock: 6, soldOut: false, waiting: "Bàn 06" }
+  ];
+  var showEmptySoldOut = false;
+  var isChef = true;
+  var reopenEdit = null;
+  var reopenQty = 0;
+  var a8Dish = null;
+  var a8Snapshot = null;
+  var wasteToday = { entries: 3, portions: 5 };
+  var wasteQty = 2;
+  var wasteReason = "Nấu hỏng";
+  var wasteConfirm = null;
+  var a10Processing = false;
+  var REASONS = ["Nấu hỏng", "Nguyên liệu hết hạn", "Rơi vỡ", "Khách trả lại", "Lý do khác"];
+  var T04_PHO_HTML = "";
+
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.remove("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.add("hidden"); }, 4000);
+  }
+  function showScreen(id) {
+    ["screen-a6", "screen-a7", "screen-a8", "screen-a9", "screen-a10"].forEach(function (s) {
+      document.getElementById(s).classList.toggle("hidden", s !== id);
+    });
+    var map = { "screen-a6": "seg-a6", "screen-a7": "seg-a7", "screen-a8": "seg-a8", "screen-a9": "seg-a9", "screen-a10": "seg-a10" };
+    Object.keys(map).forEach(function (k) {
+      document.getElementById(map[k]).classList.toggle("active", k === id);
+    });
+    window.scrollTo(0, 0);
+  }
+  function dishById(id) {
+    return DISHES.find(function (d) { return d.id === id; });
+  }
+  /* ---------- A6 ---------- */
+  function renderA6Modal() {
+    var cancel = a6.variant === "cancel";
+    document.getElementById("a6-title").textContent = "Đơn Bàn 04 đã thay đổi";
+    document.getElementById("a6-body").textContent = cancel
+      ? "Phở Bò Thăn ×1 đã bị hủy — khách đổi ý."
+      : "Ghi chú món Phở Bò Thăn (Bàn 04) đã đổi.";
+    document.getElementById("a6-diff").classList.toggle("hidden", cancel);
+    document.getElementById("a6-impact").textContent = cancel
+      ? "Món này đang nấu. Dừng lại ngay, đừng hoàn tất ticket."
+      : "Xác nhận này chỉ đổi ghi chú, không hủy món. Món vẫn tiếp tục nấu.";
+    document.getElementById("btn-a6-confirm").textContent = cancel ? "Xác nhận ngừng món" : "Xác nhận cập nhật ghi chú";
+  }
+  function openA6Modal() {
+    renderA6Modal();
+    document.getElementById("a6-modal").classList.remove("hidden");
+  }
+  function closeA6Modal() {
+    document.getElementById("a6-modal").classList.add("hidden");
+  }
+  function setBell(on) {
+    document.getElementById("bell-badge").classList.toggle("hidden", !on);
+    document.getElementById("bell-badge-a7").classList.toggle("hidden", !on);
+  }
+  function resetA6() {
+    a6.confirmed = false;
+    var pho = document.getElementById("t04-pho");
+    if (T04_PHO_HTML) pho.innerHTML = T04_PHO_HTML;
+    var flag = document.getElementById("t04-flag");
+    flag.textContent = "Có thay đổi chưa xác nhận — hoàn tất đang bị khóa.";
+    flag.style.color = "";
+    document.getElementById("ticket-t04").classList.add("flagged");
+    document.getElementById("btn-t04-done").disabled = true;
+    document.getElementById("t04-lock").style.display = "";
+    document.getElementById("btn-t04-alert").classList.add("hidden");
+    setBell(true);
+  }
+  function confirmA6() {
+    closeA6Modal();
+    a6.confirmed = true;
+    setBell(false);
+    var flag = document.getElementById("t04-flag");
+    var done = document.getElementById("btn-t04-done");
+    var alertBtn = document.getElementById("btn-t04-alert");
+    var ticket = document.getElementById("ticket-t04");
+    ticket.classList.remove("flagged");
+    alertBtn.classList.add("hidden");
+    done.disabled = false;
+    document.getElementById("t04-lock").style.display = "none";
+    if (a6.variant === "cancel") {
+      document.getElementById("t04-pho").innerHTML = '<s>Phở Bò Thăn ×1</s> <span class="statuschip danger">ĐÃ HỦY</span>';
+      flag.textContent = "Đã ngừng món Phở Bò Thăn theo đơn hủy.";
+      flag.style.color = "#7A6A58";
+      showToast("Đã ngừng món Phở Bò Thăn theo đơn hủy.");
+    } else {
+      document.getElementById("t04-note").textContent = "Ghi chú: Ít hành";
+      flag.textContent = "Đã cập nhật ghi chú: Ít hành.";
+      flag.style.color = "#7A6A58";
+      showToast("Đã cập nhật ghi chú: Ít hành.");
+    }
+  }
+  /* ---------- A7 / A8 ---------- */
+  function renderA7() {
+    var so = document.getElementById("a7-soldout");
+    so.innerHTML = "";
+    DISHES.filter(function (d) { return d.soldOut; }).forEach(function (d) {
+      if (reopenEdit === d.id) {
+        var edit = document.createElement("div");
+        edit.className = "dish-edit";
+        edit.innerHTML = '<div class="rowline"><b>' + d.name + '</b><span class="hint" style="margin-top:0">Còn lại lúc báo hết: ' + d.lastStock + ' phần — chỉnh theo thực tế</span></div>' +
+          '<div class="stepper"><button type="button" id="ro-minus" aria-label="Giảm số lượng">−</button><b id="ro-qty">' + reopenQty + '</b><button type="button" id="ro-plus" aria-label="Tăng số lượng">+</button><span class="hint">phần</span></div>' +
+          '<div class="edit-actions"><button type="button" class="mini-btn brand" id="ro-confirm">Xác nhận mở bán</button><button type="button" class="mini-btn" id="ro-cancel">Hủy</button></div>';
+        so.appendChild(edit);
+        document.getElementById("ro-minus").addEventListener("click", function () {
+          reopenQty = Math.max(1, reopenQty - 1);
+          document.getElementById("ro-qty").textContent = reopenQty;
+        });
+        document.getElementById("ro-plus").addEventListener("click", function () {
+          reopenQty = Math.min(99, reopenQty + 1);
+          document.getElementById("ro-qty").textContent = reopenQty;
+        });
+        document.getElementById("ro-cancel").addEventListener("click", function () {
+          reopenEdit = null;
+          renderA7();
+        });
+        document.getElementById("ro-confirm").addEventListener("click", function () {
+          d.stock = reopenQty;
+          d.soldOut = false;
+          d.since = null;
+          d.by = null;
+          d.waiting = "—";
+          reopenEdit = null;
+          renderA7();
+          showToast("Đã mở bán lại " + d.name + " — còn " + d.stock + " phần.");
+        });
+        return;
+      }
+      var row = document.createElement("div");
+      row.className = "dish-row";
+      row.innerHTML = '<span><b>' + d.name + '</b><span>Hết từ ' + d.since + ' · ' + d.by + ' đánh dấu</span></span>' +
+        '<button type="button" class="mini-btn brand" data-reopen="' + d.id + '">Mở bán lại</button>';
+      so.appendChild(row);
+    });
+    var av = document.getElementById("a7-available");
+    av.innerHTML = "";
+    DISHES.filter(function (d) { return !d.soldOut; }).forEach(function (d) {
+      var row = document.createElement("div");
+      row.className = "dish-row";
+      row.innerHTML = '<span><b>' + d.name + '</b><span>Còn ' + d.stock + ' phần</span></span>' +
+        '<button type="button" class="mini-btn" data-report="' + d.id + '">Báo hết</button>';
+      av.appendChild(row);
+    });
+    var soldOutCount = DISHES.filter(function (d) { return d.soldOut; }).length;
+    var empty = soldOutCount === 0 || showEmptySoldOut;
+    document.getElementById("a7-has").classList.toggle("hidden", empty);
+    document.getElementById("a7-empty").classList.toggle("hidden", !empty);
+    so.querySelectorAll("[data-reopen]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var d = dishById(b.getAttribute("data-reopen"));
+        reopenEdit = d.id;
+        reopenQty = d.lastStock || 1;
+        renderA7();
+      });
+    });
+    av.querySelectorAll("[data-report]").forEach(function (b) {
+      b.addEventListener("click", function () { openA8(b.getAttribute("data-report")); });
+    });
+  }
+  function openA8(dishId) {
+    var d = dishById(dishId);
+    if (!d || d.soldOut) d = DISHES.find(function (x) { return !x.soldOut; });
+    a8Dish = d;
+    a8Snapshot = null;
+    document.getElementById("a8-confirm").classList.remove("hidden");
+    document.getElementById("a8-success").classList.add("hidden");
+    document.getElementById("a8-title").textContent = "Báo hết món " + d.name + "?";
+    document.getElementById("a8-dish").textContent = d.name;
+    document.getElementById("a8-stock").textContent = d.stock + " phần";
+    document.getElementById("a8-waiting").textContent = d.waiting;
+    var impact = "Món này sẽ ẩn khỏi menu khách và POS ngay sau khi xác nhận.";
+    if (d.waiting && d.waiting !== "—") {
+      impact += " " + d.waiting + " đang chờ món này sẽ giữ nguyên trên ticket — món không bị tự xóa. Phục vụ sẽ được báo để liên hệ khách và đổi món.";
+    }
+    document.getElementById("a8-impact").innerHTML = "<b>Lưu ý:</b> " + impact;
+    showScreen("screen-a8");
+  }
+  function renderA8Success() {
+    var s = a8Snapshot;
+    var waitingList = s.waiting && s.waiting !== "—" ? s.waiting.split(",").map(function (x) { return x.trim(); }) : [];
+    document.getElementById("a8-success-title").textContent = "Đã báo hết món " + s.name;
+    document.getElementById("a8-waiting-card").classList.toggle("hidden", waitingList.length === 0);
+    document.getElementById("a8-mini-wrap").classList.toggle("hidden", waitingList.length === 0);
+    var rows = document.getElementById("a8-waiting-rows");
+    rows.innerHTML = "";
+    waitingList.forEach(function (t) {
+      var row = document.createElement("div");
+      row.className = "dish-row";
+      row.innerHTML = '<span><b>' + t + '</b></span><span class="statuschip danger">Chờ phục vụ xử lý</span>';
+      rows.appendChild(row);
+    });
+    if (waitingList.length > 0) {
+      document.getElementById("a8-mini-table").textContent = waitingList[0];
+      document.getElementById("a8-mini-dish").textContent = s.name;
+      document.getElementById("a8-alert-note").innerHTML = "<b>Đã tạo cảnh báo cho phục vụ/quản lý</b> để liên hệ khách và đổi món.";
+    } else {
+      document.getElementById("a8-alert-note").innerHTML = "Không có bàn nào đang chờ món này.";
+    }
+  }
+  /* ---------- A9 / A10 ---------- */
+  function selectedDish() {
+    return dishById(document.getElementById("a9-dish").value) || DISHES[2];
+  }
+  function buildDishOptions() {
+    var sel = document.getElementById("a9-dish");
+    var cur = sel.value;
+    sel.innerHTML = "";
+    DISHES.forEach(function (d) {
+      var opt = document.createElement("option");
+      opt.value = d.id;
+      opt.textContent = d.name + (d.soldOut ? " (đang hết)" : " (còn " + d.stock + " phần)");
+      sel.appendChild(opt);
+    });
+    sel.value = dishById(cur) ? cur : "nem";
+  }
+  function syncA9Stock() {
+    var d = selectedDish();
+    var minus = document.getElementById("a9-minus");
+    var plus = document.getElementById("a9-plus");
+    var submit = document.getElementById("btn-a9-next");
+    var hint = document.getElementById("a9-max-hint");
+    if (d.soldOut || d.stock === 0) {
+      minus.disabled = true;
+      plus.disabled = true;
+      submit.disabled = true;
+      document.getElementById("a9-qty").textContent = "0";
+      hint.textContent = "Món đang hết — không còn phần nào để ghi hủy.";
+    } else {
+      minus.disabled = false;
+      plus.disabled = false;
+      submit.disabled = false;
+      wasteQty = Math.max(1, Math.min(wasteQty, d.stock));
+      document.getElementById("a9-qty").textContent = wasteQty;
+      hint.textContent = "Tối đa " + d.stock + " phần (theo tồn kho).";
+    }
+  }
+  function noteRequired() { return wasteReason === "Lý do khác"; }
+  function updateNoteLabel() {
+    document.getElementById("a9-note-label").textContent = noteRequired() ? "Ghi chú (bắt buộc)" : "Ghi chú (không bắt buộc)";
+    if (!noteRequired()) document.getElementById("a9-note-err").classList.add("hidden");
+  }
+  function renderReasons() {
+    var wrap = document.getElementById("a9-reasons");
+    wrap.innerHTML = "";
+    REASONS.forEach(function (r) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "radio-card" + (wasteReason === r ? " selected" : "");
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", wasteReason === r ? "true" : "false");
+      b.innerHTML = '<span>' + r + '</span><span class="radio-dot"></span>';
+      b.addEventListener("click", function () { wasteReason = r; renderReasons(); updateNoteLabel(); });
+      wrap.appendChild(b);
+    });
+  }
+  function renderA9() {
+    document.getElementById("a9-chef").classList.toggle("hidden", !isChef);
+    document.getElementById("a9-staff").classList.toggle("hidden", isChef);
+    document.getElementById("a9-today").textContent = wasteToday.entries + " lượt · " + wasteToday.portions + " phần";
+    buildDishOptions();
+    syncA9Stock();
+    renderReasons();
+    updateNoteLabel();
+  }
+  function wasteDraft() {
+    var d = selectedDish();
+    return {
+      dish: d.name,
+      qty: wasteQty,
+      reason: wasteReason,
+      note: document.getElementById("a9-note").value.trim()
+    };
+  }
+  function openA10(d) {
+    /* Snapshot riêng: A10 chỉ đọc bản này — không đọc lại form khi xác nhận */
+    wasteConfirm = { dish: d.dish, qty: d.qty, reason: d.reason, note: d.note };
+    a10Processing = false;
+    var btn = document.getElementById("btn-a10-confirm");
+    btn.disabled = false;
+    btn.textContent = "Xác nhận ghi hủy";
+    document.getElementById("a10-review").classList.remove("hidden");
+    document.getElementById("a10-success").classList.add("hidden");
+    var rows = '<div class="row"><span>Món</span><b>' + wasteConfirm.dish + '</b></div>' +
+      '<div class="row"><span>Số lượng</span><b>' + wasteConfirm.qty + ' phần</b></div>' +
+      '<div class="row"><span>Lý do</span><b>' + wasteConfirm.reason + '</b></div>' +
+      '<div class="row"><span>Ghi chú</span><b class="meta">' + (wasteConfirm.note || "Không có") + '</b></div>' +
+      '<div class="row"><span>Người ghi</span><b>Bếp trưởng Minh</b></div>' +
+      '<div class="row"><span>Giờ ghi</span><b>11:35</b></div>';
+    document.getElementById("a10-rows").innerHTML = rows;
+    document.getElementById("a10-success-text").textContent = wasteConfirm.dish + " · " + wasteConfirm.qty + " phần · " + wasteConfirm.reason;
+    showScreen("screen-a10");
+  }
+
+  /* ---------- Wiring ---------- */
+  document.getElementById("btn-a6-confirm").addEventListener("click", confirmA6);
+  document.getElementById("btn-a6-later").addEventListener("click", function () {
+    closeA6Modal();
+    document.getElementById("btn-t04-alert").classList.remove("hidden");
+    showToast("Ticket Bàn 04 vẫn bị khóa cho đến khi xác nhận thay đổi.");
+  });
+  document.getElementById("btn-t04-alert").addEventListener("click", openA6Modal);
+  document.getElementById("btn-bell").addEventListener("click", function () {
+    if (!a6.confirmed) openA6Modal();
+    else showToast("Không còn cảnh báo chưa xác nhận.");
+  });
+  document.getElementById("btn-bell-a7").addEventListener("click", function () {
+    if (!a6.confirmed) { showScreen("screen-a6"); openA6Modal(); }
+    else showToast("Không còn cảnh báo chưa xác nhận.");
+  });
+  document.getElementById("btn-t07-done").addEventListener("click", function () {
+    document.getElementById("ticket-t07").classList.add("done");
+    this.disabled = true;
+    this.textContent = "Đã hoàn tất";
+    showToast("Đã hoàn tất ticket Bàn 07.");
+  });
+  document.getElementById("btn-head-soldout").addEventListener("click", function () { renderA7(); showScreen("screen-a7"); });
+  document.getElementById("btn-head-waste").addEventListener("click", function () { renderA9(); showScreen("screen-a9"); });
+  document.getElementById("btn-head-waste-a7").addEventListener("click", function () { renderA9(); showScreen("screen-a9"); });
+  document.getElementById("back-a8").addEventListener("click", function () { renderA7(); showScreen("screen-a7"); });
+  document.getElementById("btn-a8-back").addEventListener("click", function () { renderA7(); showScreen("screen-a7"); });
+  document.getElementById("btn-a8-confirm").addEventListener("click", function () {
+    if (!a8Dish) return;
+    var d = a8Dish;
+    a8Snapshot = { name: d.name, waiting: d.waiting };
+    d.stock = 0;
+    d.soldOut = true;
+    d.since = "11:35";
+    d.by = "Bếp trưởng Minh";
+    document.getElementById("a8-confirm").classList.add("hidden");
+    document.getElementById("a8-success").classList.remove("hidden");
+    renderA8Success();
+    renderA7();
+  });
+  document.getElementById("btn-a8-to-list").addEventListener("click", function () { renderA7(); showScreen("screen-a7"); });
+  document.getElementById("btn-a8-to-board").addEventListener("click", function () { showScreen("screen-a6"); });
+  document.getElementById("back-a9").addEventListener("click", function () { showScreen("screen-a6"); });
+  document.getElementById("btn-a9-back-board").addEventListener("click", function () { showScreen("screen-a6"); });
+  document.getElementById("a9-dish").addEventListener("change", syncA9Stock);
+  document.getElementById("a9-minus").addEventListener("click", function () {
+    wasteQty = Math.max(1, wasteQty - 1);
+    document.getElementById("a9-qty").textContent = wasteQty;
+  });
+  document.getElementById("a9-plus").addEventListener("click", function () {
+    var max = selectedDish().stock;
+    wasteQty = Math.min(max, wasteQty + 1);
+    document.getElementById("a9-qty").textContent = wasteQty;
+  });
+  document.getElementById("a9-note").addEventListener("input", function () {
+    if (this.value.trim() !== "") document.getElementById("a9-note-err").classList.add("hidden");
+  });
+  document.getElementById("btn-a9-next").addEventListener("click", function () {
+    if (noteRequired() && document.getElementById("a9-note").value.trim() === "") {
+      document.getElementById("a9-note-err").classList.remove("hidden");
+      document.getElementById("a9-note").focus();
+      return;
+    }
+    document.getElementById("a9-note-err").classList.add("hidden");
+    openA10(wasteDraft());
+  });
+  document.getElementById("back-a10").addEventListener("click", function () { renderA9(); showScreen("screen-a9"); });
+  document.getElementById("btn-a10-edit").addEventListener("click", function () { renderA9(); showScreen("screen-a9"); });
+  document.getElementById("btn-a10-confirm").addEventListener("click", function () {
+    if (a10Processing || !wasteConfirm) return;
+    a10Processing = true;
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "Đang ghi…";
+    setTimeout(function () {
+      wasteToday.entries++;
+      wasteToday.portions += wasteConfirm.qty;
+      document.getElementById("a10-today-line").textContent = "Hôm nay đã ghi hủy: " + wasteToday.entries + " lượt · " + wasteToday.portions + " phần.";
+      document.getElementById("a10-review").classList.add("hidden");
+      document.getElementById("a10-success").classList.remove("hidden");
+      renderA9();
+      a10Processing = false;
+      btn.disabled = false;
+      btn.textContent = "Xác nhận ghi hủy";
+    }, 600);
+  });
+  document.getElementById("btn-a10-again").addEventListener("click", function () {
+    wasteQty = 2;
+    wasteReason = "Nấu hỏng";
+    document.getElementById("a9-note").value = "";
+    renderA9();
+    showScreen("screen-a9");
+  });
+  document.getElementById("btn-a10-board").addEventListener("click", function () { showScreen("screen-a6"); });
+  /* ---------- Demo segs ---------- */
+  document.getElementById("seg-a6").addEventListener("click", function () { showScreen("screen-a6"); });
+  document.getElementById("seg-a7").addEventListener("click", function () { renderA7(); showScreen("screen-a7"); });
+  document.getElementById("seg-a8").addEventListener("click", function () { openA8(a8Dish ? a8Dish.id : "nem"); });
+  document.getElementById("seg-a9").addEventListener("click", function () { renderA9(); showScreen("screen-a9"); });
+  document.getElementById("seg-a10").addEventListener("click", function () { openA10(wasteDraft()); });
+  document.getElementById("seg-land").addEventListener("click", function () {
+    document.body.classList.remove("layout-port");
+    document.body.classList.add("layout-land");
+    this.classList.add("active");
+    document.getElementById("seg-port").classList.remove("active");
+  });
+  document.getElementById("seg-port").addEventListener("click", function () {
+    document.body.classList.remove("layout-land");
+    document.body.classList.add("layout-port");
+    this.classList.add("active");
+    document.getElementById("seg-land").classList.remove("active");
+  });
+  document.getElementById("seg-cancel").addEventListener("click", function () {
+    a6.variant = "cancel";
+    this.classList.add("active");
+    document.getElementById("seg-edit").classList.remove("active");
+    showScreen("screen-a6");
+    resetA6();
+    openA6Modal();
+  });
+  document.getElementById("seg-edit").addEventListener("click", function () {
+    a6.variant = "edit";
+    this.classList.add("active");
+    document.getElementById("seg-cancel").classList.remove("active");
+    showScreen("screen-a6");
+    resetA6();
+    openA6Modal();
+  });
+  document.getElementById("btn-reset-a6").addEventListener("click", function () {
+    showScreen("screen-a6");
+    resetA6();
+    openA6Modal();
+  });
+  document.getElementById("seg-has").addEventListener("click", function () {
+    showEmptySoldOut = false;
+    this.classList.add("active");
+    document.getElementById("seg-empty").classList.remove("active");
+    renderA7();
+  });
+  document.getElementById("seg-empty").addEventListener("click", function () {
+    showEmptySoldOut = true;
+    this.classList.add("active");
+    document.getElementById("seg-has").classList.remove("active");
+    renderA7();
+  });
+  document.getElementById("seg-chef").addEventListener("click", function () {
+    isChef = true;
+    this.classList.add("active");
+    document.getElementById("seg-staff").classList.remove("active");
+    renderA9();
+  });
+  document.getElementById("seg-staff").addEventListener("click", function () {
+    isChef = false;
+    this.classList.add("active");
+    document.getElementById("seg-chef").classList.remove("active");
+    renderA9();
+  });
+  T04_PHO_HTML = document.getElementById("t04-pho").innerHTML;
+  renderA7();
+  renderA9();
+  openA6Modal();
+</script>
+</body>
+</html>

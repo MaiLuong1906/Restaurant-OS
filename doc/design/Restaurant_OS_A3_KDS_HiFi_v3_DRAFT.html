@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A3 v3 — KDS Minimal Operations UI (1 hàng đợi)</title>
+<style>
+  /* Design System KHÓA (theo quyết định ngày 2026-11-05, khớp bảng token):
+     nền ops #F6F4F0 (KDS + Dashboard) · nền web/khách #F5F2EA · card #FFFFFF
+     chữ chính #141210 · chữ vận hành #2B2118 · chữ phụ #7A6A58 / #6F6659 · viền #E9E4DC
+     brand #8C1D2C (nút hành động chính DUY NHẤT) · danger #D14B3A (hủy/lỗi/quá SLA)
+     trạng thái bàn: trống #5F7F5E · đang dùng #D9A441 · quá giờ #D14B3A · đang dọn #9A8F80
+     (màu trạng thái bàn KHÔNG dùng làm màu nút bấm)
+     sắp đến hạn (KDS-riêng) #9A6B12 · nền nhạt quá SLA #FDEAE6 · nền nhạt sắp trễ #FDF3D7
+     Spacing bội số 4px: header 56px · lề desktop 24px · header→nội dung 20px · gap ticket 16px
+     padding card 18px · gap nhóm 12px · gap dòng món 10px · nút 48px · bo 8px · bóng nhẹ */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 24px 24px; }
+  /* ===== Header 56px ===== */
+  .kds-header { height: 56px; background: #fff; border-bottom: 1px solid #E9E4DC; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; gap: 16px; }
+  .kds-header .left { display: flex; align-items: baseline; gap: 12px; }
+  .kds-header h1 { margin: 0; font-size: 20px; color: #2B2118; }
+  .kds-header .station { font-size: 16px; color: #2B2118; }
+  .kds-header .right { display: flex; align-items: center; gap: 20px; font-size: 15px; }
+  .conn { display: flex; align-items: center; gap: 6px; color: #2B2118; }
+  .conn svg { color: #5F7F5E; }
+  #clock { font-variant-numeric: tabular-nums; font-weight: 700; color: #2B2118; }
+  /* ===== Stats bar 64-72px: chỉ 4 số ===== */
+  .stats { margin-top: 20px; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-height: 68px; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; }
+  .stat { padding: 12px 20px; border-right: 1px solid #E9E4DC; }
+  .stat:last-child { border-right: none; }
+  .stat b { display: block; font-size: 24px; line-height: 1.2; }
+  .stat span { font-size: 13px; color: #7A6A58; }
+  .stat b.late { color: #D14B3A; }
+  /* ===== Queue ===== */
+  .queue-head { margin: 24px 0 12px; }
+  .queue-head h2 { margin: 0; font-size: 17px; letter-spacing: 0.4px; text-transform: uppercase; }
+  .queue-head p { margin: 4px 0 0; font-size: 14px; color: #7A6A58; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 1099px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 699px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } .stat:nth-child(2) { border-right: none; } .stat:nth-child(1), .stat:nth-child(2) { border-bottom: 1px solid #E9E4DC; } }
+  /* ===== Ticket card ===== */
+  .ticket { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 18px; }
+  .ticket.sla-soon { border-left: 6px solid #9A6B12; }
+  .ticket.sla-overdue { border-left: 6px solid #D14B3A; }
+  .ticket.flash { box-shadow: 0 0 0 2px #8C1D2C, 0 1px 3px rgba(0,0,0,0.08); }
+  .t-row1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .t-table { font-size: 24px; font-weight: 800; }
+  .chip { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+  .chip.overdue { background: #FDEAE6; color: #D14B3A; }
+  .chip.soon { background: #FDF3D7; color: #9A6B12; }
+  .chip.ok { background: #F6F4F0; color: #7A6A58; }
+  .t-meta { display: flex; align-items: center; gap: 6px; font-size: 15px; margin-top: 8px; color: #141210; }
+  .t-meta .tno { color: #7A6A58; }
+  .allergy { display: flex; align-items: center; gap: 8px; background: #D14B3A; color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; padding: 9px 16px; border-radius: 6px; margin-top: 12px; min-height: 38px; }
+  .items { list-style: none; padding: 0; margin: 12px 0; }
+  .items li { font-size: 18px; margin: 10px 0; }
+  .item-note { display: flex; align-items: flex-start; gap: 6px; font-size: 14px; color: #7A6A58; margin: 12px 0 0; }
+  .t-actions { margin-top: 16px; }
+  .t-actions button { width: 100%; height: 48px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .t-actions button:hover { background: #6F1623; }
+  .icon { width: 18px; height: 18px; flex: none; }
+  .icon-warn { width: 20px; height: 20px; flex: none; }
+  .hidden { display: none !important; }
+  /* ===== Toast + Hoàn tác ===== */
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #141210; color: #fff; padding: 12px 16px 12px 20px; border-radius: 8px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 100; display: flex; align-items: center; gap: 16px; }
+  .toast button { background: transparent; border: 1px solid #fff; color: #fff; border-radius: 8px; padding: 8px 14px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  /* ===== Sections (không thuộc màn KDS) ===== */
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin-top: 20px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .demo-strip { border-style: dashed; }
+  .demo-strip button { height: 44px; padding: 0 18px; font-size: 15px; font-weight: 700; cursor: pointer; border-radius: 8px; background: #fff; border: 1px solid #E9E4DC; color: #141210; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1px solid #E9E4DC; vertical-align: middle; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="draftbar"><strong>BẢN V3 — MINIMAL OPERATIONS UI (theo định hướng ngày 2026-11-05)</strong> · 1 hàng đợi lưới 3/2/1 cột · 1 nút/ticket (brand) · Nền ops · v1/v2 giữ nguyên, không sửa · Chưa phải thiết kế chốt · Chưa sửa route thật <code>(staff)/kds</code>.</div>
+
+<!-- ===== HEADER 56px ===== -->
+<header class="kds-header">
+  <div class="left">
+    <h1>KDS Bếp</h1>
+    <span class="station">Bếp Nướng</span>
+  </div>
+  <div class="right">
+    <span class="conn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>Đã kết nối</span>
+    <span>🕐 <span id="clock">--:--:--</span></span>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ===== STATS: chỉ 4 số, không biểu đồ/doanh thu ===== -->
+  <div class="stats" role="status">
+    <div class="stat"><b id="stat-open">4</b><span>Ticket đang mở</span></div>
+    <div class="stat"><b id="stat-late" class="late">2</b><span>Quá SLA</span></div>
+    <div class="stat"><b id="stat-dishes">11</b><span>Món cần làm</span></div>
+    <div class="stat"><b id="stat-done">0</b><span>Vừa hoàn tất</span></div>
+  </div>
+
+  <div class="queue-head">
+    <h2>Đơn cần chế biến</h2>
+    <p>Sắp xếp tự động: dị ứng trước, quá SLA tiếp theo, sắp đến hạn, rồi theo thời gian nhận. Ticket hoàn tất biến mất khỏi hàng đợi, chỉ hiện toast xác nhận.</p>
+  </div>
+
+  <!-- ===== 1 HÀNG ĐỢI DUY NHẤT, DẠNG LƯỚI (không phải cột trạng thái) ===== -->
+  <div class="grid" id="queue">
+    <article class="ticket sla-overdue" data-table="Bàn 04" data-dishes="3" data-overdue="1">
+      <div class="t-row1"><span class="t-table">Bàn 04</span><span class="chip overdue">Quá SLA</span></div>
+      <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Chờ <span class="mins" data-minutes="18">18</span> phút</span><span class="tno">· Ticket #004</span></div>
+      <div class="allergy"><svg class="icon-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>DỊ ỨNG: ĐẬU PHỘNG</div>
+      <ul class="items">
+        <li>2 × Nem Rán Phố Cổ</li>
+        <li>1 × Gỏi Ngó Sen Tôm Thịt</li>
+      </ul>
+      <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+    </article>
+
+    <article class="ticket sla-overdue" data-table="Bàn 08" data-dishes="4" data-overdue="1">
+      <div class="t-row1"><span class="t-table">Bàn 08</span><span class="chip overdue">Quá SLA</span></div>
+      <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Chờ <span class="mins" data-minutes="16">16</span> phút</span><span class="tno">· Ticket #008</span></div>
+      <div class="allergy"><svg class="icon-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>DỊ ỨNG: ĐẬU PHỘNG</div>
+      <ul class="items">
+        <li>3 × Bò Cuộn Nấm Nướng</li>
+        <li>1 × Nem Rán Phố Cổ</li>
+      </ul>
+      <p class="item-note"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg><span>Ghi chú: Không hành, ít cay</span></p>
+      <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+    </article>
+
+    <article class="ticket sla-soon" data-table="Bàn 09" data-dishes="3" data-overdue="0">
+      <div class="t-row1"><span class="t-table">Bàn 09</span><span class="chip soon">Sắp đến hạn</span></div>
+      <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Chờ <span class="mins" data-minutes="12">12</span> phút</span><span class="tno">· Ticket #009</span></div>
+      <ul class="items">
+        <li>1 × Bò Cuộn Nấm Nướng</li>
+        <li>2 × Nem Rán Phố Cổ</li>
+      </ul>
+      <p class="item-note"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg><span>Ghi chú: Không hành</span></p>
+      <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+    </article>
+
+    <article class="ticket" data-table="Bàn 02" data-dishes="1" data-overdue="0">
+      <div class="t-row1"><span class="t-table">Bàn 02</span><span class="chip ok">Trong hạn</span></div>
+      <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Chờ <span class="mins" data-minutes="6">6</span> phút</span><span class="tno">· Ticket #002</span></div>
+      <ul class="items">
+        <li>1 × Phở Bò Thăn</li>
+      </ul>
+      <p class="item-note"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg><span>Ghi chú: Không hành</span></p>
+      <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+    </article>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status">
+    <span id="toast-msg"></span>
+    <button type="button" id="toast-undo">Hoàn tác</button>
+  </div>
+
+  <!-- ===== KHU VỰC DEMO — KHÔNG THUỘC MÀN KDS (để thử highlight ticket mới) ===== -->
+  <section class="block demo-strip">
+    <h2>Khu vực demo — không thuộc màn KDS</h2>
+    <p style="color:#7A6A58">Màn KDS thật không có nút này. Nút dưới đây chỉ để thử hiệu ứng "ticket mới xuất hiện" trong bản nháp: ticket mới được chèn đúng vị trí sắp xếp (cuối hàng đợi vì chưa dị ứng, chưa quá hạn) và highlight nhẹ 1–2 giây rồi trở về bình thường.</p>
+    <button type="button" id="demo-new">Mô phỏng: ticket mới vào</button>
+  </section>
+
+  <!-- ===== QUYẾT ĐỊNH V3 (so với v2) ===== -->
+  <section class="block">
+    <h2>Quyết định v3 (so với v2 — v2 giữ nguyên để đối chiếu)</h2>
+    <ul>
+      <li><strong>Kanban 2 cột → 1 hàng đợi lưới:</strong> không còn cột Chờ nấu / Đang nấu / Xong. Lưới 3 cột ở desktop (mỗi ticket tối thiểu ~340–360px), 2 cột tablet ngang, 1 cột tablet dọc — đây là số cột của lưới, không phải cột trạng thái.</li>
+      <li><strong>Bỏ nút "Bắt đầu nấu":</strong> mỗi ticket chỉ còn 1 nút "Hoàn tất ticket". SLA tính từ khi ticket đến trạm bếp (theo đúng điều kiện ở mục 4 của định hướng: chỉ đo tổng thời gian nhận → hoàn tất). Nếu sau này cần thống kê riêng thời gian chờ và thời gian nấu thì mới thêm lại nút Bắt đầu nấu.</li>
+      <li><strong>Nút dùng brand, không dùng xanh dương/xanh lá:</strong> "Hoàn tất ticket" là brand <code>#8C1D2C</code>, chữ trắng, cao 48px, bo 8px, không icon trong nút. Màu xanh của trạng thái bàn không đồng nghĩa với màu nút bấm — token <code>kds-action</code> xanh dương và <code>sage-700</code> xanh lá từ v7 không còn là màu nút KDS nữa.</li>
+      <li><strong>Nền KDS đổi từ giấy sang ops:</strong> nền board là <code>#F6F4F0</code> (nền ứng dụng vận hành, chung với Dashboard), không còn <code>#F5F2EA</code> của v7.1. Nền giấy vẫn giữ cho website/POS/staff/menu khách.</li>
+      <li><strong>86 bỏ hẳn:</strong> không còn nút 86 từng món (v1) lẫn dòng "Báo hết món" trên ticket (v2). Đường báo hết món thuộc về màn A7/A8 và quyền quản lý, không nằm trên card đầu bếp.</li>
+      <li><strong>SLA không thanh tiến độ, không phần trăm, không nhấp nháy:</strong> quá hạn chỉ có viền trái đỏ cố định + chip "Quá SLA"; sắp đến hạn chip vàng đậm; ticket bình thường chỉ hiện thời gian chờ. Timer không nhấp nháy liên tục (bỏ hiệu ứng blink của v7).</li>
+      <li><strong>Toast + Hoàn tác quay lại:</strong> hoàn tất thì ticket biến mất nhẹ nhàng, toast xác nhận kèm nút "Hoàn tác" trong vài giây (5 giây trong nháp), không mở modal xác nhận mỗi lần hoàn thành. Điểm mở của v2 về hoàn tác coi như đã chốt theo hướng này.</li>
+      <li><strong>Không ảnh món ăn trên card:</strong> ảnh chỉ xuất hiện ở màn chi tiết riêng khi cần hướng dẫn trình bày món, không làm thumbnail thường trực.</li>
+      <li><strong>Icon một bộ outline duy nhất (Lucide):</strong> cảnh báo, thời gian, ghi chú, hoàn tất, kết nối — vẽ bằng SVG outline trong nháp (app thật dùng sẵn lucide-react trong repo). Không trộn emoji, icon đặc và icon nhiều màu.</li>
+      <li><strong>Header 56px, thống kê 64–72px, spacing bội số 4px:</strong> lề desktop 24px, header→nội dung 20px, gap ticket 16px, padding card 18px, gap nhóm 12px, gap dòng món 10px, nút 48px, bo 8px, icon thường 18px, icon cảnh báo 20px.</li>
+      <li><strong>Thứ tự thông tin trên card cố định:</strong> Bàn (24px) + chip trạng thái (12px) cùng hàng → thời gian chờ (15px) + mã ticket → banner dị ứng (cao ~38px, chỉ khi có) → tên món + số lượng (18px) → ghi chú (14px) → nút hoàn tất (48px).</li>
+    </ul>
+  </section>
+
+  <!-- ===== ĐIỂM CÒN MỞ ===== -->
+  <section class="block">
+    <h2>Điểm còn mở (v3 chưa tự quyết)</h2>
+    <ul>
+      <li><strong>Chip "Đang xử lý" trong mock:</strong> mock của cậu ghi Bàn 09 là "Đang xử lý". Trong mô hình một nút, hệ thống không biết đầu bếp đã bắt đầu nấu hay chưa, nên v3 dùng chip theo SLA (Quá SLA / Sắp đến hạn / Trong hạn) thay cho trạng thái xử lý. Nếu cần trạng thái "đang nấu" thật thì phải quay lại nút Bắt đầu nấu (đánh đổi đã nêu ở trên).</li>
+      <li><strong>Dropdown chuyển trạm:</strong> quy tắc đã chốt là đầu bếp phân nhiều trạm thì dùng một dropdown nhỏ thay cho tab, nhưng bản nháp này vẽ trường hợp một trạm (Bếp Nướng) nên chỉ hiện tên trạm dạng text. Dropdown chỉ xuất hiện khi tài khoản thực sự được phân nhiều trạm.</li>
+      <li><strong>Nút secondary "Xem ghi chú" và danger "Hủy ticket":</strong> đây là 2 loại nút trong hệ thống nút chung, nhưng không nằm trên card hàng đợi — ghi chú đã hiện trực tiếp trên card, còn Hủy ticket thuộc thao tác nguy hiểm (màn A9, quyền Bếp trưởng). Cần cậu xác nhận cách hiểu này.</li>
+      <li><strong>Cách tính SLA:</strong> v3 theo định hướng là tính từ khi ticket đến trạm. Nếu team cần tách thời gian chờ và thời gian nấu để thống kê thì phải thêm lại nút Bắt đầu nấu.</li>
+      <li><strong>Tên trạm, mã bàn, tên món, số liệu thống kê là ví dụ:</strong> "Bếp Nướng", "Bàn 04", "Nem Rán Phố Cổ", 4 ticket / 11 món đều là dữ liệu minh họa; số liệu thống kê trong nháp được tính trực tiếp từ các ticket ví dụ này.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <h2>Palette khóa áp dụng trong v3 (đối chiếu nhanh)</h2>
+    <p><span class="swatch" style="background:#F6F4F0"></span>Nền ops <code>#F6F4F0</code> · <span class="swatch" style="background:#FFFFFF"></span>Card <code>#FFFFFF</code> · <span class="swatch" style="background:#141210"></span>Chữ chính <code>#141210</code> · <span class="swatch" style="background:#2B2118"></span>Chữ vận hành <code>#2B2118</code> · <span class="swatch" style="background:#7A6A58"></span>Chữ phụ <code>#7A6A58</code> · <span class="swatch" style="background:#E9E4DC"></span>Viền <code>#E9E4DC</code> · <span class="swatch" style="background:#8C1D2C"></span>Brand <code>#8C1D2C</code> · <span class="swatch" style="background:#D14B3A"></span>Danger <code>#D14B3A</code> · <span class="swatch" style="background:#9A6B12"></span>Sắp đến hạn <code>#9A6B12</code> · <span class="swatch" style="background:#FDEAE6"></span>Nền quá SLA <code>#FDEAE6</code>.</p>
+    <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP v3 (Minimal Operations UI), chưa phải thiết kế chốt. v1/v2 giữ nguyên. Không sửa repo, plan gốc, bảng giai đoạn 0 đã chốt. Hướng thị giác tham khảo yammiipos.com (card sạch, ít đường viền, phân cấp rõ) nhưng màu thực tế vẫn theo Design System của dự án.</p>
+  </section>
+</div>
+
+<script>
+  function tickClock() {
+    var el = document.getElementById("clock");
+    if (el) el.textContent = new Date().toLocaleTimeString("vi-VN");
+  }
+  tickClock(); setInterval(tickClock, 1000);
+  // Thời gian chờ tính bằng phút, cập nhật mỗi phút (nháp — app thật tính lại chip SLA khi qua ngưỡng).
+  setInterval(function () {
+    document.querySelectorAll(".mins[data-minutes]").forEach(function (el) {
+      var m = (parseInt(el.getAttribute("data-minutes"), 10) || 0) + 1;
+      el.setAttribute("data-minutes", m);
+      el.textContent = m;
+    });
+  }, 60000);
+  function updateStats() {
+    var q = document.getElementById("queue");
+    var tickets = q.querySelectorAll(".ticket");
+    var dishes = 0, late = 0;
+    tickets.forEach(function (t) {
+      dishes += parseInt(t.getAttribute("data-dishes"), 10) || 0;
+      late += parseInt(t.getAttribute("data-overdue"), 10) || 0;
+    });
+    document.getElementById("stat-open").textContent = tickets.length;
+    document.getElementById("stat-late").textContent = late;
+    document.getElementById("stat-dishes").textContent = dishes;
+  }
+  var toastTimer = null, lastRemoved = null;
+  function showToast(table) {
+    var t = document.getElementById("toast");
+    document.getElementById("toast-msg").textContent = "✓ " + table + " đã hoàn tất — đã báo cho phục vụ";
+    t.classList.remove("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.add("hidden"); lastRemoved = null; }, 5000);
+  }
+  document.getElementById("queue").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-action='complete']");
+    if (!btn) return;
+    var ticket = btn.closest(".ticket");
+    if (!ticket) return;
+    var table = ticket.getAttribute("data-table") || "Bàn";
+    var parent = ticket.parentNode;
+    var next = ticket.nextSibling;
+    lastRemoved = { node: ticket, parent: parent, next: next };
+    ticket.remove();
+    var doneEl = document.getElementById("stat-done");
+    doneEl.textContent = (parseInt(doneEl.textContent, 10) || 0) + 1;
+    updateStats();
+    showToast(table);
+  });
+  document.getElementById("toast-undo").addEventListener("click", function () {
+    if (!lastRemoved) return;
+    if (lastRemoved.next) lastRemoved.parent.insertBefore(lastRemoved.node, lastRemoved.next);
+    else lastRemoved.parent.appendChild(lastRemoved.node);
+    lastRemoved = null;
+    var doneEl = document.getElementById("stat-done");
+    doneEl.textContent = Math.max(0, (parseInt(doneEl.textContent, 10) || 0) - 1);
+    document.getElementById("toast").classList.add("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    updateStats();
+  });
+  var demoCount = 0;
+  document.getElementById("demo-new").addEventListener("click", function () {
+    demoCount += 1;
+    var art = document.createElement("article");
+    art.className = "ticket flash";
+    art.setAttribute("data-table", "Bàn 12");
+    art.setAttribute("data-dishes", "2");
+    art.setAttribute("data-overdue", "0");
+    art.innerHTML = '<div class="t-row1"><span class="t-table">Bàn 12</span><span class="chip ok">Trong hạn</span></div>'
+      + '<div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Chờ <span class="mins" data-minutes="0">0</span> phút</span><span class="tno">· Ticket #0' + (20 + demoCount) + '</span></div>'
+      + '<ul class="items"><li>2 × Gà Nướng Mật Ong</li></ul>'
+      + '<div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>';
+    document.getElementById("queue").appendChild(art);
+    updateStats();
+    setTimeout(function () { art.classList.remove("flash"); }, 1500);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B2 v2 — Staff Home (theo UX Audit 7/10)</title>
+<style>
+  /* Ngôn ngữ vận hành đã khóa:
+     nền ops #F6F4F0 · card #FFFFFF · chữ chính #141210 · chữ vận hành #2B2118
+     chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C · brand-dark #6F1623
+     danger #D14B3A (chỉ số quá SLA và cảnh báo nguy hiểm) · bo 8px · bóng nhẹ
+     spacing bội số 4px · nút chính 48px · icon một bộ outline Lucide, stroke 2
+     Staff Portal = điện thoại cá nhân (mobile-first) + bản laptop cùng nội dung.
+     Thay đổi theo audit: bỏ viền đỏ quanh card KDS; cảnh báo dị ứng tách thành
+     khu vực riêng; header gọn; quick actions gọn; padding dưới cho bottom nav. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .democtl { background: #fff; border-bottom: 1px solid #E9E4DC; padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: #7A6A58; }
+  .democtl .seg { display: flex; background: #F6F4F0; border: 1px solid #E9E4DC; border-radius: 8px; padding: 4px; gap: 4px; }
+  .democtl .seg button { border: none; background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 6px; color: #2B2118; }
+  .democtl .seg button.active { background: #8C1D2C; color: #fff; }
+  /* ===== Khung app ===== */
+  .app { margin: 0 auto; background: #F6F4F0; border-left: 1px solid #E9E4DC; border-right: 1px solid #E9E4DC; min-height: 100vh; display: flex; flex-direction: column; }
+  body.layout-phone .app { max-width: 480px; }
+  body.layout-laptop .app { max-width: 1024px; }
+  .content { flex: 1; padding: 16px 20px 24px; }
+  body.layout-phone .content { padding-bottom: 96px; }
+  .greet h1 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.25; color: #2B2118; }
+  .greet p { margin: 4px 0 0; font-size: 12px; color: #7A6A58; }
+  .rolechip { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; background: #fff; border: 1px solid #E9E4DC; color: #2B2118; }
+  /* Top nav chỉ hiện ở bản laptop: cao 40px */
+  .topnav { display: none; margin-top: 16px; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; padding: 4px; gap: 4px; }
+  body.layout-laptop .topnav { display: flex; }
+  .topnav button { flex: 1; border: none; background: transparent; cursor: pointer; font-size: 15px; font-weight: 600; padding: 10px 16px; border-radius: 6px; color: #2B2118; min-height: 40px; }
+  .topnav button.active { background: #8C1D2C; color: #fff; }
+  /* Lưới nội dung */
+  .grid2 { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+  body.layout-laptop .grid2 { grid-template-columns: 1fr 1fr; gap: 16px; }
+  body.layout-laptop .span2 { grid-column: 1 / -1; }
+  .card { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: #2B2118; }
+  .card .sub { font-size: 12px; color: #7A6A58; margin: 0; }
+  /* Thẻ ca hôm nay */
+  .shift-rows { margin-top: 8px; }
+  .shift-rows .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 15px; }
+  .shift-rows .row span:first-child { color: #7A6A58; }
+  .shift-rows .row b { font-weight: 600; text-align: right; }
+  .shift-rows .row .meta { color: #7A6A58; font-weight: 400; }
+  .clockin { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 15px; font-weight: 600; }
+  .clockin svg { color: #8C1D2C; flex: none; }
+  /* Thẻ KDS — card trắng, viền chuẩn; Danger chỉ ở số quá SLA */
+  .kds-stats { display: flex; gap: 20px; margin-top: 12px; }
+  .kds-stats b { display: block; font-size: 22px; font-weight: 700; }
+  .kds-stats span { font-size: 12px; color: #7A6A58; }
+  .kds-stats .stat-sub { display: block; font-size: 11px; color: #7A6A58; margin-top: 2px; }
+  .kds-stats .late b { color: #D14B3A; }
+  .btn-brand { width: 100%; height: 48px; margin-top: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .btn-brand:hover { background: #6F1623; }
+  /* Khu vực cảnh báo riêng (tách khỏi thẻ ca) */
+  .alert-title { display: flex; align-items: center; gap: 8px; }
+  .alert-title svg { color: #D14B3A; flex: none; }
+  .alert-rows { list-style: none; padding: 0; margin: 12px 0 0; }
+  .alert-rows li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #E9E4DC; font-size: 15px; }
+  .alert-rows li .st-overdue { color: #D14B3A; font-weight: 600; white-space: nowrap; }
+  .alert-rows li .st-ok { color: #7A6A58; white-space: nowrap; }
+  /* Thao tác nhanh — gọn theo audit */
+  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  body.layout-laptop .quick { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .quick button { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; cursor: pointer; padding: 12px 8px; min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; color: #2B2118; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .quick button svg { color: #8C1D2C; }
+  .quick button small { font-size: 12px; font-weight: 400; color: #7A6A58; }
+  /* Tóm tắt lương / phép */
+  .bignum { font-size: 20px; font-weight: 700; margin-top: 8px; }
+  .linklike { background: none; border: none; cursor: pointer; padding: 12px 0 0; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  /* Thông báo — phân cấp: cần hành động vs đã xong */
+  .noti { list-style: none; padding: 0; margin: 12px 0 0; }
+  .noti li { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid #E9E4DC; font-size: 15px; }
+  .noti li:last-child { border-bottom: none; }
+  .noti li button { background: none; border: none; cursor: pointer; padding: 0; text-align: left; font-size: 15px; color: #141210; }
+  .noti li button b { color: #8C1D2C; }
+  .noti .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; }
+  .noti .dot.action { background: #D14B3A; }
+  .noti .dot.done { background: #9A8F80; }
+  .noti .tag { font-size: 11px; font-weight: 700; color: #D14B3A; }
+  /* Bottom nav chỉ hiện ở bản điện thoại: cao 64–68px + safe area */
+  .bottomnav { display: none; position: sticky; bottom: 0; background: #fff; border-top: 1px solid #E9E4DC; grid-template-columns: repeat(4, 1fr); padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); min-height: 64px; }
+  body.layout-phone .bottomnav { display: grid; }
+  .bottomnav button { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 500; color: #7A6A58; padding: 6px 0; min-height: 48px; }
+  .bottomnav button.active { color: #8C1D2C; }
+  .bottomnav button svg { color: inherit; }
+  .icon { width: 20px; height: 20px; }
+  .icon-sm { width: 18px; height: 18px; flex: none; }
+  /* Toast đích đến — chỉ ngôn ngữ nghiệp vụ, không mã màn hay ghi chú nội bộ */
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); background: #141210; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 100; max-width: 92vw; text-align: center; }
+  body.layout-phone .toast { bottom: 88px; }
+  body.layout-laptop .toast { bottom: 24px; }
+  .hidden { display: none !important; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin: 20px auto 0; max-width: 1024px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .map-table th, .map-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #E9E4DC; vertical-align: top; }
+  .map-table th { color: #7A6A58; font-size: 13px; }
+</style>
+</head>
+<body class="layout-phone">
+<div class="draftbar"><strong>NHÁP B2 v2 — Staff Home (theo UX Audit 7/10)</strong> · Bỏ viền đỏ KDS · Cảnh báo dị ứng thành khu vực riêng · Không nội dung nội bộ trong UI · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+<div class="democtl">
+  <span>Xem bản (nút này chỉ để soi, không thuộc màn hình):</span>
+  <div class="seg">
+    <button type="button" id="seg-phone" class="active">Điện thoại</button>
+    <button type="button" id="seg-laptop">Laptop</button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="content">
+    <div class="greet">
+      <h1>Xin chào, Huy</h1>
+      <p>Thứ Năm, 05/11/2026</p>
+      <span class="rolechip">Đầu bếp · Bếp chính</span>
+    </div>
+
+    <nav class="topnav" aria-label="Điều hướng Staff Portal (bản laptop)">
+      <button type="button" class="active" data-dest="Mở Trang chủ">Trang chủ</button>
+      <button type="button" data-dest="Mở Lịch ca">Lịch ca</button>
+      <button type="button" data-dest="Mở Lương và Tip">Lương &amp; Tip</button>
+      <button type="button" data-dest="Mở Cá nhân">Cá nhân</button>
+    </nav>
+
+    <div class="grid2">
+      <!-- Thẻ ca hôm nay -->
+      <section class="card">
+        <h2>Ca hôm nay</h2>
+        <p class="sub">Ca sáng · Nhà hàng chính</p>
+        <div class="shift-rows">
+          <div class="row"><span>Giờ ca</span><b>08:00 – 14:00</b></div>
+          <div class="row"><span>Khu vực</span><b>Bếp chính</b></div>
+          <div class="row"><span>Ca tiếp theo</span><b class="meta">Thứ Sáu · 08:00 – 14:00</b></div>
+        </div>
+        <div class="clockin">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Đã vào ca lúc 07:58
+        </div>
+      </section>
+
+      <!-- Thẻ KDS — card trắng, viền chuẩn; Danger chỉ ở số quá SLA -->
+      <section class="card">
+        <h2>Bếp — KDS</h2>
+        <p class="sub">Hàng đợi lúc này</p>
+        <div class="kds-stats">
+          <div><b>6</b><span>Ticket đang chờ</span></div>
+          <div class="late"><b>2</b><span>Ticket quá SLA</span><span class="stat-sub">trong 6 ticket chờ</span></div>
+          <div><b>16</b><span>Món cần làm</span><span class="stat-sub">tổng món của 6 ticket</span></div>
+        </div>
+        <button type="button" class="btn-brand" data-dest="Mở KDS — Bếp">Vào bếp</button>
+      </section>
+
+      <!-- Khu vực cảnh báo riêng — tách khỏi thẻ ca -->
+      <section class="card span2">
+        <h2 class="alert-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          Cảnh báo cần chú ý
+        </h2>
+        <p class="sub">3 ticket dị ứng đậu phộng đang chờ xử lý — xem rõ từng ticket, bấm để sang đúng ngữ cảnh ở KDS.</p>
+        <ul class="alert-rows">
+          <li><span>Bàn 04 · Nem Rán Phố Cổ ×2, Gỏi Ngó Sen ×1</span><span class="st-overdue">Quá SLA</span></li>
+          <li><span>Bàn 07 · Nem Rán Phố Cổ ×3</span><span class="st-ok">Trong hạn</span></li>
+          <li><span>Bàn 08 · Bò Cuộn Nấm Nướng ×3, Nem Rán Phố Cổ ×1</span><span class="st-overdue">Quá SLA</span></li>
+        </ul>
+        <button type="button" class="linklike" data-dest="Mở KDS — Bếp">Xem ở KDS →</button>
+      </section>
+
+      <!-- Thao tác nhanh -->
+      <section class="card span2">
+        <h2>Thao tác nhanh</h2>
+        <p class="sub">4 chức năng thường dùng</p>
+        <div class="quick">
+          <button type="button" data-dest="Mở Chấm công">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Chấm công<small>Vào / ra ca</small>
+          </button>
+          <button type="button" data-dest="Mở Lịch ca">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+            Lịch ca<small>Ca tuần này</small>
+          </button>
+          <button type="button" data-dest="Mở Danh sách nghỉ">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            Xin nghỉ<small>Đơn &amp; quỹ phép</small>
+          </button>
+          <button type="button" data-dest="Mở Phiếu lương">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+            Lương &amp; Tip<small>Phiếu tháng này</small>
+          </button>
+        </div>
+      </section>
+
+      <!-- Tóm tắt lương -->
+      <section class="card">
+        <h2>Lương tháng 11</h2>
+        <div class="bignum">4.250.000đ</div>
+        <p class="sub">Tip tháng 11: 320.000đ · Tính đến 05/11</p>
+        <button type="button" class="linklike" data-dest="Mở Phiếu lương">Xem phiếu lương →</button>
+      </section>
+
+      <!-- Quỹ phép -->
+      <section class="card">
+        <h2>Quỹ phép</h2>
+        <div class="bignum">Còn 6 ngày</div>
+        <p class="sub">2 đơn đang chờ duyệt</p>
+        <button type="button" class="linklike" data-dest="Mở Danh sách nghỉ">Xem đơn nghỉ →</button>
+      </section>
+
+      <!-- Thông báo — phân cấp: cần hành động vs đã xong -->
+      <section class="card span2">
+        <h2>Thông báo</h2>
+        <ul class="noti">
+          <li><span class="dot action"></span><button type="button" data-dest="Mở Lịch ca">Lịch tuần sau đã đăng — <b>xem Lịch ca</b> <span class="tag">Cần xem</span></button></li>
+          <li><span class="dot done"></span><button type="button" data-dest="Mở Danh sách nghỉ">Đơn xin nghỉ ngày 12/11 đã được duyệt — <b>xem Đơn nghỉ</b></button></li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <nav class="bottomnav" aria-label="Điều hướng Staff Portal (bản điện thoại)">
+    <button type="button" class="active" data-dest="Mở Trang chủ">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Trang chủ
+    </button>
+    <button type="button" data-dest="Mở Lịch ca">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+      Lịch ca
+    </button>
+    <button type="button" data-dest="Mở Lương và Tip">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+      Lương &amp; Tip
+    </button>
+    <button type="button" data-dest="Mở Cá nhân">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Cá nhân
+    </button>
+  </nav>
+</div>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<section class="block">
+  <h2>Thay đổi v1 → v2 (theo UX Audit)</h2>
+  <ul>
+    <li><strong>Must fix — bỏ viền đỏ KDS:</strong> card KDS về trắng, viền #E9E4DC như mọi card; Danger chỉ ở số "2 Ticket quá SLA". CTA "Vào bếp" giữ brand.</li>
+    <li><strong>Must fix — cảnh báo dị ứng thành khu vực riêng:</strong> tách khỏi thẻ ca, đặt giữa khu vực công việc (Ca + KDS) và tiện ích phụ (thao tác nhanh, lương/phép). Nêu rõ từng ticket (bàn + món + trạng thái Quá SLA/Trong hạn) thay vì chỉ dựa vào màu đỏ; nút "Xem ở KDS" dẫn sang đúng ngữ cảnh xử lý.</li>
+    <li><strong>Must fix — padding dưới:</strong> nội dung bản điện thoại có padding-bottom 96px (nav 64–68px + safe area + khoảng thở) để bottom nav không che nội dung cuối trang.</li>
+    <li><strong>Must fix — xóa nội dung nội bộ khỏi UI:</strong> bỏ "theo nháp A3 v5" (phụ đề KDS), "không còn nút chết như demo cũ" (phụ đề thao tác nhanh), và các toast ghi mã màn/dòng "sẽ vẽ ở bước B3–B5". Toast trong v2 chỉ nói ngôn ngữ nghiệp vụ ("Mở Chấm công", "Mở KDS — Bếp"). Mã màn B3/B6/B9/B11 chỉ còn trong phần ghi chú cuối file này, không xuất hiện trong giao diện màn hình.</li>
+    <li><strong>Should improve — làm rõ số liệu KDS:</strong> "2 quá SLA" là một phần trong 6 ticket chờ (ghi rõ "trong 6 ticket chờ"), "16 món" là tổng món của 6 ticket (ghi rõ dưới số). Cách tính không đổi, chỉ làm rõ nhãn.</li>
+    <li><strong>Should improve — trạng thái chấm công:</strong> "Đã vào ca lúc 07:58" kèm icon check màu brand, bỏ chấm xanh lá — màu xanh trạng thái bàn trống không dùng để biểu diễn trạng thái chấm công (hai nghiệp vụ khác nhau, theo audit).</li>
+    <li><strong>Should improve — gọn header và quick actions:</strong> lời chào 20px/600, ngày 12px, role 12px; quick actions icon 20px, tiêu đề 14px/600, phụ đề 12px, padding 12px, cao tối thiểu 76px, vùng chạm giữ 48px.</li>
+    <li><strong>Should improve — phân cấp thông báo:</strong> "Lịch tuần sau đã đăng" là cần hành động (chấm đỏ + nhãn "Cần xem"); "Đơn nghỉ đã duyệt" là đã xong (chấm xám, không nhãn).</li>
+    <li><strong>Thứ tự ưu tiên mới (cả hai bản):</strong> Header → Ca hôm nay → KDS → Cảnh báo → Thao tác nhanh → Lương + Phép → Thông báo → Bottom nav. Bản laptop: Ca + KDS song song, cảnh báo full width ngay sau.</li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>Trả lời 3 câu hỏi nghiệp vụ trong audit (đề xuất, chờ cậu chốt)</h2>
+  <table class="map-table">
+    <tr><th>Câu hỏi</th><th>Đề xuất</th><th>Lý do</th></tr>
+    <tr><td>1. Ưu tiên chính của đầu bếp?</td><td><strong>(a) KDS là công việc chính, Dashboard chỉ là màn tổng quan</strong></td><td>Đầu bếp làm việc ở KDS; Dashboard chỉ trả lời "đang trong ca nào, có gì đang chờ, làm gì ngay". Chọn (a) nên thứ tự v2 đặt Ca → KDS → Cảnh báo lên đầu, lương/phép/thông báo xuống dưới. Nếu chọn (b) hay (c) thì thứ tự này phải vẽ lại.</td></tr>
+    <tr><td>2. Cảnh báo dị ứng hiện cho ai?</td><td><strong>(a) Tất cả nhân viên bếp có liên quan</strong></td><td>An toàn thực phẩm là trách nhiệm chung, không phải thông tin mật; người trực tiếp nấu món đó phải thấy — mô hình hiện tại không phân ticket cho từng cá nhân (một hàng đợi chung) nên (b) không áp được, còn (c) thì người nấu lại không thấy.</td></tr>
+    <tr><td>3. Dashboard dùng chung cho các role Staff khác?</td><td><strong>(c) Chung layout, khu vực nghiệp vụ khác nhau theo role</strong></td><td>(a) chung hẳn sẽ nhét thẻ vô dụng vào từng role (phục vụ không cần thẻ KDS, đầu bếp không cần thẻ bàn); (b) mỗi role một Dashboard riêng thì nhân đôi công bảo trì. (c) khớp cách v2 đã làm: khung chung (header, ca, thao tác nhanh, lương/phép, thông báo), khu vực công việc thay theo role — phục vụ thay thẻ KDS bằng thẻ bàn/đơn đang phục vụ.</td></tr>
+  </table>
+</section>
+
+<section class="block">
+  <h2>Điểm còn mở / xung đột đã nêu rõ (v2 chưa tự quyết)</h2>
+  <ul>
+    <li><strong>Màu nền trong audit vs token đã khóa:</strong> audit ghi nền #F5F2EA nhưng Design System đã khóa nền app vận hành là #F6F4F0 (nền #F5F2EA là của web/khách). V2 giữ #F6F4F0 theo quyết định đã chốt — nếu audit muốn đổi thì cần nói rõ là đổi token chung.</li>
+    <li><strong>Số ticket dị ứng 2 → 3:</strong> v1 và audit đều ghi "2 ticket dị ứng" theo dữ liệu A3 v4 (Bàn 04 + Bàn 08). Nháp A3 v5 đã thêm Bàn 07 cũng dị ứng đậu phộng nên v2 ghi 3 ticket (Bàn 04, 07, 08). Số liệu KDS (6 ticket / 2 quá SLA / 16 món) vẫn khớp v5.</li>
+    <li><strong>Nhãn bottom nav 11px:</strong> theo đúng mục D2 của audit (10–11px). Mục E.3 của chính audit cũng dặn không giảm metadata dưới 12px cho nội dung phụ có ý nghĩa — v2 vẫn theo D2 cho nhãn nav (tab bar 11px là chuẩn chung), còn mọi metadata khác giữ 12px.</li>
+    <li><strong>Tab Cá nhân và thẻ KDS cho role phục vụ:</strong> vẫn chờ chốt như ở v1 — câu 3 ở trên là đề xuất hướng trả lời, chưa phải quyết định.</li>
+    <li><strong>Số liệu trong nháp là ví dụ:</strong> giờ ca, lương tạm tính, quỹ phép, số ticket KDS chỉ để soi bố cục, không phải dữ liệu thật.</li>
+  </ul>
+  <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP B2 v2 (theo UX Audit 7/10), chưa phải thiết kế chốt. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A3 v1–v5, A1, A5 v1–v2, B2 v1.</p>
+</section>
+
+<script>
+  var toastTimer = null;
+  function showDest(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = "→ " + msg;
+    t.classList.remove("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.add("hidden"); }, 4000);
+  }
+  document.querySelectorAll("[data-dest]").forEach(function (el) {
+    el.addEventListener("click", function () { showDest(el.getAttribute("data-dest")); });
+  });
+  document.getElementById("seg-phone").addEventListener("click", function () {
+    document.body.classList.remove("layout-laptop");
+    document.body.classList.add("layout-phone");
+    this.classList.add("active");
+    document.getElementById("seg-laptop").classList.remove("active");
+  });
+  document.getElementById("seg-laptop").addEventListener("click", function () {
+    document.body.classList.remove("layout-phone");
+    document.body.classList.add("layout-laptop");
+    this.classList.add("active");
+    document.getElementById("seg-phone").classList.remove("active");
+  });
+</script>
+</body>
+</html>

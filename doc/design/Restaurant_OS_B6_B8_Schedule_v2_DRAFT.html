@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B6–B8 v2 — Lịch ca / Đăng ký ca / Đổi ca (theo UX Audit)</title>
+<style>
+  /* Ngôn ngữ vận hành đã khóa:
+     nền ops #F6F4F0 · card #FFFFFF · chữ chính #141210 · chữ vận hành #2B2118
+     chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C · brand-dark #6F1623 (đã có
+     trong token khóa, dùng cho hover — không phải màu mới) · danger #D14B3A
+     (chỉ lỗi/cảnh báo nguy hiểm) · bo 8px thống nhất (trừ hình tròn)
+     bóng nhẹ · spacing bội số 4px · nút chính 48px
+     icon một bộ outline Lucide, stroke 2
+     B6–B8 đi theo luồng từ B2 (tab Lịch ca) và từ B3, không thêm tab mới.
+     Điện thoại cá nhân là chính; bản laptop cùng nội dung.
+     v2 theo UX Audit + 4 quyết định đã chốt: quản lý đăng ca trống thủ công;
+     đổi ca người nhận xác nhận trước rồi quản lý duyệt; hủy tùy loại yêu cầu;
+     đăng ký ca luôn cần duyệt. Font Be Vietnam Pro chưa tải trong nháp —
+     khi lên code thật dùng next/font; nháp dùng font hệ thống dự phòng. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .democtl { background: #fff; border-bottom: 1px solid #E9E4DC; padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: #7A6A58; }
+  .democtl .seg { display: flex; background: #F6F4F0; border: 1px solid #E9E4DC; border-radius: 8px; padding: 4px; gap: 4px; }
+  .democtl .seg button { border: none; background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 8px; color: #2B2118; }
+  .democtl .seg button.active { background: #8C1D2C; color: #fff; }
+  .democtl .demo-btn { border: 1px solid #E9E4DC; background: #fff; cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 8px; color: #2B2118; }
+  /* ===== Khung app ===== */
+  .app { margin: 0 auto; background: #F6F4F0; border-left: 1px solid #E9E4DC; border-right: 1px solid #E9E4DC; min-height: 100vh; display: flex; flex-direction: column; }
+  body.layout-phone .app { max-width: 480px; }
+  body.layout-laptop .app { max-width: 1024px; }
+  .content { flex: 1; padding: 16px 20px 32px; }
+  .narrow { max-width: 640px; margin: 0 auto; }
+  .backlink { background: none; border: none; cursor: pointer; padding: 4px 0 12px; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  .screen-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .screen-head h1 { margin: 0; font-size: 20px; font-weight: 600; color: #2B2118; }
+  .screen-head p { margin: 4px 0 0; font-size: 12px; color: #7A6A58; }
+  .card { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px; margin-top: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: #2B2118; }
+  .card .sub { font-size: 12px; color: #7A6A58; margin: 0; }
+  .rows { margin-top: 8px; }
+  .rows .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 15px; }
+  .rows .row span:first-child { color: #7A6A58; }
+  .rows .row b { font-weight: 600; text-align: right; }
+  .rows .row .meta { color: #7A6A58; font-weight: 400; }
+  /* Nút */
+  .btn-brand { width: 100%; height: 48px; margin-top: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .btn-brand:hover { background: #6F1623; }
+  .btn-brand:disabled { opacity: 0.6; cursor: default; }
+  .btn-ghost { width: 100%; height: 48px; margin-top: 12px; font-size: 16px; font-weight: 600; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .btn-small { width: auto; height: auto; min-height: 48px; margin-top: 0; padding: 10px 16px; font-size: 14px; flex: none; }
+  .linklike { background: none; border: none; cursor: pointer; padding: 12px 0 0; font-size: 15px; font-weight: 600; color: #8C1D2C; }
+  /* B6: thanh chọn ngày (điện thoại) + lưới ngày (laptop 2 cột) */
+  .weeknav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+  .weeknav .label { font-size: 16px; font-weight: 600; text-align: center; }
+  .weeknav button { width: 48px; height: 48px; flex: none; font-size: 20px; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .daystrip { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 4px; -webkit-overflow-scrolling: touch; }
+  .strip-day { flex: 0 0 64px; min-height: 64px; padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .strip-day .dow { display: block; font-size: 12px; font-weight: 600; }
+  .strip-day .num { display: block; font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .strip-day .dots { display: block; font-size: 10px; line-height: 1; margin-top: 2px; letter-spacing: 2px; }
+  .strip-day .dots .own { color: #8C1D2C; }
+  .strip-day .dots .pend { color: #8C1D2C; }
+  .strip-day .dots .open { color: #7A6A58; }
+  .strip-day.selected { background: #8C1D2C; border-color: #8C1D2C; color: #fff; }
+  .strip-day.selected .dots .own, .strip-day.selected .dots .pend { color: #fff; }
+  .strip-day.selected .dots .open { color: #E9E4DC; }
+  .strip-legend { font-size: 12px; color: #7A6A58; margin: 4px 0 0; }
+  .weekgrid { display: none; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  body.layout-laptop .weekgrid { display: grid; }
+  body.layout-laptop .daystrip, body.layout-laptop .strip-legend, body.layout-laptop #day-detail { display: none; }
+  .day { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 12px; }
+  .day.today { border-color: #8C1D2C; }
+  .day .dow { font-size: 14px; font-weight: 600; color: #2B2118; }
+  .day .date { font-size: 12px; color: #7A6A58; }
+  .shift { margin-top: 8px; padding: 8px; border-radius: 8px; font-size: 14px; }
+  .shift.own { background: #F6F4F0; border-left: 3px solid #8C1D2C; }
+  .shift.open { border: 1px dashed #7A6A58; }
+  .shift.pending { border: 1px dashed #7A6A58; background: #fff; }
+  .shift b { display: block; font-size: 14px; }
+  .shift span { font-size: 12px; color: #7A6A58; }
+  .shift .tag { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .shift .tag.open-tag { background: #fff; border: 1px solid #7A6A58; color: #2B2118; }
+  .shift .tag.pending-tag { background: #fff; border: 1px solid #7A6A58; color: #2B2118; }
+  .shift .btn-small { margin-top: 8px; }
+  .day .off { margin-top: 8px; font-size: 14px; color: #7A6A58; }
+  .empty { text-align: center; padding: 24px 16px; }
+  .empty h2 { font-size: 18px; margin: 0 0 4px; }
+  .empty p { font-size: 14px; color: #7A6A58; margin: 4px 0 0; }
+  /* Form B7/B8 */
+  .field-label { font-size: 15px; font-weight: 600; margin: 16px 0 8px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .chips button { flex: 0 0 auto; min-height: 48px; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #2B2118; }
+  .chips button.selected { background: #8C1D2C; border-color: #8C1D2C; color: #fff; }
+  .chips button:disabled { opacity: 0.4; cursor: default; }
+  .radio-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 16px; margin-top: 8px; min-height: 64px; font-size: 15px; cursor: pointer; border: 1px solid #E9E4DC; border-radius: 8px; background: #fff; color: #141210; }
+  .radio-card b { display: block; font-size: 15px; }
+  .radio-card span { font-size: 12px; color: #7A6A58; }
+  .radio-card.selected { border-color: #8C1D2C; box-shadow: 0 0 0 1px #8C1D2C; }
+  .radio-card:disabled { opacity: 0.4; cursor: default; }
+  .radio-dot { width: 20px; height: 20px; flex: none; border-radius: 50%; border: 2px solid #7A6A58; }
+  .radio-card.selected .radio-dot { border-color: #8C1D2C; background: #8C1D2C; box-shadow: inset 0 0 0 3px #fff; }
+  textarea, .search { width: 100%; margin-top: 8px; padding: 12px; font-family: inherit; font-size: 15px; border: 1px solid #E9E4DC; border-radius: 8px; }
+  textarea { min-height: 80px; resize: vertical; }
+  .warn { margin-top: 12px; font-size: 14px; font-weight: 600; color: #D14B3A; }
+  .hint { margin-top: 8px; font-size: 12px; color: #7A6A58; }
+  /* Trạng thái yêu cầu */
+  .statuschip { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px; border: 1px solid #7A6A58; color: #2B2118; }
+  .statuschip.approved { border-color: #8C1D2C; color: #8C1D2C; }
+  .statuschip.rejected { border-color: #D14B3A; color: #D14B3A; }
+  .success-head { text-align: center; padding: 24px 16px 8px; }
+  .success-head svg { color: #8C1D2C; }
+  .success-head h2 { font-size: 20px; margin: 12px 0 4px; }
+  .success-head p { font-size: 15px; color: #2B2118; margin: 4px 0 0; }
+  .icon { width: 20px; height: 20px; }
+  .icon-lg { width: 48px; height: 48px; }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; background: #141210; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 100; max-width: 92vw; text-align: center; }
+  .hidden { display: none !important; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin: 20px auto 0; max-width: 1024px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .map-table th, .map-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #E9E4DC; vertical-align: top; }
+  .map-table th { color: #7A6A58; font-size: 13px; }
+</style>
+</head>
+<body class="layout-phone">
+<div class="draftbar"><strong>NHÁP B6–B8 v2 — Lịch ca / Đăng ký ca / Đổi ca (theo UX Audit)</strong> · Đã sửa 3 lỗi logic v1 · Đổi ca 2 bước xác nhận · Chỉ làm UI trước, chưa nối API · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+<div class="democtl">
+  <span>Xem màn (nút này chỉ để soi, không thuộc màn hình):</span>
+  <div class="seg">
+    <button type="button" id="seg-b6" class="active">Lịch ca</button>
+    <button type="button" id="seg-b7">Đăng ký ca</button>
+    <button type="button" id="seg-b8">Đổi ca</button>
+  </div>
+  <div class="seg">
+    <button type="button" id="seg-phone" class="active">Điện thoại</button>
+    <button type="button" id="seg-laptop">Laptop</button>
+  </div>
+  <span>Tuần ở Lịch ca:</span>
+  <div class="seg">
+    <button type="button" id="seg-week-cur" class="active">Tuần này</button>
+    <button type="button" id="seg-week-next">Tuần sau</button>
+    <button type="button" id="seg-week-empty">Tuần trống</button>
+  </div>
+  <span>Trạng thái yêu cầu đổi ca:</span>
+  <div class="seg">
+    <button type="button" id="seg-st-peer" class="active">Chờ người nhận</button>
+    <button type="button" id="seg-st-manager">Chờ quản lý</button>
+    <button type="button" id="seg-st-approved">Đã duyệt</button>
+    <button type="button" id="seg-st-rejected">Bị từ chối</button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="content">
+
+    <!-- ============ B6: Lịch ca ============ -->
+    <section id="screen-b6">
+      <div class="screen-head">
+        <div>
+          <h1>Lịch ca</h1>
+          <p>Ca của bạn và ca trống có thể đăng ký</p>
+        </div>
+        <button type="button" class="btn-brand btn-small" id="btn-to-swap-top">Đổi ca</button>
+      </div>
+      <div class="card">
+        <div class="rows">
+          <div class="row"><span>Ca của bạn tuần này</span><b id="sum-own">5 ca · 29 giờ</b></div>
+          <div class="row"><span>Ca trống có thể đăng ký</span><b id="sum-open">4 ca</b></div>
+          <div class="row hidden" id="sum-pending-row"><span>Đang chờ duyệt</span><b id="sum-pending">0 ca</b></div>
+        </div>
+      </div>
+      <div class="weeknav">
+        <button type="button" id="week-prev" aria-label="Tuần trước">‹</button>
+        <span class="label" id="week-label">Tuần 05/11 – 11/11/2026</span>
+        <button type="button" id="week-next" aria-label="Tuần sau">›</button>
+      </div>
+      <div class="daystrip" id="daystrip"></div>
+      <p class="strip-legend">● Ca của bạn &nbsp; ◐ Chờ duyệt &nbsp; ○ Ca trống</p>
+      <div class="card" id="day-detail"></div>
+      <div class="weekgrid" id="weekgrid"></div>
+      <div class="card hidden" id="week-empty">
+        <div class="empty">
+          <h2>Bạn chưa được phân ca trong tuần này</h2>
+          <p>Hiện chưa có ca trống để đăng ký.</p>
+          <button type="button" class="btn-brand" id="btn-empty-register">Đăng ký ca</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ B7: Đăng ký ca ============ -->
+    <section id="screen-b7" class="hidden">
+      <div class="narrow">
+        <button type="button" class="backlink" id="back-b7">← Lịch ca</button>
+        <div class="screen-head">
+          <div>
+            <h1>Đăng ký ca</h1>
+            <p>Chọn ngày và ca muốn đăng ký — luôn cần quản lý duyệt</p>
+          </div>
+        </div>
+        <div id="b7-form">
+          <p class="field-label" id="b7-days-label">Chọn ngày muốn đăng ký</p>
+          <div class="chips" id="b7-days" role="group" aria-labelledby="b7-days-label"></div>
+          <p class="field-label">Chọn ca</p>
+          <div id="b7-shifts"></div>
+          <p class="warn hidden" id="b7-warn"></p>
+          <p class="hint" id="b7-empty-hint" hidden>Không có ca khả dụng vào ngày đã chọn.</p>
+          <label class="field-label" for="b7-note">Ghi chú (không bắt buộc)</label>
+          <textarea id="b7-note" placeholder="Ví dụ: Chỉ làm được đến 21:00"></textarea>
+          <button type="button" class="btn-brand" id="btn-submit-b7">Gửi đăng ký</button>
+          <p class="hint">Đăng ký xong sẽ chuyển sang trạng thái chờ duyệt — quản lý duyệt thì ca mới hiện trong lịch của bạn.</p>
+        </div>
+        <div id="b7-success" class="hidden">
+          <div class="card">
+            <div class="success-head">
+              <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <h2>Đã gửi đăng ký</h2>
+              <p id="b7-success-text">Ca tối · Thứ 6, 06/11 · 17:00 – 22:00</p>
+              <p><span class="statuschip">Chờ duyệt</span></p>
+              <p class="hint" id="b7-sent-time">Đã gửi lúc 07:58, Thứ Năm 05/11.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-brand" id="btn-b7-to-schedule">Xem lịch ca</button>
+          <button type="button" class="btn-ghost" id="btn-b7-cancel">Hủy đăng ký</button>
+          <button type="button" class="btn-ghost" id="btn-b7-again">Đăng ký ca khác</button>
+        </div>
+        <div id="b7-cancelled" class="hidden">
+          <div class="card">
+            <div class="success-head">
+              <h2>Đã hủy đăng ký</h2>
+              <p>Ca trống đã trở lại cho người khác đăng ký.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-brand" id="btn-b7-cancel-to-schedule">Xem lịch ca</button>
+          <button type="button" class="btn-ghost" id="btn-b7-cancel-again">Đăng ký ca khác</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ B8: Đổi ca ============ -->
+    <section id="screen-b8" class="hidden">
+      <div class="narrow">
+        <button type="button" class="backlink" id="back-b8">← Lịch ca</button>
+        <div class="screen-head">
+          <div>
+            <h1>Đổi ca</h1>
+            <p>Người nhận xác nhận trước, sau đó quản lý duyệt</p>
+          </div>
+        </div>
+        <div id="b8-form">
+          <p class="field-label">Ca của tôi muốn đổi</p>
+          <div id="b8-own"></div>
+          <p class="field-label">Đổi với nhân viên</p>
+          <input type="search" class="search" id="b8-search" placeholder="Tìm theo tên…" aria-label="Tìm nhân viên theo tên">
+          <div id="b8-peers"></div>
+          <p class="hint hidden" id="b8-no-peer">Không tìm thấy nhân viên phù hợp.</p>
+          <label class="field-label" for="b8-reason">Lý do</label>
+          <textarea id="b8-reason" placeholder="Ví dụ: việc gia đình"></textarea>
+          <button type="button" class="btn-brand" id="btn-submit-b8" disabled>Gửi yêu cầu đổi ca</button>
+          <p class="hint">Chọn ca của bạn và người muốn đổi thì mới gửi được.</p>
+        </div>
+        <div id="b8-request" class="hidden">
+          <div class="card">
+            <h2>Yêu cầu của tôi <span class="statuschip" id="b8-status-chip">Chờ người nhận xác nhận</span></h2>
+            <div class="rows">
+              <div class="row"><span>Ca của bạn</span><b id="b8-req-own">Ca sáng · Thứ 6, 06/11</b></div>
+              <div class="row"><span>Đổi với</span><b id="b8-req-peer">Minh · Ca tối · Thứ 6, 06/11</b></div>
+              <div class="row"><span>Lý do</span><b id="b8-req-reason" class="meta">Việc gia đình</b></div>
+              <div class="row hidden" id="b8-req-actor-row"><span>Người xử lý</span><b id="b8-req-actor">—</b></div>
+              <div class="row hidden" id="b8-req-reject-row"><span>Lý do từ chối</span><b id="b8-req-reject" class="meta">—</b></div>
+              <div class="row"><span>Gửi lúc</span><b class="meta">07:58, Thứ Năm 05/11</b></div>
+            </div>
+            <p class="hint" id="b8-status-note">Minh xác nhận thì yêu cầu chuyển cho quản lý duyệt.</p>
+            <p class="hint">Muốn hủy yêu cầu này thì gặp quản lý.</p>
+          </div>
+          <button type="button" class="btn-brand" id="btn-b8-to-schedule">Xem lịch ca</button>
+          <button type="button" class="btn-ghost" id="btn-b8-new">Đổi ca khác</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<section class="block">
+  <h2>Thay đổi v1 → v2 (theo UX Audit + 4 quyết định đã chốt)</h2>
+  <ul>
+    <li><strong>Sửa lỗi B7 — đăng ký được ca hết chỗ (Must fix, audit đúng):</strong> v1 chỉ khóa nút gửi khi trùng giờ cá nhân, nên ngày không có ca trống (ví dụ Chủ nhật) vẫn gửi được. V2 chặn gửi khi ca đã chọn hết chỗ hoặc không còn ca khả dụng, và hiện trạng thái rỗng "Không có ca khả dụng vào ngày đã chọn". Điều kiện gửi: có ca trống &gt; 0 chỗ và không trùng giờ. Backend vẫn phải kiểm tra lại số chỗ khi nhận request (tránh hai người cùng đăng ký suất cuối).</li>
+    <li><strong>Sửa lỗi B7 — mở sai tuần (Must fix, audit đúng):</strong> v1 luôn đặt tuần hiện tại khi mở form đăng ký, nên đăng ký ca tuần sau có thể mở nhầm ngày tuần này. V2 truyền đúng tuần + ngày (định danh bằng ngày, không dùng chỉ số mảng) nên nút "Đăng ký" ở tuần sau mở đúng ngày tuần sau.</li>
+    <li><strong>Sửa lỗi B8 — tự chọn sẵn (Must fix, audit đúng):</strong> v1 tự gán sẵn ca của bạn và nhân viên đầu tiên, dễ gửi nhầm yêu cầu ảnh hưởng lịch của hai người. V2 không chọn sẵn gì cả; nút gửi chỉ bật khi đã chọn đủ ca của bạn và người đổi. (V1 còn gán ca sau khi render nên lần tải đầu không hiện trạng thái chọn — v2 không còn lỗi này vì không gán mặc định.)</li>
+    <li><strong>B6 mobile — thanh chọn ngày + chi tiết ngày:</strong> điện thoại không còn 7 card lớn xếp dọc; thay bằng thanh chọn 7 ngày có thể cuộn (chấm báo: ● ca của bạn, ◐ chờ duyệt, ○ ca trống) + chi tiết ngày đang chọn bên dưới. Laptop: lưới 2 cột thay vì 7 cột hẹp (mỗi cột ~470px thay vì ~133px).</li>
+    <li><strong>Nút Đổi ca đưa lên cạnh tiêu đề Lịch ca</strong> (không còn nằm cuối màn hình sau toàn bộ lịch).</li>
+    <li><strong>Ca chờ duyệt hiện trong lịch B6:</strong> đăng ký xong thì ca đó hiện ở đúng ngày với nhãn "Chờ duyệt" (không tính là ca chính thức); đổi ca thì ca của bạn hiện nhãn "Chờ đổi ca". Tóm tắt tuần có thêm dòng "Đang chờ duyệt" khi có ca chờ.</li>
+    <li><strong>B7 gọn lại:</strong> chọn ngày dạng thanh chip cuộn ngang; card chọn ca toàn chiều rộng, hiện số chỗ ngay trong card, ca hết chỗ hiện "Đã đủ người" và không chọn được; thẻ Khu vực riêng bỏ đi, khu vực hiện trong dòng ca ("08:00 – 14:00 · Bếp chính · Còn 2 chỗ"); màn thành công thêm nhãn "Chờ duyệt", giờ gửi và nút "Hủy đăng ký" (theo quyết định hủy tùy loại yêu cầu).</li>
+    <li><strong>B8 luồng 2 bước (theo quyết định):</strong> người nhận xác nhận trước → quản lý duyệt. Trạng thái yêu cầu có 4 nấc soi bằng nút trên thanh soi: Chờ người nhận xác nhận → Chờ quản lý duyệt → Đã duyệt / Bị từ chối. Khi bị từ chối hiện đủ người xử lý + lý do + giờ gửi.</li>
+    <li><strong>B8 tìm kiếm người đổi:</strong> thêm ô tìm theo tên (lọc trong danh sách người đủ điều kiện đổi ca); không có kết quả thì hiện "Không tìm thấy nhân viên phù hợp". Danh sách người đổi chỉ gồm người đủ điều kiện — điều kiện đủ (cùng khu vực/kỹ năng/không trùng lịch/giới hạn giờ) do backend kiểm tra khi nối API, nháp không tự loại bằng frontend.</li>
+    <li><strong>Trạng thái rỗng:</strong> tuần trống (nút soi "Tuần trống") hiện "Bạn chưa được phân ca trong tuần này" + "Hiện chưa có ca trống để đăng ký"; ngày không có ca khả dụng ở B7 hiện trạng thái rỗng; tìm người đổi không có kết quả hiện trạng thái rỗng.</li>
+    <li><strong>Loading khi gửi:</strong> nút gửi hiện "Đang gửi…" và bị vô hiệu hóa trong lúc xử lý (mô phỏng), rồi mới sang trạng thái thành công.</li>
+    <li><strong>Chuẩn hóa bo góc:</strong> tất cả về 8px (trừ hình tròn như chấm radio). Nhỏ như nhãn trạng thái và khối ca trước đây 4px/6px nay đều 8px.</li>
+    <li><strong>Accessibility:</strong> textarea có label thật; chip ngày và card radio có trạng thái chọn rõ ràng (aria-pressed / role="radio" + aria-checked).</li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>Quyết định đã chốt trong v2</h2>
+  <table class="map-table">
+    <tr><th>Câu hỏi</th><th>Quyết định</th></tr>
+    <tr><td>1. Ca trống được tạo như thế nào?</td><td><strong>Quản lý đăng ca trống thủ công.</strong> Không tự sinh khi thiếu nhân sự.</td></tr>
+    <tr><td>2. Đổi ca có cần người nhận xác nhận không?</td><td><strong>Người nhận xác nhận trước, sau đó quản lý duyệt</strong> (luồng 2 bước). V2 vẽ đủ 4 nấc trạng thái.</td></tr>
+    <tr><td>3. Nhân viên có được hủy yêu cầu đang chờ duyệt?</td><td><strong>Tùy loại yêu cầu</strong> — cách hiểu trong v2, chờ cậu xác nhận lại: <strong>đăng ký ca được hủy</strong> khi đang chờ duyệt (nút "Hủy đăng ký" ở màn thành công B7, hủy xong ca chờ duyệt biến mất khỏi lịch); <strong>đổi ca không được hủy</strong> sau khi gửi (thẻ yêu cầu B8 không có nút hủy, ghi "Muốn hủy yêu cầu này thì gặp quản lý"). Nếu ý cậu khác (ví dụ đổi ca được hủy trước khi người nhận xác nhận) thì nói, mình sửa một dòng là xong.</td></tr>
+    <tr><td>4. Đăng ký ca có cần quản lý duyệt?</td><td><strong>Luôn cần duyệt</strong> — không tự động xác nhận dù còn chỗ.</td></tr>
+  </table>
+</section>
+
+<section class="block">
+  <h2>Điểm mở còn lại (v2 chưa tự quyết)</h2>
+  <ul>
+    <li><strong>Cách hiểu "hủy tùy loại yêu cầu":</strong> v2 đang hiểu là đăng ký được hủy, đổi ca không — cần cậu xác nhận lại có đúng ý không.</li>
+    <li><strong>Điều kiện đủ để đổi ca:</strong> cùng khu vực/kỹ năng/không trùng lịch/giới hạn giờ làm việc — do backend kiểm tra; nháp chỉ liệt kê người mẫu đủ điều kiện, chưa vẽ màn hình báo "không đủ điều kiện".</li>
+    <li><strong>Màn "Yêu cầu của tôi":</strong> audit đề xuất nút xem yêu cầu trong danh sách yêu cầu của nhân viên — inventory B1–B13 không có màn này. Cần chốt: thêm màn mới, hay xem yêu cầu ngay trong lịch B6 (ca chờ duyệt đã hiện ở đó)?</li>
+    <li><strong>Mã yêu cầu:</strong> audit để tùy chọn (hỗ trợ tra cứu). Nháp chưa thêm mã vào màn thành công — nếu cần thì thêm dòng mã nhỏ.</li>
+    <li><strong>Hạn đăng ký / đổi ca:</strong> đăng ký trước ca bao lâu thì được, đổi ca có hạn chót không — vẫn chưa chốt, nháp chưa vẽ hạn chót.</li>
+    <li><strong>Thông báo kết quả duyệt:</strong> quản lý duyệt/từ chối thì nhân viên biết bằng cách nào (thông báo ở B2 hay chỉ thấy khi mở lịch)? Nháp chưa vẽ.</li>
+    <li><strong>Font:</strong> Be Vietnam Pro chưa được tải trong nháp (không thêm link ngoài để giữ nháp tự chứa) — khi lên code thật dùng next/font; nháp dùng font hệ thống dự phòng.</li>
+    <li><strong>Màu #6F1623:</strong> audit nói token khóa chưa xác định mã này — thực tế nó đã có trong Design System đã khóa (brand-dark, dùng cho hover). V2 vẫn dùng như cũ, không phải màu mới.</li>
+    <li><strong>Khi nối API:</strong> không đưa dữ liệu người dùng (tên, ca, ghi chú) trực tiếp vào innerHTML — dùng textContent; trạng thái loading/error khi tải lịch và khi gửi (ca đã bị người khác đăng ký trước, quản lý vừa đổi lịch) xử lý ở tầng code, nháp chỉ mô phỏng nút "Đang gửi…".</li>
+    <li><strong>Số liệu trong nháp là ví dụ:</strong> ca, giờ, số chỗ còn, tên nhân viên (Minh, Lan, Tuấn, Hương) chỉ để soi bố cục, không phải dữ liệu thật.</li>
+  </ul>
+  <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP B6–B8 v2 (theo UX Audit + 4 quyết định đã chốt), chưa phải thiết kế chốt. Bản v1 giữ nguyên. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A1 / A3 v1–v5 / A5 v1–v2 / B2 v1–v2 / B3–B5 v1–v2.</p>
+</section>
+
+<script>
+  var SHIFTS = {
+    morning: { name: "Ca sáng", time: "08:00 – 14:00", hours: 6 },
+    evening: { name: "Ca tối", time: "17:00 – 22:00", hours: 5 }
+  };
+  var WEEKS = {
+    current: {
+      label: "Tuần 05/11 – 11/11/2026",
+      days: [
+        { dow: "Thứ 5", date: "05/11", today: true, own: ["morning"], open: [], pending: [] },
+        { dow: "Thứ 6", date: "06/11", own: ["morning"], open: [{ key: "evening", left: 1 }], pending: [] },
+        { dow: "Thứ 7", date: "07/11", own: ["evening"], open: [{ key: "morning", left: 2 }], pending: [] },
+        { dow: "Chủ nhật", date: "08/11", own: [], open: [], pending: [] },
+        { dow: "Thứ 2", date: "09/11", own: ["morning"], open: [], pending: [] },
+        { dow: "Thứ 3", date: "10/11", own: [], open: [{ key: "morning", left: 2 }, { key: "evening", left: 1 }], pending: [] },
+        { dow: "Thứ 4", date: "11/11", own: ["morning"], open: [], pending: [] }
+      ]
+    },
+    next: {
+      label: "Tuần 12/11 – 18/11/2026",
+      days: [
+        { dow: "Thứ 5", date: "12/11", own: ["morning"], open: [{ key: "evening", left: 2 }], pending: [] },
+        { dow: "Thứ 6", date: "13/11", own: [], open: [{ key: "morning", left: 1 }], pending: [] },
+        { dow: "Thứ 7", date: "14/11", own: ["evening"], open: [], pending: [] },
+        { dow: "Chủ nhật", date: "15/11", own: [], open: [], pending: [] },
+        { dow: "Thứ 2", date: "16/11", own: ["morning"], open: [{ key: "evening", left: 1 }], pending: [] },
+        { dow: "Thứ 3", date: "17/11", own: ["morning"], open: [], pending: [] },
+        { dow: "Thứ 4", date: "18/11", own: [], open: [{ key: "morning", left: 2 }], pending: [] }
+      ]
+    },
+    empty: {
+      label: "Tuần 19/11 – 25/11/2026",
+      days: [
+        { dow: "Thứ 5", date: "19/11", own: [], open: [], pending: [] },
+        { dow: "Thứ 6", date: "20/11", own: [], open: [], pending: [] },
+        { dow: "Thứ 7", date: "21/11", own: [], open: [], pending: [] },
+        { dow: "Chủ nhật", date: "22/11", own: [], open: [], pending: [] },
+        { dow: "Thứ 2", date: "23/11", own: [], open: [], pending: [] },
+        { dow: "Thứ 3", date: "24/11", own: [], open: [], pending: [] },
+        { dow: "Thứ 4", date: "25/11", own: [], open: [], pending: [] }
+      ]
+    }
+  };
+  var PEERS = [
+    { name: "Minh", shift: "evening", dow: "Thứ 6", date: "06/11" },
+    { name: "Lan", shift: "morning", dow: "Thứ 7", date: "07/11" },
+    { name: "Tuấn", shift: "evening", dow: "Thứ 3", date: "10/11" },
+    { name: "Hương", shift: "morning", dow: "Thứ 3", date: "10/11" }
+  ];
+  var weekKey = "current";
+  var selectedDay = 0;
+  var b7Week = "current", b7Day = 1, b7Shift = "evening", b7Pending = null;
+  var b8Own = null, b8Peer = null, b8Status = "peer";
+  var b8Search = "";
+
+  function showScreen(id) {
+    ["screen-b6", "screen-b7", "screen-b8"].forEach(function (s) {
+      document.getElementById(s).classList.toggle("hidden", s !== id);
+    });
+    var map = { "screen-b6": "seg-b6", "screen-b7": "seg-b7", "screen-b8": "seg-b8" };
+    ["seg-b6", "seg-b7", "seg-b8"].forEach(function (s) {
+      document.getElementById(s).classList.toggle("active", s === map[id]);
+    });
+    window.scrollTo(0, 0);
+  }
+  function weekStats(w) {
+    var ownCount = 0, hours = 0, openCount = 0, pendCount = 0;
+    w.days.forEach(function (d) {
+      d.own.forEach(function (k) { ownCount++; hours += SHIFTS[k].hours; });
+      openCount += d.open.length;
+      pendCount += d.pending.length;
+    });
+    return { ownCount: ownCount, hours: hours, openCount: openCount, pendCount: pendCount };
+  }
+  function dayHas(d, kind) {
+    if (kind === "own") return d.own.length > 0;
+    if (kind === "pend") return d.pending.length > 0;
+    return d.open.length > 0;
+  }
+  function shiftBlock(d, kind, key, extra) {
+    var s = SHIFTS[key];
+    if (kind === "own") {
+      var swapMark = d.swapPending && d.swapPending.indexOf(key) !== -1;
+      return '<div class="shift own"><b>' + s.name + '</b><span>' + s.time + ' · Bếp chính</span><br><span class="tag">Ca của bạn</span>' +
+        (swapMark ? ' <span class="tag pending-tag">Chờ đổi ca</span>' : '') + '</div>';
+    }
+    if (kind === "open") {
+      return '<div class="shift open"><b>' + s.name + '</b><span>' + s.time + ' · Còn ' + extra.left + ' chỗ</span><br><span class="tag open-tag">Ca trống</span><br><button type="button" class="btn-brand btn-small" data-week="' + weekKey + '" data-date="' + d.date + '" data-shift="' + key + '">Đăng ký</button></div>';
+    }
+    return '<div class="shift pending"><b>' + s.name + '</b><span>' + s.time + ' · Bếp chính</span><br><span class="tag pending-tag">' + (extra.kind === "swap" ? "Chờ đổi ca" : "Chờ duyệt") + '</span></div>';
+  }
+  function dayInnerHTML(d) {
+    var html = '<div class="dow">' + d.dow + '</div><div class="date">' + d.date + '</div>';
+    d.own.forEach(function (k) { html += shiftBlock(d, "own", k); });
+    d.pending.forEach(function (p) { html += shiftBlock(d, "pending", p.key, p); });
+    d.open.forEach(function (o) { html += shiftBlock(d, "open", o.key, o); });
+    if (!d.own.length && !d.open.length && !d.pending.length) html += '<div class="off">Nghỉ</div>';
+    return html;
+  }
+  function bindRegisterButtons(root) {
+    root.querySelectorAll("[data-date]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        openB7(btn.dataset.week, btn.dataset.date, btn.dataset.shift);
+      });
+    });
+  }
+  function renderWeek() {
+    var w = WEEKS[weekKey];
+    document.getElementById("week-label").textContent = w.label;
+    var st = weekStats(w);
+    document.getElementById("sum-own").textContent = st.ownCount + " ca · " + st.hours + " giờ";
+    document.getElementById("sum-open").textContent = st.openCount + " ca";
+    var pendRow = document.getElementById("sum-pending-row");
+    if (st.pendCount > 0) {
+      document.getElementById("sum-pending").textContent = st.pendCount + " ca";
+      pendRow.classList.remove("hidden");
+    } else {
+      pendRow.classList.add("hidden");
+    }
+    var isEmpty = st.ownCount === 0 && st.openCount === 0 && st.pendCount === 0;
+    document.getElementById("week-empty").classList.toggle("hidden", !isEmpty);
+    // Thanh chọn ngày (điện thoại)
+    var strip = document.getElementById("daystrip");
+    strip.innerHTML = "";
+    w.days.forEach(function (d, di) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "strip-day" + (di === selectedDay ? " selected" : "");
+      b.setAttribute("aria-pressed", di === selectedDay ? "true" : "false");
+      var dots = "";
+      if (dayHas(d, "own")) dots += '<span class="own">●</span>';
+      if (dayHas(d, "pend")) dots += '<span class="pend">◐</span>';
+      if (dayHas(d, "open")) dots += '<span class="open">○</span>';
+      b.innerHTML = '<span class="dow">' + d.dow + '</span><span class="num">' + d.date.split("/")[0] + '</span><span class="dots">' + dots + '</span>';
+      b.addEventListener("click", function () { selectedDay = di; renderWeek(); });
+      strip.appendChild(b);
+    });
+    // Chi tiết ngày đang chọn (điện thoại)
+    var detail = document.getElementById("day-detail");
+    var d = w.days[selectedDay];
+    detail.innerHTML = dayInnerHTML(d);
+    bindRegisterButtons(detail);
+    // Lưới ngày (laptop 2 cột)
+    var grid = document.getElementById("weekgrid");
+    grid.innerHTML = "";
+    w.days.forEach(function (dd) {
+      var cell = document.createElement("div");
+      cell.className = "day" + (dd.today ? " today" : "");
+      cell.innerHTML = dayInnerHTML(dd);
+      grid.appendChild(cell);
+    });
+    bindRegisterButtons(grid);
+  }
+  function setWeek(key) {
+    weekKey = key;
+    selectedDay = 0;
+    ["cur", "next", "empty"].forEach(function (k) {
+      document.getElementById("seg-week-" + k).classList.toggle("active", key === k);
+    });
+    renderWeek();
+  }
+  function renderB7Days() {
+    var w = WEEKS[b7Week];
+    var wrap = document.getElementById("b7-days");
+    wrap.innerHTML = "";
+    w.days.forEach(function (d, di) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = d.dow + " " + d.date;
+      if (di === b7Day) b.classList.add("selected");
+      b.setAttribute("aria-pressed", di === b7Day ? "true" : "false");
+      b.addEventListener("click", function () { b7Day = di; renderB7Days(); renderB7Shifts(); });
+      wrap.appendChild(b);
+    });
+  }
+  function b7CanSubmit() {
+    var day = WEEKS[b7Week].days[b7Day];
+    var open = day.open.find(function (o) { return o.key === b7Shift; });
+    var conflict = day.own.indexOf(b7Shift) !== -1;
+    return { open: open, conflict: conflict, ok: !!open && !conflict };
+  }
+  function renderB7Shifts() {
+    var day = WEEKS[b7Week].days[b7Day];
+    var wrap = document.getElementById("b7-shifts");
+    wrap.innerHTML = "";
+    var anyOpen = day.open.length > 0;
+    Object.keys(SHIFTS).forEach(function (key) {
+      var s = SHIFTS[key];
+      var open = day.open.find(function (o) { return o.key === key; });
+      var conflict = day.own.indexOf(key) !== -1;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "radio-card" + (b7Shift === key ? " selected" : "");
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", b7Shift === key ? "true" : "false");
+      b.innerHTML = '<span><b>' + s.name + ' · ' + s.time + '</b><span>' +
+        (open ? "Bếp chính · Còn " + open.left + " chỗ" : (conflict ? "Bếp chính · Bạn đã có ca này" : "Bếp chính · Đã đủ người")) +
+        '</span></span><span class="radio-dot"></span>';
+      if (!open) b.disabled = true;
+      b.addEventListener("click", function () { b7Shift = key; renderB7Shifts(); });
+      wrap.appendChild(b);
+    });
+    var check = b7CanSubmit();
+    var warn = document.getElementById("b7-warn");
+    var emptyHint = document.getElementById("b7-empty-hint");
+    var submit = document.getElementById("btn-submit-b7");
+    emptyHint.hidden = anyOpen;
+    if (!anyOpen) {
+      warn.classList.add("hidden");
+      submit.disabled = true;
+    } else if (check.conflict) {
+      warn.textContent = "Bạn đã có " + SHIFTS[b7Shift].name.toLowerCase() + " ngày này — không thể đăng ký trùng giờ.";
+      warn.classList.remove("hidden");
+      submit.disabled = true;
+    } else {
+      warn.classList.add("hidden");
+      submit.disabled = !check.ok;
+    }
+  }
+  function openB7(week, date, shiftKey) {
+    b7Week = week;
+    var days = WEEKS[week].days;
+    b7Day = days.findIndex(function (d) { return d.date === date; });
+    if (b7Day === -1) b7Day = 0;
+    b7Shift = shiftKey;
+    renderB7Days();
+    renderB7Shifts();
+    document.getElementById("b7-form").classList.remove("hidden");
+    document.getElementById("b7-success").classList.add("hidden");
+    document.getElementById("b7-cancelled").classList.add("hidden");
+    showScreen("screen-b7");
+  }
+  function renderB8Own() {
+    var wrap = document.getElementById("b8-own");
+    wrap.innerHTML = "";
+    WEEKS.current.days.forEach(function (d) {
+      d.own.forEach(function (k) {
+        var s = SHIFTS[k];
+        var id = d.date + "-" + k;
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "radio-card" + (b8Own === id ? " selected" : "");
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", b8Own === id ? "true" : "false");
+        b.innerHTML = '<span><b>' + s.name + ' · ' + d.dow + ", " + d.date + '</b><span>' + s.time + ' · Bếp chính</span></span><span class="radio-dot"></span>';
+        b.addEventListener("click", function () { b8Own = id; renderB8Own(); updateB8Submit(); });
+        wrap.appendChild(b);
+      });
+    });
+  }
+  function renderB8Peers() {
+    var wrap = document.getElementById("b8-peers");
+    wrap.innerHTML = "";
+    var q = b8Search.trim().toLowerCase();
+    var list = PEERS.map(function (p, i) { return { p: p, i: i }; })
+      .filter(function (x) { return !q || x.p.name.toLowerCase().indexOf(q) !== -1; });
+    document.getElementById("b8-no-peer").classList.toggle("hidden", list.length > 0);
+    list.forEach(function (x) {
+      var p = x.p;
+      var s = SHIFTS[p.shift];
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "radio-card" + (b8Peer === x.i ? " selected" : "");
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", b8Peer === x.i ? "true" : "false");
+      b.innerHTML = '<span><b>' + p.name + '</b><span>' + s.name + ' · ' + p.dow + ", " + p.date + '</span><span>' + s.time + ' · Bếp chính</span></span><span class="radio-dot"></span>';
+      b.addEventListener("click", function () { b8Peer = x.i; renderB8Peers(); updateB8Submit(); });
+      wrap.appendChild(b);
+    });
+  }
+  function updateB8Submit() {
+    document.getElementById("btn-submit-b8").disabled = !(b8Own && b8Peer !== null);
+  }
+  function renderB8Status() {
+    var chip = document.getElementById("b8-status-chip");
+    var note = document.getElementById("b8-status-note");
+    var actorRow = document.getElementById("b8-req-actor-row");
+    var rejectRow = document.getElementById("b8-req-reject-row");
+    chip.classList.remove("approved", "rejected");
+    actorRow.classList.add("hidden");
+    rejectRow.classList.add("hidden");
+    if (b8Status === "peer") {
+      chip.textContent = "Chờ người nhận xác nhận";
+      note.textContent = "Minh xác nhận thì yêu cầu chuyển cho quản lý duyệt.";
+    } else if (b8Status === "manager") {
+      chip.textContent = "Chờ quản lý duyệt";
+      note.textContent = "Minh đã xác nhận — đang chờ quản lý duyệt.";
+    } else if (b8Status === "approved") {
+      chip.textContent = "Đã duyệt";
+      chip.classList.add("approved");
+      note.textContent = "Quản lý đã duyệt — lịch ca đã cập nhật cho cả hai người.";
+    } else {
+      chip.textContent = "Bị từ chối";
+      chip.classList.add("rejected");
+      document.getElementById("b8-req-actor").textContent = "Minh (người nhận)";
+      document.getElementById("b8-req-reject").textContent = "Minh đã có lịch bận ngày đó.";
+      actorRow.classList.remove("hidden");
+      rejectRow.classList.remove("hidden");
+      note.textContent = "Lịch ca giữ nguyên như cũ — bạn có thể tạo yêu cầu mới.";
+    }
+    ["peer", "manager", "approved", "rejected"].forEach(function (st, i) {
+      document.getElementById(["seg-st-peer", "seg-st-manager", "seg-st-approved", "seg-st-rejected"][i])
+        .classList.toggle("active", st === b8Status);
+    });
+  }
+
+  document.getElementById("week-prev").addEventListener("click", function () { setWeek("current"); });
+  document.getElementById("week-next").addEventListener("click", function () { setWeek("next"); });
+  ["cur", "next", "empty"].forEach(function (k) {
+    document.getElementById("seg-week-" + k).addEventListener("click", function () { setWeek(k); });
+  });
+  document.getElementById("btn-to-swap-top").addEventListener("click", function () { showScreen("screen-b8"); });
+  document.getElementById("btn-empty-register").addEventListener("click", function () {
+    openB7(weekKey, WEEKS[weekKey].days[0].date, "morning");
+  });
+  document.getElementById("back-b7").addEventListener("click", function () { showScreen("screen-b6"); });
+  document.getElementById("back-b8").addEventListener("click", function () { showScreen("screen-b6"); });
+  document.getElementById("btn-submit-b7").addEventListener("click", function () {
+    var btn = document.getElementById("btn-submit-b7");
+    btn.disabled = true;
+    btn.textContent = "Đang gửi…";
+    setTimeout(function () {
+      btn.disabled = false;
+      btn.textContent = "Gửi đăng ký";
+      var day = WEEKS[b7Week].days[b7Day];
+      var s = SHIFTS[b7Shift];
+      b7Pending = { week: b7Week, date: day.date, key: b7Shift };
+      day.pending.push({ key: b7Shift, kind: "register" });
+      document.getElementById("b7-success-text").textContent =
+        s.name + " · " + day.dow + ", " + day.date + " · " + s.time;
+      document.getElementById("b7-form").classList.add("hidden");
+      document.getElementById("b7-success").classList.remove("hidden");
+      renderWeek();
+    }, 800);
+  });
+  document.getElementById("btn-b7-to-schedule").addEventListener("click", function () { showScreen("screen-b6"); });
+  document.getElementById("btn-b7-again").addEventListener("click", function () {
+    document.getElementById("b7-success").classList.add("hidden");
+    document.getElementById("b7-form").classList.remove("hidden");
+    renderB7Shifts();
+  });
+  document.getElementById("btn-b7-cancel").addEventListener("click", function () {
+    if (b7Pending) {
+      var day = WEEKS[b7Pending.week].days.find(function (d) { return d.date === b7Pending.date; });
+      if (day) {
+        day.pending = day.pending.filter(function (p) { return !(p.key === b7Pending.key && p.kind === "register"); });
+      }
+      b7Pending = null;
+      renderWeek();
+    }
+    document.getElementById("b7-success").classList.add("hidden");
+    document.getElementById("b7-cancelled").classList.remove("hidden");
+  });
+  document.getElementById("btn-b7-cancel-to-schedule").addEventListener("click", function () { showScreen("screen-b6"); });
+  document.getElementById("btn-b7-cancel-again").addEventListener("click", function () {
+    document.getElementById("b7-cancelled").classList.add("hidden");
+    document.getElementById("b7-form").classList.remove("hidden");
+    renderB7Shifts();
+  });
+  document.getElementById("b8-search").addEventListener("input", function (e) {
+    b8Search = e.target.value;
+    renderB8Peers();
+  });
+  document.getElementById("btn-submit-b8").addEventListener("click", function () {
+    var btn = document.getElementById("btn-submit-b8");
+    btn.disabled = true;
+    btn.textContent = "Đang gửi…";
+    setTimeout(function () {
+      btn.disabled = false;
+      btn.textContent = "Gửi yêu cầu đổi ca";
+      var ownLabel = "", ownDate = "", ownKey = "";
+      WEEKS.current.days.forEach(function (d) {
+        d.own.forEach(function (k) {
+          if (d.date + "-" + k === b8Own) {
+            ownLabel = SHIFTS[k].name + " · " + d.dow + ", " + d.date;
+            ownDate = d.date; ownKey = k;
+          }
+        });
+      });
+      var peer = PEERS[b8Peer];
+      document.getElementById("b8-req-own").textContent = ownLabel;
+      document.getElementById("b8-req-peer").textContent =
+        peer.name + " · " + SHIFTS[peer.shift].name + " · " + peer.dow + ", " + peer.date;
+      document.getElementById("b8-req-reason").textContent =
+        document.getElementById("b8-reason").value.trim() || "Không ghi lý do";
+      var day = WEEKS.current.days.find(function (d) { return d.date === ownDate; });
+      if (day) {
+        day.swapPending = day.swapPending || [];
+        if (day.swapPending.indexOf(ownKey) === -1) day.swapPending.push(ownKey);
+      }
+      b8Status = "peer";
+      renderB8Status();
+      document.getElementById("b8-form").classList.add("hidden");
+      document.getElementById("b8-request").classList.remove("hidden");
+      renderWeek();
+    }, 800);
+  });
+  document.getElementById("btn-b8-to-schedule").addEventListener("click", function () { showScreen("screen-b6"); });
+  document.getElementById("btn-b8-new").addEventListener("click", function () {
+    document.getElementById("b8-request").classList.add("hidden");
+    document.getElementById("b8-form").classList.remove("hidden");
+  });
+  ["peer", "manager", "approved", "rejected"].forEach(function (st, i) {
+    document.getElementById(["seg-st-peer", "seg-st-manager", "seg-st-approved", "seg-st-rejected"][i])
+      .addEventListener("click", function () {
+        b8Status = st;
+        renderB8Status();
+        document.getElementById("b8-form").classList.add("hidden");
+        document.getElementById("b8-request").classList.remove("hidden");
+        showScreen("screen-b8");
+      });
+  });
+  ["seg-b6", "seg-b7", "seg-b8"].forEach(function (id, i) {
+    document.getElementById(id).addEventListener("click", function () {
+      showScreen("screen-b" + (i + 6));
+    });
+  });
+  document.getElementById("seg-phone").addEventListener("click", function () {
+    document.body.classList.remove("layout-laptop");
+    document.body.classList.add("layout-phone");
+    this.classList.add("active");
+    document.getElementById("seg-laptop").classList.remove("active");
+  });
+  document.getElementById("seg-laptop").addEventListener("click", function () {
+    document.body.classList.remove("layout-phone");
+    document.body.classList.add("layout-laptop");
+    this.classList.add("active");
+    document.getElementById("seg-phone").classList.remove("active");
+  });
+  renderWeek();
+  renderB7Days();
+  renderB7Shifts();
+  renderB8Own();
+  renderB8Peers();
+  updateB8Submit();
+  renderB8Status();
+</script>
+</body>
+</html>

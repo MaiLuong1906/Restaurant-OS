@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A5 v2 — Ticket Detail Drawer (4 khu vực, footer cố định)</title>
+<style>
+  /* Ngôn ngữ A3 v4 đã duyệt (bỏ trạm) + Drawer v2:
+     nền ops #F6F4F0 · card #FFFFFF · nền kem badge #F5F2EA · chữ chính #141210
+     chữ vận hành #2B2118 · chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C
+     danger #D14B3A · nền nhạt quá SLA #FDEAE6 · nền nhạt sắp trễ #FDF3D7
+     sắp đến hạn #9A6B12 · xanh chức năng #5F7F5E (chỉ trạng thái) · bo 8px · bóng nhẹ
+     Drawer: rộng 480–520px · padding ngang 24px · padding dọc 20px · header 52px
+     khoảng cách giữa nhóm 20px · banner dị ứng 40–44px · nút 48px · icon 18–20px
+     Footer cố định ở cuối drawer, nội dung được phép cuộn, không cố định chiều cao drawer. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 24px 24px; }
+  .kds-header { height: 56px; background: #fff; border-bottom: 1px solid #E9E4DC; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; gap: 16px; }
+  .kds-header h1 { margin: 0; font-size: 20px; color: #2B2118; }
+  .kds-header .right { display: flex; align-items: center; gap: 20px; font-size: 15px; }
+  .conn { display: flex; align-items: center; gap: 6px; color: #2B2118; }
+  .conn svg { color: #5F7F5E; }
+  #clock { font-variant-numeric: tabular-nums; font-weight: 700; color: #2B2118; }
+  .stats { margin-top: 20px; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-height: 68px; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; }
+  .stat { padding: 12px 20px; border-right: 1px solid #E9E4DC; }
+  .stat:last-child { border-right: none; }
+  .stat b { display: block; font-size: 24px; line-height: 1.2; }
+  .stat span { font-size: 13px; color: #7A6A58; }
+  .stat b.late { color: #D14B3A; }
+  .queue-head { margin: 24px 0 12px; }
+  .queue-head h2 { margin: 0; font-size: 17px; letter-spacing: 0.4px; text-transform: uppercase; }
+  .queue-head p { margin: 4px 0 0; font-size: 14px; color: #7A6A58; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 1099px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 699px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } .stat:nth-child(2) { border-right: none; } .stat:nth-child(1), .stat:nth-child(2) { border-bottom: 1px solid #E9E4DC; } }
+  .ticket { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 18px; cursor: pointer; }
+  .ticket.sla-soon { border-left: 6px solid #9A6B12; }
+  .ticket.sla-overdue { border-left: 6px solid #D14B3A; }
+  .t-row1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .t-table { font-size: 24px; font-weight: 800; }
+  .chip { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+  .chip.overdue { background: #FDEAE6; color: #D14B3A; }
+  .chip.soon { background: #FDF3D7; color: #9A6B12; }
+  .chip.ok { background: #F6F4F0; color: #7A6A58; }
+  .t-meta { display: flex; align-items: center; gap: 6px; font-size: 15px; margin-top: 8px; }
+  .t-meta .tno { color: #7A6A58; }
+  .allergy-q { display: flex; align-items: center; gap: 8px; background: #D14B3A; color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; padding: 9px 16px; border-radius: 6px; margin-top: 12px; min-height: 38px; }
+  .items-q { list-style: none; padding: 0; margin: 12px 0; }
+  .items-q li { font-size: 18px; margin: 10px 0; }
+  .item-note-q { display: flex; align-items: flex-start; gap: 6px; font-size: 14px; color: #7A6A58; margin: 12px 0 0; }
+  .t-actions { margin-top: 16px; }
+  .t-actions button { width: 100%; height: 48px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .t-actions button:hover { background: #6F1623; }
+  /* ===== Drawer v2 ===== */
+  .drawer { max-width: 520px; width: 100%; margin: 24px auto 0; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px 24px; display: flex; flex-direction: column; max-height: 85vh; }
+  .d-scroll { overflow-y: auto; flex: 1; min-height: 0; }
+  .zone { margin-top: 20px; }
+  .zone:first-child { margin-top: 0; }
+  .d-head { min-height: 52px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .d-title { font-size: 24px; font-weight: 600; line-height: 1.2; }
+  .d-ticketno { font-size: 12px; color: #7A6A58; margin-top: 2px; letter-spacing: 0.4px; }
+  .x-btn { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex: none; }
+  .d-wait { font-size: 16px; font-weight: 600; margin-top: 8px; }
+  .d-wait.overdue { color: #D14B3A; }
+  .d-wait.soon { color: #9A6B12; }
+  .d-arrival { font-size: 12px; color: #7A6A58; margin-top: 4px; }
+  .allergy-btn { width: 100%; display: flex; align-items: center; gap: 8px; background: #D14B3A; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.3px; padding: 11px 16px; border: none; border-radius: 8px; cursor: pointer; text-align: left; }
+  .allergy-detail { border: 1px solid #E9E4DC; border-radius: 8px; padding: 12px 16px; margin-top: 8px; font-size: 14px; color: #7A6A58; }
+  .dish-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .dish-head h4 { margin: 0; font-size: 16px; }
+  .dish-head span { font-size: 13px; color: #7A6A58; }
+  .dish-list { margin-top: 4px; }
+  .dish-row { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #E9E4DC; align-items: flex-start; }
+  .dish-row:last-child { border-bottom: none; }
+  .qty-badge { width: 38px; height: 38px; flex: none; background: #F5F2EA; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; }
+  .dish-name { font-size: 18px; font-weight: 600; line-height: 1.3; }
+  .dish-note { font-size: 14px; color: #7A6A58; margin-top: 2px; }
+  .ticket-note h4 { margin: 0 0 6px; font-size: 15px; color: #2B2118; }
+  .ticket-note p { margin: 0; font-size: 14px; color: #7A6A58; }
+  .d-footer { border-top: 1px solid #E9E4DC; padding-top: 16px; margin-top: 20px; background: #fff; }
+  .d-footer .btn { width: 100%; height: 48px; font-size: 16px; font-weight: 600; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .d-footer .btn:hover { background: #6F1623; }
+  .exc-btn { width: 100%; background: none; border: none; cursor: pointer; padding: 12px 0 0; text-align: center; }
+  .exc-btn b { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 600; color: #2B2118; }
+  .exc-btn b svg { color: #D14B3A; }
+  .exc-btn span { display: block; font-size: 13px; color: #7A6A58; margin-top: 2px; }
+  .exc-btn:disabled { cursor: default; }
+  .exc-btn:disabled b { color: #D14B3A; }
+  .exc-note { border: 1px solid #E9E4DC; border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: 15px; }
+  .icon { width: 18px; height: 18px; flex: none; }
+  .icon-warn { width: 20px; height: 20px; flex: none; }
+  .hidden { display: none !important; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #141210; color: #fff; padding: 12px 16px 12px 20px; border-radius: 8px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 100; display: flex; align-items: center; gap: 16px; }
+  .toast button { background: transparent; border: 1px solid #fff; color: #fff; border-radius: 8px; padding: 8px 14px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin-top: 20px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .map-table th, .map-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #E9E4DC; vertical-align: top; }
+  .map-table th { color: #7A6A58; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="draftbar"><strong>NHÁP A5 v2 — Ticket Detail Drawer (4 khu vực, footer cố định)</strong> · Chỉ 1 nút X · Báo sự cố dạng text · 4 trạng thái (bỏ COOKING) · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+
+<header class="kds-header">
+  <h1>KDS Bếp</h1>
+  <div class="right">
+    <span class="conn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>Đã kết nối</span>
+    <span>🕐 <span id="clock">--:--:--</span></span>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ===== VIEW: QUEUE (A3 v4 thu gọn) ===== -->
+  <div id="view-queue">
+    <div class="stats" role="status">
+      <div class="stat"><b id="stat-open">4</b><span>Ticket đang mở</span></div>
+      <div class="stat"><b id="stat-late" class="late">2</b><span>Quá SLA</span></div>
+      <div class="stat"><b id="stat-dishes">11</b><span>Món cần làm</span></div>
+      <div class="stat"><b id="stat-done">0</b><span>Vừa hoàn tất</span></div>
+    </div>
+    <div class="queue-head">
+      <h2>Đơn cần chế biến</h2>
+      <p>Chạm vào ticket để mở drawer chi tiết. Bấm "Hoàn tất ticket" thì hoàn tất ngay không cần mở chi tiết.</p>
+    </div>
+    <div class="grid" id="queue">
+      <article class="ticket sla-overdue" data-id="t04" data-table="Bàn 04" data-dishes="3" data-overdue="1">
+        <div class="t-row1"><span class="t-table">Bàn 04</span><span class="chip overdue">Quá SLA</span></div>
+        <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Đã chờ <span class="mins" data-minutes="20">20</span> phút</span><span class="tno">· Ticket #004</span></div>
+        <div class="allergy-q"><svg class="icon-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>DỊ ỨNG: ĐẬU PHỘNG</div>
+        <ul class="items-q"><li>2 × Nem Rán Phố Cổ</li><li>1 × Gỏi Ngó Sen Tôm Thịt</li></ul>
+        <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+      </article>
+      <article class="ticket sla-overdue" data-table="Bàn 08" data-id="t08" data-dishes="4" data-overdue="1">
+        <div class="t-row1"><span class="t-table">Bàn 08</span><span class="chip overdue">Quá SLA</span></div>
+        <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Đã chờ <span class="mins" data-minutes="16">16</span> phút</span><span class="tno">· Ticket #008</span></div>
+        <div class="allergy-q"><svg class="icon-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>DỊ ỨNG: ĐẬU PHỘNG</div>
+        <ul class="items-q"><li>3 × Bò Cuộn Nấm Nướng</li><li>1 × Nem Rán Phố Cổ</li></ul>
+        <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+      </article>
+      <article class="ticket sla-soon" data-table="Bàn 09" data-id="t09" data-dishes="3" data-overdue="0">
+        <div class="t-row1"><span class="t-table">Bàn 09</span><span class="chip soon">Sắp đến hạn</span></div>
+        <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Đã chờ <span class="mins" data-minutes="12">12</span> phút</span><span class="tno">· Ticket #009</span></div>
+        <ul class="items-q"><li>1 × Bò Cuộn Nấm Nướng</li><li>2 × Nem Rán Phố Cổ</li></ul>
+        <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+      </article>
+      <article class="ticket" data-table="Bàn 02" data-id="t02" data-dishes="1" data-overdue="0">
+        <div class="t-row1"><span class="t-table">Bàn 02</span><span class="chip ok">Trong hạn</span></div>
+        <div class="t-meta"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Đã chờ <span class="mins" data-minutes="6">6</span> phút</span><span class="tno">· Ticket #002</span></div>
+        <ul class="items-q"><li>1 × Phở Bò Thăn</li></ul>
+        <div class="t-actions"><button type="button" data-action="complete">Hoàn tất ticket</button></div>
+      </article>
+    </div>
+  </div>
+
+  <!-- ===== VIEW: DRAWER v2 ===== -->
+  <div id="view-detail" class="hidden">
+    <div class="drawer">
+      <div class="d-scroll">
+        <!-- Khu vực 1: Header -->
+        <div class="zone d-head">
+          <div>
+            <div class="d-title" id="d-table">Bàn 04</div>
+            <div class="d-ticketno" id="d-ticketno">TICKET #004</div>
+          </div>
+          <button type="button" class="x-btn" id="d-close" aria-label="Đóng drawer, quay lại hàng đợi (không đổi trạng thái ticket)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg></button>
+        </div>
+        <!-- Khu vực 2: Trạng thái -->
+        <div class="zone">
+          <span class="chip overdue" id="d-chip">Quá SLA</span>
+          <div class="d-wait overdue" id="d-wait">Đã chờ 20 phút</div>
+          <div class="d-arrival" id="d-arrival">Vào bếp lúc --:--</div>
+        </div>
+        <!-- Khu vực 3: Nội dung chế biến -->
+        <div class="zone" id="d-allergy-zone">
+          <button type="button" class="allergy-btn" id="d-allergy-btn"><svg class="icon-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span id="d-allergy-text">DỊ ỨNG: ĐẬU PHỘNG</span></button>
+          <div class="allergy-detail hidden" id="d-allergy-detail">Chi tiết về dị ứng sẽ lấy từ dữ liệu nghiệp vụ của quán khi triển khai (ví dụ: mức độ, món liên quan). Nháp này không tự sinh hướng dẫn chế biến.</div>
+        </div>
+        <div class="zone">
+          <div class="dish-head"><h4>Món cần làm</h4><span id="d-summary">02 món · 03 phần</span></div>
+          <div class="dish-list" id="d-dishes"></div>
+        </div>
+        <div class="zone ticket-note hidden" id="d-note-zone">
+          <h4>Lưu ý chế biến</h4>
+          <p id="d-note-text"></p>
+        </div>
+      </div>
+      <!-- Khu vực 4: Action footer (cố định cuối drawer) -->
+      <div class="d-footer">
+        <button type="button" class="btn" id="d-complete">✓ Hoàn tất ticket</button>
+        <button type="button" class="exc-btn" id="d-exc"><b><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Báo sự cố</b><span>Không thể chế biến ticket này</span></button>
+        <div id="d-exc-note" class="exc-note hidden">Đã báo sự cố — quản lý/bếp trưởng xử lý (màn A7/A8, chưa vẽ). Ticket vẫn ở hàng đợi cho đến khi có quyết định.</div>
+      </div>
+    </div>
+    <p style="text-align:center;color:#7A6A58;font-size:14px">Trong app thật, drawer này phủ lên trên hàng đợi; nút X chỉ đóng drawer và giữ nguyên trạng thái ticket — X không hủy ticket, không báo sự cố.</p>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status">
+    <span id="toast-msg"></span>
+    <button type="button" id="toast-undo">Hoàn tác</button>
+  </div>
+
+  <!-- ===== THAY ĐỔI v1 → v2 ===== -->
+  <section class="block">
+    <h2>Thay đổi A5 v1 → v2 (theo đúng phản hồi)</h2>
+    <ul>
+      <li><strong>Một thao tác quay lại duy nhất:</strong> chỉ giữ nút X ở header drawer. Link "Quay lại hàng đợi" ở cuối đã bỏ — X chỉ đóng drawer, giữ nguyên trạng thái ticket, không hủy, không báo sự cố.</li>
+      <li><strong>Thời gian phân cấp lại:</strong> "Đã chờ 20 phút" (16px, semibold, đỏ khi quá SLA) tách khỏi metadata "Vào bếp lúc 01:37" (12px, chữ phụ) và mã ticket (12px ở header). Cách viết đổi từ "Chờ X phút" sang "Đã chờ X phút" cho rõ trạng thái — áp dụng cả trong drawer lẫn bản sao hàng đợi của file này (file A3 v4 đã duyệt không sửa).</li>
+      <li><strong>Footer cố định:</strong> drawer dùng cột flex, vùng nội dung cuộn, footer nằm cố định cuối drawer — danh sách món dài cũng không phải cuộn xuống tìm nút hoàn tất. Khoảng cách nhóm 20px, không còn khoảng trống lớn giữa món và nút.</li>
+      <li><strong>"Báo không làm được" → "Báo sự cố":</strong> thành text action dưới nút chính (tiêu đề "Báo sự cố" + dòng phụ "Không thể chế biến ticket này"), không dùng nút đỏ lớn, không cạnh tranh thị giác với "Hoàn tất ticket".</li>
+      <li><strong>Danh sách món phân cấp lại:</strong> badge số lượng nền kem 38×38px (ghi "02", "01") + tên món 18px semibold + ghi chú riêng ngay dưới tên món đó (14px, chữ phụ) + divider màu viền, khoảng cách giữa món 12px. Không thumbnail. Tiêu đề "Món cần làm" kèm tổng "02 món · 03 phần" tính từ dữ liệu.</li>
+      <li><strong>Banner dị ứng:</strong> giữ đỏ đặc #D14B3A, cao ~42px (padding 11px 16px), icon 20px, chữ 15px semibold, bo 8px, luôn nằm trước danh sách món. Chạm banner mở rộng phần chi tiết — nội dung chi tiết thật phải lấy từ dữ liệu nghiệp vụ của quán, nháp không tự sinh hướng dẫn chế biến (xem ghi chú trong drawer).</li>
+      <li><strong>Kích thước drawer:</strong> rộng tối đa 520px (trong khoảng 480–520px), padding ngang 24px, dọc 20px, header 52px, nút 48px, bo 8px, icon 18–20px. Chiều cao drawer không cố định — nội dung dài thì vùng giữa cuộn, footer ở yên.</li>
+    </ul>
+  </section>
+
+  <!-- ===== 4 TRẠNG THÁI ===== -->
+  <section class="block">
+    <h2>Trạng thái món — đã chốt 4 trạng thái, bỏ COOKING (ngày 2026-11-05)</h2>
+    <table class="map-table">
+      <tr><th>Trạng thái</th><th>Ai đặt</th><th>Đầu bếp thấy gì</th></tr>
+      <tr><td><code>WAITING</code></td><td>Hệ thống, khi đơn vào bếp</td><td>Trong hàng đợi (chip Trong hạn / Sắp đến hạn / Quá SLA); mốc bắt đầu tính SLA</td></tr>
+      <tr><td><code>READY</code></td><td>Đầu bếp, bằng nút "Hoàn tất ticket"</td><td>Ticket rời hàng đợi; phục vụ thấy để đi lấy món</td></tr>
+      <tr><td><code>SERVED</code></td><td>Phục vụ (role Nhân viên), khi giao món ra bàn</td><td>Không thuộc KDS — đóng vòng đời đơn, phục vụ/thu ngân dùng để chốt bàn</td></tr>
+      <tr><td><code>REJECTED</code></td><td>Đầu bếp, bằng "Báo sự cố" trong drawer</td><td>Ticket vẫn ở hàng đợi chờ quản lý/bếp trưởng xử lý ở A7/A8</td></tr>
+    </table>
+    <p style="color:#7A6A58">COOKING đã bỏ khỏi hợp đồng UI vì mô hình một nút không có gì chuyển ticket sang COOKING. Backend giữ enum để tương thích hay gộp vào WAITING thì quyết lúc code. Nếu sau này cần thống kê riêng thời gian nấu thì COOKING quay lại cùng nút Bắt đầu nấu.</p>
+  </section>
+
+  <!-- ===== 2 CÂU HỎI NGHIỆP VỤ ===== -->
+  <section class="block">
+    <h2>Hai câu hỏi nghiệp vụ (đề xuất, chờ cậu chốt)</h2>
+    <ul>
+      <li><strong>Hoàn tất ticket hay hoàn tất từng món?</strong> Đề xuất cho v2: giữ hoàn tất theo ticket như đã vẽ, vì đó là thao tác nhanh nhất và khớp mô hình hiện tại. Nếu quán phục vụ món theo đợt (món xong trước giao trước, ví dụ 4 món làm xong 2 món muốn chuyển ngay) thì cần thêm hoàn tất từng món trong drawer (checkbox hoặc nút nhỏ bên cạnh mỗi món) mà vẫn giữ nút hoàn tất toàn bộ ticket. Cấu trúc hàng món trong v2 (badge số lượng + tên + ghi chú) đã chừa sẵn chỗ để thêm trạng thái từng món sau mà không phải vẽ lại. Fact quyết định: quán giao món cùng lúc cả ticket hay giao theo đợt?</li>
+      <li><strong>Nút X đóng hay hủy ticket?</strong> Tách biệt tuyệt đối trong v2: X chỉ đóng drawer, giữ nguyên trạng thái ticket. Hủy hoặc báo không thể chế biến là luồng ngoại lệ riêng — nút "Báo sự cố" trong footer (→ A7/A8, quản lý/bếp trưởng xử lý). Không có nút "Hủy ticket" trong drawer; hủy thuộc màn A9, quyền Bếp trưởng.</li>
+    </ul>
+  </section>
+
+  <!-- ===== ĐIỂM MỞ ===== -->
+  <section class="block">
+    <h2>Điểm còn mở (v2 chưa tự quyết)</h2>
+    <ul>
+      <li><strong>Xung đột nhỏ cần cậu xác nhận:</strong> wireframe của cậu ghi header là "TICKET #004 · BẾP NƯỚNG", nhưng cậu vừa chốt chắc chắn bỏ trạm nên v2 này KHÔNG hiện tên trạm ở header. Nếu cậu muốn giữ tên trạm dạng metadata trong drawer thì nói mình, thêm lại chỉ là một dòng.</li>
+      <li><strong>Drawer trên tablet thật là bottom sheet hay panel cố định?</strong> Nháp mô phỏng bằng chuyển view để soi nội dung; dạng phủ thật cần chốt (đề xuất: panel 480–520px phủ lên hàng đợi).</li>
+      <li><strong>Ảnh hướng dẫn trình bày do ai cung cấp, khi nào có?</strong> Drawer v2 không còn khung ảnh (theo luật "ảnh chỉ khi cần hướng dẫn"); khi có ảnh thật thì thêm mục trình bày vào khu vực nội dung, không đặt thumbnail lên card hàng đợi.</li>
+      <li><strong>Ai xử lý ticket bị "Báo sự cố", và 1 món không làm được thì xử lý cả ticket hay chỉ món đó?</strong> Hai câu này vẫn chờ chốt như ở v1.</li>
+      <li><strong>Mã bàn, tên món, giờ vào bếp, ghi chú là dữ liệu ví dụ</strong> — nội dung lưu ý dị ứng thật phải lấy từ dữ liệu nghiệp vụ của quán, không tự sinh hướng dẫn chế biến.</li>
+    </ul>
+    <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP A5 v2 (Ticket Detail Drawer), chưa phải thiết kế chốt. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A3 v1–v4, A1 và A5 v1.</p>
+  </section>
+</div>
+
+<script>
+  var TICKETS = {
+    t04: { table: "Bàn 04", chip: "overdue", chipText: "Quá SLA", mins: 20, no: "#004", allergy: "DỊ ỨNG: ĐẬU PHỘNG", dishes: [{ qty: 2, name: "Nem Rán Phố Cổ", note: null }, { qty: 1, name: "Gỏi Ngó Sen Tôm Thịt", note: null }], ticketNote: null },
+    t08: { table: "Bàn 08", chip: "overdue", chipText: "Quá SLA", mins: 16, no: "#008", allergy: "DỊ ỨNG: ĐẬU PHỘNG", dishes: [{ qty: 3, name: "Bò Cuộn Nấm Nướng", note: "Không hành" }, { qty: 1, name: "Nem Rán Phố Cổ", note: "Ít cay" }], ticketNote: null },
+    t09: { table: "Bàn 09", chip: "soon", chipText: "Sắp đến hạn", mins: 12, no: "#009", allergy: null, dishes: [{ qty: 1, name: "Bò Cuộn Nấm Nướng", note: null }, { qty: 2, name: "Nem Rán Phố Cổ", note: "Không hành" }], ticketNote: null },
+    t02: { table: "Bàn 02", chip: "ok", chipText: "Trong hạn", mins: 6, no: "#002", allergy: null, dishes: [{ qty: 1, name: "Phở Bò Thăn", note: "Không hành" }], ticketNote: "Giao kèm nước chấm riêng." }
+  };
+  var reported = {};
+  var currentId = null;
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function tickClock() {
+    var el = document.getElementById("clock");
+    if (el) el.textContent = new Date().toLocaleTimeString("vi-VN");
+  }
+  tickClock(); setInterval(tickClock, 1000);
+  setInterval(function () {
+    document.querySelectorAll(".mins[data-minutes]").forEach(function (el) {
+      var m = (parseInt(el.getAttribute("data-minutes"), 10) || 0) + 1;
+      el.setAttribute("data-minutes", m);
+      el.textContent = m;
+    });
+  }, 60000);
+  function arrivalLabel(mins) {
+    var d = new Date(Date.now() - mins * 60000);
+    return "Vào bếp lúc " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+  function updateStats() {
+    var q = document.getElementById("queue");
+    var tickets = q.querySelectorAll(".ticket");
+    var dishes = 0, late = 0;
+    tickets.forEach(function (t) {
+      dishes += parseInt(t.getAttribute("data-dishes"), 10) || 0;
+      late += parseInt(t.getAttribute("data-overdue"), 10) || 0;
+    });
+    document.getElementById("stat-open").textContent = tickets.length;
+    document.getElementById("stat-late").textContent = late;
+    document.getElementById("stat-dishes").textContent = dishes;
+  }
+  var toastTimer = null, lastRemoved = null;
+  function showToast(table) {
+    var t = document.getElementById("toast");
+    document.getElementById("toast-msg").textContent = "✓ " + table + " đã hoàn tất — đã báo cho phục vụ";
+    t.classList.remove("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.add("hidden"); lastRemoved = null; }, 5000);
+  }
+  function completeTicket(card) {
+    if (!card) return;
+    var table = card.getAttribute("data-table") || "Bàn";
+    lastRemoved = { node: card, parent: card.parentNode, next: card.nextSibling };
+    card.remove();
+    var doneEl = document.getElementById("stat-done");
+    doneEl.textContent = (parseInt(doneEl.textContent, 10) || 0) + 1;
+    updateStats();
+    showToast(table);
+    showQueue();
+  }
+  function showQueue() {
+    document.getElementById("view-queue").classList.remove("hidden");
+    document.getElementById("view-detail").classList.add("hidden");
+    currentId = null;
+  }
+  function openDetail(id) {
+    var t = TICKETS[id];
+    if (!t) return;
+    var card = document.querySelector('.ticket[data-id="' + id + '"]');
+    if (!card) return;
+    currentId = id;
+    document.getElementById("d-table").textContent = t.table;
+    document.getElementById("d-ticketno").textContent = "TICKET " + t.no;
+    var chip = document.getElementById("d-chip");
+    chip.className = "chip " + t.chip;
+    chip.textContent = t.chipText;
+    var minsEl = card.querySelector(".mins");
+    var mins = minsEl ? (parseInt(minsEl.getAttribute("data-minutes"), 10) || t.mins) : t.mins;
+    var waitEl = document.getElementById("d-wait");
+    waitEl.textContent = "Đã chờ " + mins + " phút";
+    waitEl.className = "d-wait " + t.chip;
+    document.getElementById("d-arrival").textContent = arrivalLabel(mins);
+    var az = document.getElementById("d-allergy-zone");
+    if (t.allergy) {
+      az.classList.remove("hidden");
+      document.getElementById("d-allergy-text").textContent = t.allergy;
+      document.getElementById("d-allergy-detail").classList.add("hidden");
+    } else az.classList.add("hidden");
+    var totalQty = 0;
+    document.getElementById("d-dishes").innerHTML = t.dishes.map(function (d) {
+      totalQty += d.qty;
+      return '<div class="dish-row"><span class="qty-badge">' + pad2(d.qty) + '</span><div><div class="dish-name">' + d.name + '</div>' + (d.note ? '<div class="dish-note">' + d.note + '</div>' : "") + "</div></div>";
+    }).join("");
+    document.getElementById("d-summary").textContent = pad2(t.dishes.length) + " món · " + pad2(totalQty) + " phần";
+    var nz = document.getElementById("d-note-zone");
+    if (t.ticketNote) { nz.classList.remove("hidden"); document.getElementById("d-note-text").textContent = t.ticketNote; }
+    else nz.classList.add("hidden");
+    var exc = document.getElementById("d-exc");
+    var excNote = document.getElementById("d-exc-note");
+    if (reported[id]) { exc.disabled = true; exc.innerHTML = "<b>Báo sự cố</b><span>Đã báo sự cố cho ticket này</span>"; excNote.classList.remove("hidden"); }
+    else { exc.disabled = false; exc.innerHTML = '<b><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Báo sự cố</b><span>Không thể chế biến ticket này</span>'; excNote.classList.add("hidden"); }
+    document.getElementById("view-queue").classList.add("hidden");
+    document.getElementById("view-detail").classList.remove("hidden");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  document.getElementById("queue").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-action='complete']");
+    var card = e.target.closest(".ticket");
+    if (!card) return;
+    if (btn) { completeTicket(card); return; }
+    openDetail(card.getAttribute("data-id"));
+  });
+  document.getElementById("d-close").addEventListener("click", showQueue);
+  document.getElementById("d-allergy-btn").addEventListener("click", function () {
+    document.getElementById("d-allergy-detail").classList.toggle("hidden");
+  });
+  document.getElementById("d-complete").addEventListener("click", function () {
+    if (!currentId) return;
+    var card = document.querySelector('.ticket[data-id="' + currentId + '"]');
+    completeTicket(card);
+  });
+  document.getElementById("d-exc").addEventListener("click", function () {
+    if (!currentId) return;
+    reported[currentId] = true;
+    var exc = document.getElementById("d-exc");
+    exc.disabled = true;
+    exc.innerHTML = "<b>Báo sự cố</b><span>Đã báo sự cố cho ticket này</span>";
+    document.getElementById("d-exc-note").classList.remove("hidden");
+  });
+  document.getElementById("toast-undo").addEventListener("click", function () {
+    if (!lastRemoved) return;
+    if (lastRemoved.next) lastRemoved.parent.insertBefore(lastRemoved.node, lastRemoved.next);
+    else lastRemoved.parent.appendChild(lastRemoved.node);
+    lastRemoved = null;
+    var doneEl = document.getElementById("stat-done");
+    doneEl.textContent = Math.max(0, (parseInt(doneEl.textContent, 10) || 0) - 1);
+    document.getElementById("toast").classList.add("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    updateStats();
+  });
+</script>
+</body>
+</html>

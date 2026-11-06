@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A3 v5 — KDS: Theo ticket / Theo mẻ nấu (Smart Batch Cooking)</title>
+<style>
+  /* Ngôn ngữ A3 v4 đã duyệt + chế độ Theo mẻ nấu (UC Smart Batch Cooking):
+     nền ops #F6F4F0 · card #FFFFFF · nền kem #F5F2EA · chữ chính #141210
+     chữ vận hành #2B2118 · chữ phụ #7A6A58 · viền #E9E4DC · brand #8C1D2C
+     danger #D14B3A · nền nhạt quá SLA #FDEAE6 · nền nhạt sắp trễ #FDF3D7
+     sắp đến hạn #9A6B12 · bo 8px · bóng nhẹ · spacing bội số 4px
+     Header 56px · thống kê 64–72px · ticket/mẻ 1 nút 48px brand · không thanh SLA
+     không phần trăm, không nhấp nháy, không ảnh món trên card, không trạm, không chuông. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Be Vietnam Pro", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F6F4F0; color: #141210; font-size: 16px; }
+  .draftbar { background: #8C1D2C; color: #fff; padding: 10px 24px; font-size: 14px; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 24px 24px; }
+  .kds-header { height: 56px; background: #fff; border-bottom: 1px solid #E9E4DC; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; gap: 16px; }
+  .kds-header h1 { margin: 0; font-size: 20px; color: #2B2118; }
+  .kds-header .right { display: flex; align-items: center; gap: 20px; font-size: 15px; }
+  .conn { display: flex; align-items: center; gap: 6px; color: #2B2118; }
+  .conn svg { color: #5F7F5E; }
+  #clock { font-variant-numeric: tabular-nums; font-weight: 700; color: #2B2118; }
+  .stats { margin-top: 20px; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-height: 68px; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; }
+  .stat { padding: 12px 20px; border-right: 1px solid #E9E4DC; }
+  .stat:last-child { border-right: none; }
+  .stat b { display: block; font-size: 24px; line-height: 1.2; }
+  .stat span { font-size: 13px; color: #7A6A58; }
+  .stat b.late { color: #D14B3A; }
+  .queue-head { margin: 24px 0 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .queue-head h2 { margin: 0; font-size: 17px; letter-spacing: 0.4px; text-transform: uppercase; }
+  .queue-head p { margin: 4px 0 0; font-size: 14px; color: #7A6A58; max-width: 640px; }
+  .view-toggle { display: flex; background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; padding: 4px; gap: 4px; flex: none; }
+  .view-toggle button { border: none; background: transparent; cursor: pointer; font-size: 15px; font-weight: 600; padding: 10px 18px; border-radius: 6px; color: #2B2118; }
+  .view-toggle button.active { background: #8C1D2C; color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 1099px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 699px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } .stat:nth-child(2) { border-right: none; } .stat:nth-child(1), .stat:nth-child(2) { border-bottom: 1px solid #E9E4DC; } }
+  .card { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 18px; }
+  .card.sla-soon { border-left: 6px solid #9A6B12; }
+  .card.sla-overdue { border-left: 6px solid #D14B3A; }
+  .card.just-updated { border: 2px solid #8C1D2C; box-shadow: 0 0 0 4px rgba(140,29,44,0.12); }
+  .t-row1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .t-table { font-size: 24px; font-weight: 800; }
+  .chip { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+  .chip.overdue { background: #FDEAE6; color: #D14B3A; }
+  .chip.soon { background: #FDF3D7; color: #9A6B12; }
+  .chip.ok { background: #F6F4F0; color: #7A6A58; }
+  .chip.new { background: #8C1D2C; color: #fff; }
+  .t-meta { display: flex; align-items: center; gap: 6px; font-size: 15px; margin-top: 8px; }
+  .t-meta .tno { color: #7A6A58; }
+  .allergy { display: flex; align-items: center; gap: 8px; background: #D14B3A; color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; padding: 9px 16px; border-radius: 6px; margin-top: 12px; min-height: 38px; }
+  .items { list-style: none; padding: 0; margin: 12px 0; }
+  .items li { font-size: 18px; margin: 10px 0; }
+  .items li .note { font-size: 14px; color: #7A6A58; }
+  .items li.done { color: #7A6A58; }
+  .items li.done .dname { text-decoration: none; }
+  .progress { font-size: 14px; color: #7A6A58; margin-top: 4px; }
+  .actions { margin-top: 16px; }
+  .actions button { width: 100%; height: 48px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; border-radius: 8px; background: #8C1D2C; color: #fff; }
+  .actions button:hover { background: #6F1623; }
+  /* Card mẻ nấu */
+  .b-name { font-size: 20px; font-weight: 700; line-height: 1.25; }
+  .b-total { font-size: 16px; font-weight: 700; margin-top: 8px; }
+  .b-total span { color: #7A6A58; font-weight: 400; }
+  .b-note { font-size: 14px; color: #7A6A58; margin-top: 6px; }
+  .b-tables { list-style: none; padding: 0; margin: 12px 0 0; }
+  .b-tables li { font-size: 15px; padding: 8px 0; border-bottom: 1px solid #E9E4DC; display: flex; justify-content: space-between; gap: 8px; }
+  .b-tables li:last-child { border-bottom: none; }
+  .b-tables .b-qty { color: #7A6A58; white-space: nowrap; }
+  .b-new { font-size: 14px; font-weight: 700; color: #8C1D2C; margin-top: 8px; }
+  .demo-zone { border: 1px dashed #9A8F80; border-radius: 8px; padding: 16px 20px; margin-top: 24px; background: #fff; }
+  .demo-zone p { margin: 0 0 12px; font-size: 14px; color: #7A6A58; }
+  .demo-zone button { height: 48px; padding: 0 20px; font-size: 15px; font-weight: 700; cursor: pointer; border: 1px solid #8C1D2C; border-radius: 8px; background: #fff; color: #8C1D2C; }
+  .icon { width: 18px; height: 18px; flex: none; }
+  .icon-warn { width: 20px; height: 20px; flex: none; }
+  .hidden { display: none !important; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #141210; color: #fff; padding: 12px 16px 12px 20px; border-radius: 8px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 100; display: flex; align-items: center; gap: 16px; max-width: 92vw; }
+  .toast button { background: transparent; border: 1px solid #fff; color: #fff; border-radius: 8px; padding: 8px 14px; font-size: 15px; font-weight: 700; cursor: pointer; flex: none; }
+  .empty { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; padding: 32px 20px; text-align: center; color: #7A6A58; font-size: 16px; grid-column: 1 / -1; }
+  section.block { background: #fff; border: 1px solid #E9E4DC; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px 20px; margin-top: 20px; }
+  section.block h2 { margin-top: 0; font-size: 19px; }
+  section.block li { margin: 6px 0; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .map-table th, .map-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #E9E4DC; vertical-align: top; }
+  .map-table th { color: #7A6A58; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="draftbar"><strong>NHÁP A3 v5 — KDS: Theo ticket / Theo mẻ nấu</strong> · UC Smart Batch Cooking theo ngôn ngữ v4 · Không trạm · Chưa phải thiết kế chốt · Chưa sửa route thật.</div>
+
+<header class="kds-header">
+  <h1>KDS Bếp</h1>
+  <div class="right">
+    <span class="conn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>Đã kết nối</span>
+    <span>🕐 <span id="clock">--:--:--</span></span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats" role="status">
+    <div class="stat"><b id="stat-open">6</b><span>Ticket đang mở</span></div>
+    <div class="stat"><b id="stat-late" class="late">2</b><span>Quá SLA</span></div>
+    <div class="stat"><b id="stat-dishes">16</b><span>Món cần làm</span></div>
+    <div class="stat"><b id="stat-done">0</b><span>Vừa hoàn tất</span></div>
+  </div>
+
+  <div class="queue-head">
+    <div>
+      <h2 id="queue-title">Mẻ nấu cần làm</h2>
+      <p id="queue-sub">Mẻ = cùng món + cùng ghi chú + cùng trạng thái dị ứng, từ nhiều bàn, nấu chung một lần. Hoàn tất mẻ thì món đó xong ở mọi bàn trong mẻ.</p>
+    </div>
+    <div class="view-toggle" role="tablist" aria-label="Chế độ xem hàng đợi">
+      <button type="button" id="tab-ticket" role="tab" aria-selected="false">Theo ticket</button>
+      <button type="button" id="tab-batch" role="tab" aria-selected="true">Theo mẻ nấu</button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="demo-zone">
+    <p>KHU VỰC DEMO — không thuộc màn KDS. Bấm để mô phỏng đơn mới vào đúng mẻ Phở đang mở (xem mẻ Phở tăng phần và highlight "Mới").</p>
+    <button type="button" id="demo-new">Mô phỏng đơn mới: Bàn 12 — 2 × Phở Bò Thăn (Không hành)</button>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status">
+    <span id="toast-msg"></span>
+    <button type="button" id="toast-undo">Hoàn tác</button>
+  </div>
+
+  <section class="block">
+    <h2>Luật gộp mẻ (tính trực tiếp từ ticket trong nháp)</h2>
+    <table class="map-table">
+      <tr><th>Mẻ</th><th>Gộp từ</th><th>Tổng phần · Số bàn</th><th>Vì sao tách / gộp</th></tr>
+      <tr><td>Nem Rán Phố Cổ — dị ứng đậu phộng</td><td>Bàn 04 ×2 + Bàn 07 ×3</td><td>05 phần · 02 bàn</td><td>Cùng món, cùng (không) ghi chú, cùng dị ứng → gộp, dù khác bàn</td></tr>
+      <tr><td>Gỏi Ngó Sen Tôm Thịt — dị ứng</td><td>Bàn 04 ×1</td><td>01 phần · 01 bàn</td><td>Khác món → mẻ riêng</td></tr>
+      <tr><td>Bò Cuộn Nấm Nướng — "Không hành" — dị ứng</td><td>Bàn 08 ×3</td><td>03 phần · 01 bàn</td><td>Cùng món nhưng khác ghi chú so với Bò Cuộn thường → mẻ riêng</td></tr>
+      <tr><td>Nem Rán Phố Cổ — "Ít cay" — dị ứng</td><td>Bàn 08 ×1</td><td>01 phần · 01 bàn</td><td>Khác ghi chú → mẻ riêng, dù cùng món và cùng bàn với mẻ trên</td></tr>
+      <tr><td>Nem Rán Phố Cổ — "Không hành" — không dị ứng</td><td>Bàn 09 ×2</td><td>02 phần · 01 bàn</td><td>Không dị ứng → không bao giờ gộp với mẻ dị ứng cùng tên</td></tr>
+      <tr><td>Bò Cuộn Nấm Nướng — không ghi chú — không dị ứng</td><td>Bàn 09 ×1</td><td>01 phần · 01 bàn</td><td>Khác ghi chú so với mẻ "Không hành" → mẻ riêng</td></tr>
+      <tr><td>Phở Bò Thăn — "Không hành" — không dị ứng</td><td>Bàn 02 ×1 + Bàn 06 ×2</td><td>03 phần · 02 bàn</td><td>Cùng món, cùng ghi chú, cùng không dị ứng → gộp</td></tr>
+    </table>
+    <p style="color:#7A6A58">Tổng 16 phần = đúng tổng món của 6 ticket. Mẻ chỉ tồn tại khi còn phần đang chờ; mẻ hết phần thì rời hàng đợi. Thứ tự mẻ: dị ứng trước → quá SLA → sắp đến hạn → theo thời gian chờ dài nhất trong mẻ.</p>
+  </section>
+
+  <section class="block">
+    <h2>Trạng thái theo món (cập nhật sau khi có mẻ)</h2>
+    <ul>
+      <li><strong>WAITING theo món:</strong> món đang chờ trong ticket; mẻ được tính trực tiếp từ các món WAITING, không phải dữ liệu nhập tay.</li>
+      <li><strong>READY theo món:</strong> đặt bằng "Hoàn tất mẻ" (món đó READY ở mọi bàn trong mẻ) hoặc "Hoàn tất ticket" (mọi món còn lại của ticket READY cùng lúc). Phục vụ thấy món READY theo từng bàn để đi lấy.</li>
+      <li><strong>Ticket READY là trạng thái suy ra:</strong> ticket rời hàng đợi khi đủ món READY — đầu bếp không bấm thêm thao tác nào cho ticket.</li>
+      <li><strong>SERVED</strong> (phục vụ đặt khi giao món) và <strong>REJECTED</strong> (đầu bếp báo sự cố trong drawer A5) giữ nguyên như đã chốt 4 trạng thái, bỏ COOKING.</li>
+      <li><strong>Báo sự cố ở mẻ (chưa vẽ nút):</strong> nếu cả mẻ không làm được (ví dụ hết nguyên liệu), báo một lần thì flag mọi ticket trong mẻ chờ A7/A8 — không phải báo từng ticket.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <h2>Thay đổi so với A3 v4 (v4 giữ nguyên, không sửa)</h2>
+    <ul>
+      <li><strong>Thêm chế độ xem:</strong> toggle "Theo ticket / Theo mẻ nấu" ở đầu hàng đợi. Chế độ Theo ticket là v4 nguyên vẹn (1 card 1 bàn, 1 nút "Hoàn tất ticket"), chỉ cộng thêm dòng "Đã xong X/Y món" và dấu ✓ ở món đã xong qua mẻ.</li>
+      <li><strong>Card mẻ:</strong> tên món 20px + chip SLA gấp nhất trong mẻ + dòng "Tổng 05 phần · gộp 02 bàn" + danh sách bàn kèm số phần và thời gian chờ + banner dị ứng riêng cho mẻ dị ứng + 1 nút "Hoàn tất mẻ" 48px brand.</li>
+      <li><strong>Phần mới vào mẻ đang mở:</strong> mẻ highlight viền brand 1,5 giây kèm dòng "Mới vào mẻ: Bàn 12 ×2" (thử bằng nút demo) — đầu bếp không bỏ sót phần vào sau.</li>
+      <li><strong>Không đổi:</strong> header 56px, thống kê 4 số, thứ tự dị ứng → quá SLA → sắp đến hạn, toast + Hoàn tác 5 giây, không nút Bắt đầu nấu, không trạm, không chuông, không ảnh món trên card.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <h2>Điểm còn mở</h2>
+    <ul>
+      <li><strong>Chế độ mặc định của app thật:</strong> nháp này mở sẵn "Theo mẻ nấu" để soi tính năng mới; app thật có thể mặc định Theo ticket (v4) hoặc nhớ lựa chọn lần trước — chờ cậu chốt.</li>
+      <li><strong>Cửa sổ 5 phút trong deep-dive cũ đã bỏ:</strong> mẻ trong v5 gộp theo thời gian thực (cùng món + cùng ghi chú + cùng dị ứng là một mẻ, không giới hạn 5 phút) vì không còn nút Bắt đầu nấu để khóa mẻ. Nếu team muốn giữ luật 5 phút thì nói mình.</li>
+      <li><strong>Thông tin mẻ trong drawer A5:</strong> chưa làm trong v5 — drawer v2 vẫn mở theo ticket. Nếu cần, bước sau thêm dòng "Mẻ này còn phục vụ: Bàn 04, Bàn 07" vào drawer.</li>
+      <li><strong>Nút "Báo sự cố" cho cả mẻ:</strong> mới nêu ở mục trạng thái, chưa vẽ — cần chốt trước khi thêm nút thứ hai lên card mẻ.</li>
+      <li><strong>Dữ liệu trong nháp là ví dụ:</strong> bàn, món, ghi chú, giờ chờ chỉ để soi luật gộp mẻ, không phải dữ liệu thật.</li>
+    </ul>
+    <p style="color:#7A6A58">Trạng thái file: BẢN NHÁP A3 v5 (thêm chế độ Theo mẻ nấu), chưa phải thiết kế chốt. Không sửa repo, plan gốc, bảng giai đoạn 0, hay các bản A3 v1–v4, A1, A5 v1–v2.</p>
+  </section>
+</div>
+
+<script>
+  var TICKETS = [
+    { id: "t04", table: "Bàn 04", no: "#004", mins: 20, chip: "overdue", chipText: "Quá SLA", allergy: "ĐẬU PHỘNG", dishes: [
+      { name: "Nem Rán Phố Cổ", qty: 2, note: null, state: "waiting" },
+      { name: "Gỏi Ngó Sen Tôm Thịt", qty: 1, note: null, state: "waiting" } ] },
+    { id: "t07", table: "Bàn 07", no: "#007", mins: 8, chip: "ok", chipText: "Trong hạn", allergy: "ĐẬU PHỘNG", dishes: [
+      { name: "Nem Rán Phố Cổ", qty: 3, note: null, state: "waiting" } ] },
+    { id: "t08", table: "Bàn 08", no: "#008", mins: 16, chip: "overdue", chipText: "Quá SLA", allergy: "ĐẬU PHỘNG", dishes: [
+      { name: "Bò Cuộn Nấm Nướng", qty: 3, note: "Không hành", state: "waiting" },
+      { name: "Nem Rán Phố Cổ", qty: 1, note: "Ít cay", state: "waiting" } ] },
+    { id: "t09", table: "Bàn 09", no: "#009", mins: 12, chip: "soon", chipText: "Sắp đến hạn", allergy: null, dishes: [
+      { name: "Nem Rán Phố Cổ", qty: 2, note: "Không hành", state: "waiting" },
+      { name: "Bò Cuộn Nấm Nướng", qty: 1, note: null, state: "waiting" } ] },
+    { id: "t02", table: "Bàn 02", no: "#002", mins: 6, chip: "ok", chipText: "Trong hạn", allergy: null, dishes: [
+      { name: "Phở Bò Thăn", qty: 1, note: "Không hành", state: "waiting" } ] },
+    { id: "t06", table: "Bàn 06", no: "#006", mins: 4, chip: "ok", chipText: "Trong hạn", allergy: null, dishes: [
+      { name: "Phở Bò Thăn", qty: 2, note: "Không hành", state: "waiting" } ] }
+  ];
+  var view = "batch";
+  var doneTickets = 0;
+  var lastAction = null;
+  var justJoined = null;
+  var toastTimer = null;
+  var demoUsed = false;
+
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function waitingDishes(t) { return t.dishes.filter(function (d) { return d.state === "waiting"; }); }
+  function openTickets() { return TICKETS.filter(function (t) { return waitingDishes(t).length > 0; }); }
+
+  function computeBatches() {
+    var map = {};
+    openTickets().forEach(function (t) {
+      waitingDishes(t).forEach(function (d) {
+        var key = d.name + "|" + (d.note || "") + "|" + (t.allergy || "");
+        if (!map[key]) map[key] = { key: key, name: d.name, note: d.note, allergy: t.allergy, tables: [], total: 0, chip: "ok", chipText: "Trong hạn", maxMins: 0 };
+        var b = map[key];
+        b.tables.push({ ticket: t, dish: d });
+        b.total += d.qty;
+        if (t.chip === "overdue" || (t.chip === "soon" && b.chip === "ok")) { b.chip = t.chip; b.chipText = t.chipText; }
+        if (t.mins > b.maxMins) b.maxMins = t.mins;
+      });
+    });
+    var list = Object.keys(map).map(function (k) { return map[k]; });
+    var rank = { overdue: 3, soon: 2, ok: 1 };
+    list.sort(function (a, c) {
+      if (!!a.allergy !== !!c.allergy) return a.allergy ? -1 : 1;
+      if (rank[c.chip] !== rank[a.chip]) return rank[c.chip] - rank[a.chip];
+      if (c.maxMins !== a.maxMins) return c.maxMins - a.maxMins;
+      return c.total - a.total;
+    });
+    return list;
+  }
+
+  function updateStats() {
+    var open = openTickets();
+    var dishes = 0, late = 0;
+    open.forEach(function (t) {
+      waitingDishes(t).forEach(function (d) { dishes += d.qty; });
+      if (t.chip === "overdue") late++;
+    });
+    document.getElementById("stat-open").textContent = open.length;
+    document.getElementById("stat-late").textContent = late;
+    document.getElementById("stat-dishes").textContent = dishes;
+    document.getElementById("stat-done").textContent = doneTickets;
+  }
+
+  function warnSvg(cls) {
+    return '<svg class="' + cls + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+  }
+  function clockSvg() {
+    return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  }
+
+  function renderTickets() {
+    var grid = document.getElementById("grid");
+    var open = openTickets();
+    document.getElementById("queue-title").textContent = "Đơn cần chế biến";
+    document.getElementById("queue-sub").textContent = "Một card một bàn — để kiểm tra bàn nào đã đủ món. Món đã xong qua mẻ nấu hiện dấu ✓.";
+    if (open.length === 0) { grid.innerHTML = '<div class="empty">Hàng đợi trống — mọi ticket đã hoàn tất.</div>'; return; }
+    grid.innerHTML = open.map(function (t) {
+      var doneCount = t.dishes.filter(function (d) { return d.state === "done"; }).length;
+      var items = t.dishes.map(function (d) {
+        if (d.state === "done") return '<li class="done">✓ ' + d.qty + " × " + esc(d.name) + (d.note ? ' <span class="note">(' + esc(d.note) + ")</span>" : "") + "</li>";
+        return "<li>" + d.qty + " × " + esc(d.name) + (d.note ? ' <span class="note">(' + esc(d.note) + ")</span>" : "") + "</li>";
+      }).join("");
+      var prog = (doneCount > 0) ? '<div class="progress">Đã xong ' + doneCount + "/" + t.dishes.length + " món</div>" : "";
+      var allergy = t.allergy ? '<div class="allergy">' + warnSvg("icon-warn") + "DỊ ỨNG: " + esc(t.allergy) + "</div>" : "";
+      var isNew = (justJoined && justJoined.ticketId === t.id);
+      return '<article class="card ' + (t.chip === "overdue" ? "sla-overdue" : t.chip === "soon" ? "sla-soon" : "") + (isNew ? " just-updated" : "") + '" data-ticket="' + t.id + '">' +
+        '<div class="t-row1"><span class="t-table">' + esc(t.table) + '</span><span class="chip ' + t.chip + '">' + t.chipText + "</span></div>" +
+        '<div class="t-meta">' + clockSvg() + "<span>Đã chờ " + t.mins + " phút</span><span class=\"tno\">· Ticket " + t.no + "</span></div>" +
+        allergy + '<ul class="items">' + items + "</ul>" + prog +
+        '<div class="actions"><button type="button" data-complete-ticket="' + t.id + '">Hoàn tất ticket</button></div></article>';
+    }).join("");
+  }
+
+  function renderBatches() {
+    var grid = document.getElementById("grid");
+    var batches = computeBatches();
+    document.getElementById("queue-title").textContent = "Mẻ nấu cần làm";
+    document.getElementById("queue-sub").textContent = "Mẻ = cùng món + cùng ghi chú + cùng trạng thái dị ứng, từ nhiều bàn, nấu chung một lần. Hoàn tất mẻ thì món đó xong ở mọi bàn trong mẻ.";
+    if (batches.length === 0) { grid.innerHTML = '<div class="empty">Hàng đợi trống — mọi mẻ đã hoàn tất.</div>'; return; }
+    grid.innerHTML = batches.map(function (b) {
+      var tables = b.tables.map(function (x) {
+        return "<li><span>" + esc(x.ticket.table) + "</span><span class=\"b-qty\">" + x.dish.qty + " phần · đã chờ " + x.ticket.mins + " phút</span></li>";
+      }).join("");
+      var allergy = b.allergy ? '<div class="allergy">' + warnSvg("icon-warn") + "DỊ ỨNG: " + esc(b.allergy) + " — nấu riêng, không gộp với mẻ thường</div>" : "";
+      var note = b.note ? '<div class="b-note">Ghi chú: ' + esc(b.note) + "</div>" : "";
+      var isNew = (justJoined && justJoined.batchKey === b.key);
+      var newLine = isNew ? '<div class="b-new">Mới vào mẻ: ' + esc(justJoined.table) + " ×" + justJoined.qty + "</div>" : "";
+      return '<article class="card ' + (b.chip === "overdue" ? "sla-overdue" : b.chip === "soon" ? "sla-soon" : "") + (isNew ? " just-updated" : "") + '" data-batch="' + esc(b.key) + '">' +
+        '<div class="t-row1"><span class="b-name">' + esc(b.name) + '</span><span class="chip ' + b.chip + '">' + b.chipText + "</span></div>" +
+        '<div class="b-total">Tổng ' + pad2(b.total) + " phần <span>· gộp " + pad2(b.tables.length) + " bàn</span></div>" +
+        allergy + note + '<ul class="b-tables">' + tables + "</ul>" + newLine +
+        '<div class="actions"><button type="button" data-complete-batch="' + esc(b.key) + '">Hoàn tất mẻ</button></div></article>';
+    }).join("");
+  }
+
+  function render() {
+    document.getElementById("tab-ticket").classList.toggle("active", view === "ticket");
+    document.getElementById("tab-ticket").setAttribute("aria-selected", view === "ticket" ? "true" : "false");
+    document.getElementById("tab-batch").classList.toggle("active", view === "batch");
+    document.getElementById("tab-batch").setAttribute("aria-selected", view === "batch" ? "true" : "false");
+    if (view === "ticket") renderTickets(); else renderBatches();
+    updateStats();
+  }
+
+  function showToast(msg, action) {
+    var t = document.getElementById("toast");
+    document.getElementById("toast-msg").textContent = msg;
+    t.classList.remove("hidden");
+    lastAction = action;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.add("hidden"); lastAction = null; }, 5000);
+  }
+
+  function completeDishes(pairs, msg) {
+    var affected = [];
+    pairs.forEach(function (p) {
+      if (p.dish.state === "waiting") { p.dish.state = "done"; affected.push(p); }
+    });
+    if (affected.length === 0) return;
+    // Đếm ticket vừa hoàn tất trong lần này (mỗi ticket chỉ đếm 1 lần)
+    var doneIds = {};
+    affected.forEach(function (p) { if (waitingDishes(p.ticket).length === 0) doneIds[p.ticket.id] = true; });
+    doneTickets += Object.keys(doneIds).length;
+    showToast(msg, { pairs: affected, doneCount: Object.keys(doneIds).length });
+    render();
+  }
+
+  function completeBatch(key) {
+    var b = computeBatches().filter(function (x) { return x.key === key; })[0];
+    if (!b) return;
+    var tables = b.tables.map(function (x) { return x.ticket.table; }).join(", ");
+    completeDishes(b.tables, "✓ Đã hoàn tất " + b.name + " — " + tables + " (" + b.total + " phần)");
+  }
+
+  function completeTicket(id) {
+    var t = TICKETS.filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    completeDishes(t.dishes.map(function (d) { return { ticket: t, dish: d }; }), "✓ " + t.table + " đã hoàn tất — đã báo cho phục vụ");
+  }
+
+  document.getElementById("grid").addEventListener("click", function (e) {
+    var bb = e.target.closest("[data-complete-batch]");
+    var tb = e.target.closest("[data-complete-ticket]");
+    if (bb) completeBatch(bb.getAttribute("data-complete-batch"));
+    else if (tb) completeTicket(tb.getAttribute("data-complete-ticket"));
+  });
+  document.getElementById("tab-ticket").addEventListener("click", function () { view = "ticket"; justJoined = null; render(); });
+  document.getElementById("tab-batch").addEventListener("click", function () { view = "batch"; render(); });
+  document.getElementById("toast-undo").addEventListener("click", function () {
+    if (!lastAction) return;
+    lastAction.pairs.forEach(function (p) { p.dish.state = "waiting"; });
+    doneTickets = Math.max(0, doneTickets - (lastAction.doneCount || 0));
+    document.getElementById("toast").classList.add("hidden");
+    if (toastTimer) clearTimeout(toastTimer);
+    lastAction = null;
+    render();
+  });
+  document.getElementById("demo-new").addEventListener("click", function () {
+    if (demoUsed) return;
+    demoUsed = true;
+    this.disabled = true;
+    this.textContent = "Đã mô phỏng xong (tải lại file để thử lại)";
+    var nt = { id: "t12", table: "Bàn 12", no: "#012", mins: 2, chip: "ok", chipText: "Trong hạn", allergy: null, dishes: [
+      { name: "Phở Bò Thăn", qty: 2, note: "Không hành", state: "waiting" } ] };
+    TICKETS.push(nt);
+    var key = "Phở Bò Thăn|Không hành|";
+    justJoined = { batchKey: key, ticketId: "t12", table: "Bàn 12", qty: 2 };
+    view = "batch";
+    render();
+    setTimeout(function () { justJoined = null; render(); }, 1500);
+  });
+
+  function tickClock() {
+    var el = document.getElementById("clock");
+    if (el) el.textContent = new Date().toLocaleTimeString("vi-VN");
+  }
+  tickClock(); setInterval(tickClock, 1000);
+  setInterval(function () {
+    TICKETS.forEach(function (t) { t.mins += 1; });
+    render();
+  }, 60000);
+  render();
+</script>
+</body>
+</html>
