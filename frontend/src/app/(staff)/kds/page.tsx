@@ -236,6 +236,14 @@ export default function KitchenDisplayScreen() {
           >
             <span>Hết món</span>
           </Link>
+
+          {/* Đường vào A9 Ghi hủy */}
+          <Link
+            href="/kds/waste"
+            className="h-10 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
+          >
+            <span>Ghi hủy</span>
+          </Link>
         </div>
 
         {/* View Toggle */}

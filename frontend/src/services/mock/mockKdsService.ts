@@ -1,5 +1,19 @@
-import { Ticket, OrderItemStatus, OrderChangeAlertData, DishAvailability } from '../../types';
-import { MOCK_TICKETS, MOCK_ORDER_CHANGES, MOCK_DISH_AVAILABILITY } from './data/kdsMockData';
+import {
+  Ticket,
+  OrderItemStatus,
+  OrderChangeAlertData,
+  DishAvailability,
+  WasteDishOption,
+  WasteTodayStats,
+  WasteLogEntry,
+  CreateWasteLogRequest,
+} from '../../types';
+import {
+  MOCK_TICKETS,
+  MOCK_ORDER_CHANGES,
+  MOCK_DISH_AVAILABILITY,
+  MOCK_WASTE_LOGS,
+} from './data/kdsMockData';
 import { simulateLatency, deepClone, createNotFoundError, createValidationError } from './mockUtils';
 
 export interface KdsService {
@@ -13,18 +27,23 @@ export interface KdsService {
   listDishAvailability(): Promise<DishAvailability[]>;
   markSoldOut(dishId: string, idempotencyKey: string): Promise<DishAvailability>;
   reopenDish(dishId: string, quantity: number, idempotencyKey: string): Promise<DishAvailability>;
+  getWasteDishOptions(): Promise<WasteDishOption[]>;
+  getWasteTodayStats(): Promise<WasteTodayStats>;
+  createWasteLog(req: CreateWasteLogRequest): Promise<WasteLogEntry>;
 }
 
 export class MockKdsService implements KdsService {
   private tickets: Ticket[];
   private alerts: OrderChangeAlertData[];
   private availability: DishAvailability[];
+  private wasteLogs: WasteLogEntry[];
   private processedKeys = new Set<string>();
 
   constructor() {
     this.tickets = deepClone(MOCK_TICKETS as Ticket[]);
     this.alerts = deepClone(MOCK_ORDER_CHANGES as OrderChangeAlertData[]);
     this.availability = deepClone(MOCK_DISH_AVAILABILITY as DishAvailability[]);
+    this.wasteLogs = deepClone(MOCK_WASTE_LOGS as WasteLogEntry[]);
   }
 
   async getTickets(): Promise<Ticket[]> {
@@ -133,6 +152,92 @@ export class MockKdsService implements KdsService {
     found.markedBy = undefined;
 
     return deepClone(found);
+  }
+
+  async getWasteDishOptions(): Promise<WasteDishOption[]> {
+    await simulateLatency(100);
+    return this.availability.map((d) => ({
+      dishId: d.dishId,
+      dishName: d.dishName,
+      stockQuantity: d.status === 'SOLD_OUT' ? 0 : d.remainingPortions,
+    }));
+  }
+
+  async getWasteTodayStats(): Promise<WasteTodayStats> {
+    await simulateLatency(80);
+    const logCount = this.wasteLogs.length;
+    const portionCount = this.wasteLogs.reduce((sum, w) => sum + w.quantity, 0);
+    return { logCount, portionCount };
+  }
+
+  async createWasteLog(req: CreateWasteLogRequest): Promise<WasteLogEntry> {
+    if (!req.idempotencyKey) {
+      throw createValidationError('idempotencyKey là bắt buộc');
+    }
+    const foundLogged = this.wasteLogs.find((w) => w.idempotencyKey === req.idempotencyKey);
+    if (foundLogged) {
+      return deepClone(foundLogged);
+    }
+    if (this.processedKeys.has(req.idempotencyKey)) {
+      const match = this.wasteLogs.find((w) => w.idempotencyKey === req.idempotencyKey);
+      if (match) return deepClone(match);
+    }
+    this.processedKeys.add(req.idempotencyKey);
+
+    await simulateLatency(150);
+
+    const dish = this.availability.find((d) => d.dishId === req.dishId);
+    if (!dish) {
+      throw createNotFoundError('Dish', req.dishId);
+    }
+
+    const availableStock = dish.status === 'SOLD_OUT' ? 0 : dish.remainingPortions;
+    if (availableStock === 0) {
+      throw createValidationError('Món đang hết — không còn phần nào để ghi hủy');
+    }
+    if (!req.quantity || req.quantity < 1) {
+      throw createValidationError('Số lượng ghi hủy phải >= 1');
+    }
+    if (req.quantity > availableStock) {
+      throw createValidationError(`Số lượng ghi hủy (${req.quantity}) vượt quá tồn kho (${availableStock})`);
+    }
+
+    if (req.reason === 'Lý do khác' && (!req.note || !req.note.trim())) {
+      throw createValidationError('Vui lòng ghi rõ lý do khi chọn "Lý do khác"');
+    }
+
+    // Role check: Chỉ HEAD_CHEF/CHEF/Bếp trưởng được phép ghi hủy
+    // SECURITY NOTE: API backend bắt buộc phải enforce quyền này ở server-side
+    const role = (req.recordedByRole || 'STAFF').toUpperCase();
+    const isChef = role === 'HEAD_CHEF' || role === 'CHEF' || role.includes('CHEF');
+    if (!isChef) {
+      throw createValidationError('Chỉ Bếp trưởng mới có quyền ghi hủy món');
+    }
+
+    // Trừ kho món
+    dish.remainingPortions -= req.quantity;
+    if (dish.remainingPortions <= 0) {
+      dish.remainingPortions = 0;
+      dish.status = 'SOLD_OUT';
+      dish.soldOutAt = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    const newLog: WasteLogEntry = {
+      id: `waste-${Date.now()}`,
+      dishId: req.dishId,
+      dishName: dish.dishName,
+      quantity: req.quantity,
+      reason: req.reason,
+      note: req.note?.trim(),
+      recordedById: req.recordedById || 'usr-head-chef',
+      recordedByName: req.recordedByName || 'Bếp trưởng Minh',
+      recordedByRole: req.recordedByRole || 'HEAD_CHEF',
+      recordedAt: new Date().toISOString(),
+      idempotencyKey: req.idempotencyKey,
+    };
+
+    this.wasteLogs.push(newLog);
+    return deepClone(newLog);
   }
 
   async getTicketById(ticketId: string): Promise<Ticket> {

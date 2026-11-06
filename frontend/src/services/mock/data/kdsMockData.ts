@@ -273,3 +273,43 @@ export const MOCK_ORDER_CHANGES: readonly import('../../../types').OrderChangeAl
     createdAt: '2026-11-06T11:58:00.000Z',
   },
 ]);
+
+export const MOCK_WASTE_LOGS: readonly import('../../../types').WasteLogEntry[] = Object.freeze([
+  {
+    id: 'waste-1',
+    dishId: 'dish-nem-ran',
+    dishName: 'Nem Rán Phố Cổ',
+    quantity: 2,
+    reason: 'Nấu hỏng',
+    note: 'Cháy dầu',
+    recordedById: 'staff-head-chef',
+    recordedByName: 'Bếp trưởng Minh',
+    recordedByRole: 'HEAD_CHEF',
+    recordedAt: '2026-11-06T09:30:00.000Z',
+    idempotencyKey: 'init-waste-1',
+  },
+  {
+    id: 'waste-2',
+    dishId: 'dish-banh-xeo',
+    dishName: 'Bánh Xèo',
+    quantity: 1,
+    reason: 'Rơi vỡ',
+    recordedById: 'staff-head-chef',
+    recordedByName: 'Bếp trưởng Minh',
+    recordedByRole: 'HEAD_CHEF',
+    recordedAt: '2026-11-06T10:15:00.000Z',
+    idempotencyKey: 'init-waste-2',
+  },
+  {
+    id: 'waste-3',
+    dishId: 'dish-canh-chua',
+    dishName: 'Canh Chua Cá',
+    quantity: 2,
+    reason: 'Nguyên liệu hết hạn',
+    recordedById: 'staff-head-chef',
+    recordedByName: 'Bếp trưởng Minh',
+    recordedByRole: 'HEAD_CHEF',
+    recordedAt: '2026-11-06T11:00:00.000Z',
+    idempotencyKey: 'init-waste-3',
+  },
+]);

@@ -87,4 +87,61 @@ describe('MockKdsService', () => {
     // Reopen invalid quantity phải throw
     await expect(service.reopenDish(availableDish.dishId, 0, 'key-invalid')).rejects.toThrow();
   });
+
+  it('quản lý ghi hủy món: stats, validation, trừ kho và idempotencyKey', async () => {
+    const statsBefore = await service.getWasteTodayStats();
+    expect(statsBefore.logCount).toBeGreaterThan(0);
+
+    const options = await service.getWasteDishOptions();
+    const inStock = options.find((d) => d.stockQuantity > 0)!;
+
+    // Reject non-head-chef
+    await expect(
+      service.createWasteLog({
+        dishId: inStock.dishId,
+        quantity: 1,
+        reason: 'Nấu hỏng',
+        recordedByRole: 'STAFF',
+        idempotencyKey: 'waste-unauthorized',
+      })
+    ).rejects.toThrow();
+
+    // Reject 'Lý do khác' thiếu note
+    await expect(
+      service.createWasteLog({
+        dishId: inStock.dishId,
+        quantity: 1,
+        reason: 'Lý do khác',
+        note: '',
+        recordedByRole: 'HEAD_CHEF',
+        idempotencyKey: 'waste-missing-note',
+      })
+    ).rejects.toThrow();
+
+    // Success create waste log
+    const key = 'waste-key-success';
+    const log = await service.createWasteLog({
+      dishId: inStock.dishId,
+      quantity: 1,
+      reason: 'Nấu hỏng',
+      recordedByRole: 'HEAD_CHEF',
+      idempotencyKey: key,
+    });
+    expect(log.dishId).toBe(inStock.dishId);
+    expect(log.quantity).toBe(1);
+
+    // Duplicate idempotencyKey
+    const dup = await service.createWasteLog({
+      dishId: inStock.dishId,
+      quantity: 1,
+      reason: 'Nấu hỏng',
+      recordedByRole: 'HEAD_CHEF',
+      idempotencyKey: key,
+    });
+    expect(dup.id).toBe(log.id);
+
+    const statsAfter = await service.getWasteTodayStats();
+    expect(statsAfter.logCount).toBe(statsBefore.logCount + 1);
+    expect(statsAfter.portionCount).toBe(statsBefore.portionCount + 1);
+  });
 });

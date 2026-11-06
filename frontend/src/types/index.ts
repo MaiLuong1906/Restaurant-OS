@@ -259,3 +259,46 @@ export interface DishAvailability {
   soldOutAt?: string;
   markedBy?: string;
 }
+
+export type WasteReason =
+  | 'Nấu hỏng'
+  | 'Nguyên liệu hết hạn'
+  | 'Rơi vỡ'
+  | 'Khách trả lại'
+  | 'Lý do khác';
+
+export interface WasteDishOption {
+  dishId: string;
+  dishName: string;
+  stockQuantity: number;
+}
+
+export interface WasteTodayStats {
+  logCount: number;
+  portionCount: number;
+}
+
+export interface WasteLogEntry {
+  id: string;
+  dishId: string;
+  dishName: string;
+  quantity: number;
+  reason: WasteReason;
+  note?: string;
+  recordedById: string;
+  recordedByName: string;
+  recordedByRole: string;
+  recordedAt: string;
+  idempotencyKey: string;
+}
+
+export interface CreateWasteLogRequest {
+  dishId: string;
+  quantity: number;
+  reason: WasteReason;
+  note?: string;
+  recordedById?: string;
+  recordedByName?: string;
+  recordedByRole?: string;
+  idempotencyKey: string;
+}
