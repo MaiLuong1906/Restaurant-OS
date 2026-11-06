@@ -1,268 +1,267 @@
 'use client';
 
-import { useState } from 'react';
-import { ChefHat, Clock, Flame, CheckCircle2, RotateCcw, ArrowLeft, Layers } from 'lucide-react';
-import Link from 'next/link';
-
-import { OrderItem, OrderItemStatus } from '@/types';
-
-interface KdsItem {
-  id: string;
-  orderId: string;
-  tableNumber: string;
-  dishName: string;
-  quantity: number;
-  modifiers: string[];
-  status: OrderItemStatus;
-  elapsedMinutes: number;
-}
-
-const INITIAL_KDS_ITEMS: KdsItem[] = [
-  {
-    id: 'kds-1',
-    orderId: 'ORD-101',
-    tableNumber: 'Bàn 01',
-    dishName: 'Phở Bò Đặc Biệt',
-    quantity: 2,
-    modifiers: ['Nhiều nạm gầu', 'Hành chần riêng'],
-    status: 'WAITING',
-    elapsedMinutes: 4,
-  },
-  {
-    id: 'kds-2',
-    orderId: 'ORD-102',
-    tableNumber: 'Bàn 03',
-    dishName: 'Bún Chả Hà Nội',
-    quantity: 1,
-    modifiers: ['Không ớt cay'],
-    status: 'WAITING',
-    elapsedMinutes: 12,
-  },
-  {
-    id: 'kds-3',
-    orderId: 'ORD-103',
-    tableNumber: 'Bàn 02',
-    dishName: 'Phở Bò Đặc Biệt',
-    quantity: 1,
-    modifiers: [],
-    status: 'WAITING',
-    elapsedMinutes: 8,
-  },
-  {
-    id: 'kds-4',
-    orderId: 'ORD-100',
-    tableNumber: 'Bàn 04',
-    dishName: 'Nem Lụi Nướng Sả',
-    quantity: 2,
-    modifiers: ['Thêm nước chấm'],
-    status: 'READY',
-    elapsedMinutes: 16,
-  },
-];
+import * as React from 'react';
+import { Ticket, Batch } from '@/types';
+import { kdsService } from '@/services/mock';
+import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
+import { KdsBatchCard } from '@/components/kds/KdsBatchCard';
+import { RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function KitchenDisplayScreen() {
-  const [items, setItems] = useState<KdsItem[]>(INITIAL_KDS_ITEMS);
-  const [viewMode, setViewMode] = useState<'COLUMNS' | 'BATCH'>('COLUMNS');
+  const [tickets, setTickets] = React.useState<Ticket[]>([]);
+  const [loading, setLoading] = React.useState<boolean>(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [viewMode, setViewMode] = React.useState<'ticket' | 'batch'>('ticket');
 
-  const updateStatus = (itemId: string, newStatus: OrderItemStatus) => {
-    setItems((prev) =>
-      prev.map((it) => (it.id === itemId ? { ...it, status: newStatus } : it))
+  // Quản lý Toast và Hoàn tác 5 giây
+  const [undoToast, setUndoToast] = React.useState<{
+    id: string;
+    message: string;
+    targetType: 'ticket' | 'batch';
+    targetId: string;
+    snapshot: Ticket[];
+  } | null>(null);
+  const undoTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const fetchTickets = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await kdsService.getTickets();
+      setTickets(data);
+    } catch (err) {
+      setError((err as Error).message || 'Không thể tải danh sách đơn bếp');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
+
+  // Thuật toán gom món thành mẻ (Batch Cooking)
+  const batches: Batch[] = React.useMemo(() => {
+    const map = new Map<string, Batch>();
+
+    tickets.forEach((ticket) => {
+      ticket.items.forEach((item) => {
+        // Chỉ gom các món WAITING
+        if (item.status !== 'WAITING') return;
+
+        // Luật gộp: Cùng món + cùng ghi chú + cùng dị ứng (dị ứng không gộp với không dị ứng)
+        const allergyKey = item.allergy?.trim() || 'NO_ALLERGY';
+        const noteKey = item.notes?.trim() || 'NO_NOTE';
+        const key = `${item.dishId}_${allergyKey}_${noteKey}`;
+
+        if (!map.has(key)) {
+          map.set(key, {
+            id: `batch-${key}`,
+            dishId: item.dishId,
+            dishName: item.dishName,
+            totalQuantity: 0,
+            notes: item.notes,
+            allergy: item.allergy,
+            status: 'WAITING',
+            slaDeadline: item.slaDeadline,
+            itemIds: [],
+            items: [],
+          });
+        }
+
+        const b = map.get(key)!;
+        b.totalQuantity += item.quantity;
+        b.itemIds.push(item.id);
+        b.items.push(item);
+
+        // Lấy SLA gấp nhất
+        if (item.slaDeadline && (!b.slaDeadline || item.slaDeadline < b.slaDeadline)) {
+          b.slaDeadline = item.slaDeadline;
+        }
+      });
+    });
+
+    return Array.from(map.values());
+  }, [tickets]);
+
+  // Hoàn tất 1 ticket kèm Hoàn tác 5s
+  const handleCompleteTicket = (ticketId: string) => {
+    const snapshot = structuredClone(tickets);
+
+    // Optimistic Update
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.id === ticketId
+          ? {
+              ...t,
+              status: 'READY',
+              items: t.items.map((i) => (i.status === 'WAITING' ? { ...i, status: 'READY' } : i)),
+            }
+          : t
+      )
     );
+
+    // Hiển thị Toast Hoàn tác 5s
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+
+    setUndoToast({
+      id: crypto.randomUUID(),
+      message: `Đã hoàn tất ticket #${ticketId}`,
+      targetType: 'ticket',
+      targetId: ticketId,
+      snapshot,
+    });
+
+    undoTimeoutRef.current = setTimeout(async () => {
+      try {
+        await kdsService.updateTicketStatus(ticketId, 'READY', crypto.randomUUID());
+      } catch (err) {
+        console.error('Lỗi khi đồng bộ ticket sang READY:', err);
+      }
+      setUndoToast(null);
+    }, 5000);
   };
 
-  const waitingItems = items.filter((i) => i.status === 'WAITING');
-  const readyItems = items.filter((i) => i.status === 'READY');
+  // Hoàn tất 1 mẻ kèm Hoàn tác 5s
+  const handleCompleteBatch = (batchId: string) => {
+    const batch = batches.find((b) => b.id === batchId);
+    if (!batch) return;
 
-  // Dish Batching Summary: gom các món giống nhau để đầu bếp nấu hàng loạt
-  const batchedWaiting = waitingItems.reduce<Record<string, number>>((acc, item) => {
-    acc[item.dishName] = (acc[item.dishName] || 0) + item.quantity;
-    return acc;
-  }, {});
+    const snapshot = structuredClone(tickets);
+    const affectedItemIds = new Set(batch.itemIds);
+
+    // Optimistic Update
+    setTickets((prev) =>
+      prev.map((t) => ({
+        ...t,
+        items: t.items.map((i) => (affectedItemIds.has(i.id) ? { ...i, status: 'READY' } : i)),
+      }))
+    );
+
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+
+    setUndoToast({
+      id: crypto.randomUUID(),
+      message: `Đã hoàn tất mẻ ${batch.dishName} (${batch.totalQuantity} phần)`,
+      targetType: 'batch',
+      targetId: batchId,
+      snapshot,
+    });
+
+    undoTimeoutRef.current = setTimeout(() => {
+      setUndoToast(null);
+    }, 5000);
+  };
+
+  // Nút bấm Hoàn tác
+  const handleUndo = () => {
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    if (undoToast) {
+      setTickets(undoToast.snapshot);
+      setUndoToast(null);
+    }
+  };
+
+  // Lọc các ticket còn việc cần làm (chưa bưng xong hết)
+  const activeTickets = tickets.filter((t) =>
+    t.items.some((i) => i.status === 'WAITING' || i.status === 'READY')
+  );
 
   return (
-    <div className="min-h-screen bg-[#0B0F14] text-[#F1F5F9] flex flex-col font-sans select-none">
-      {/* KDS Header */}
-      <header className="h-16 px-6 bg-[#121820] border-b border-[#263342] flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Link
-            href="/"
-            className="h-10 w-10 rounded-xl bg-[#1A222D] border border-[#263342] flex items-center justify-center text-slate-300 hover:text-white"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-xl bg-orange-600 flex items-center justify-center">
-              <ChefHat className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold tracking-tight text-white flex items-center space-x-2">
-                <span>MÀN HÌNH BẾP KDS</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  REALTIME &lt;50ms
-                </span>
-              </h1>
-              <p className="text-xs text-slate-400">Trạm Chế Biến Tổng Bếp Nóng & Bếp Lạnh</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-ops-bg text-ops-ink flex flex-col font-sans select-none">
+      {/* Top Header */}
+      <header className="h-16 px-6 bg-white border-b border-ops-border flex items-center justify-between shadow-xs sticky top-0 z-40">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-black text-ops-brand tracking-tight">KDS BẾP TRUNG TÂM</h1>
+          <span className="text-xs bg-ops-border text-ops-ink px-2.5 py-1 rounded-full font-bold">
+            {activeTickets.length} ticket đang chờ
+          </span>
         </div>
 
-        <div className="flex items-center space-x-3">
-          {/* Switch View Mode */}
+        {/* View Toggle */}
+        <div className="flex items-center bg-ops-bg p-1 rounded-lg border border-ops-border text-sm">
           <button
-            onClick={() => setViewMode(viewMode === 'COLUMNS' ? 'BATCH' : 'COLUMNS')}
-            className="h-11 px-4 rounded-xl bg-[#1A222D] border border-[#263342] hover:bg-[#263342] text-xs font-semibold flex items-center space-x-2 text-slate-200 transition-colors"
+            type="button"
+            onClick={() => setViewMode('ticket')}
+            className={`px-4 py-1.5 rounded-md font-bold transition-all ${
+              viewMode === 'ticket' ? 'bg-white shadow-xs text-ops-brand' : 'text-ops-muted hover:text-ops-ink'
+            }`}
           >
-            <Layers className="h-4 w-4 text-orange-400" />
-            <span>{viewMode === 'COLUMNS' ? 'Xem Gom Món (Batching)' : 'Xem Theo Cột Tiến Độ'}</span>
+            Theo ticket
           </button>
-
-          <div className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-[#1A222D] border border-[#263342]">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-bold text-slate-200">STOMP: Connected</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setViewMode('batch')}
+            className={`px-4 py-1.5 rounded-md font-bold transition-all ${
+              viewMode === 'batch' ? 'bg-white shadow-xs text-ops-brand' : 'text-ops-muted hover:text-ops-ink'
+            }`}
+          >
+            Theo mẻ nấu ({batches.length})
+          </button>
         </div>
       </header>
 
-      {/* Dish Batching Bar (Gom món nhanh) */}
-      <div className="px-6 py-2.5 bg-[#161E28] border-b border-[#263342] flex items-center space-x-3 overflow-x-auto">
-        <span className="text-xs font-bold text-orange-400 uppercase tracking-wider flex items-center space-x-1 flex-shrink-0">
-          <Flame className="h-3.5 w-3.5" />
-          <span>Tổng chờ nấu:</span>
-        </span>
-        {Object.entries(batchedWaiting).map(([name, qty]) => (
-          <div
-            key={name}
-            className="flex-shrink-0 px-3 py-1 rounded-lg bg-[#1A222D] border border-[#263342] flex items-center space-x-2 text-xs"
-          >
-            <span className="font-semibold text-slate-200">{name}:</span>
-            <span className="h-5 min-w-[20px] px-1.5 rounded-md bg-orange-600 text-white font-extrabold flex items-center justify-center">
-              {qty}
-            </span>
+      {/* Main Content Area */}
+      <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+        {loading ? (
+          <div className="h-64 flex flex-col items-center justify-center gap-3 text-ops-muted">
+            <RefreshCw className="h-8 w-8 animate-spin text-ops-brand" />
+            <p className="text-sm font-semibold">Đang nạp dữ liệu đơn bếp...</p>
           </div>
-        ))}
-        {Object.keys(batchedWaiting).length === 0 && (
-          <span className="text-xs text-slate-500 italic">Không có món tồn đọng trong hàng đợi</span>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-800 p-6 rounded-lg text-center max-w-md mx-auto my-12">
+            <AlertCircle className="h-10 w-10 text-red-600 mx-auto mb-2" />
+            <h2 className="font-bold text-lg mb-1">Đã xảy ra sự cố</h2>
+            <p className="text-sm mb-4">{error}</p>
+            <button
+              onClick={fetchTickets}
+              className="px-4 py-2 bg-ops-brand text-white font-bold rounded-lg text-sm"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : activeTickets.length === 0 ? (
+          <div className="h-64 flex flex-col items-center justify-center text-ops-muted border-2 border-dashed border-ops-border rounded-xl">
+            <p className="text-lg font-bold">Bếp đang trống!</p>
+            <p className="text-sm">Hiện tại không có đơn gọi món nào cần chế biến.</p>
+          </div>
+        ) : viewMode === 'ticket' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {activeTickets.map((ticket) => (
+              <KdsTicketCard
+                key={ticket.id}
+                ticket={ticket}
+                onComplete={handleCompleteTicket}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {batches.map((batch) => (
+              <KdsBatchCard
+                key={batch.id}
+                batch={batch}
+                onComplete={handleCompleteBatch}
+              />
+            ))}
+          </div>
         )}
-      </div>
+      </main>
 
-      {/* 3 Columns Layout: Chờ nấu | Đang nấu | Sẵn sàng */}
-      <div className="flex-1 p-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden">
-        {/* Cột 1: Chờ nấu */}
-        <div className="flex flex-col rounded-2xl bg-[#121820] border border-[#263342] overflow-hidden">
-          <div className="p-4 border-b border-[#263342] bg-[#161E28] flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="h-3 w-3 rounded-full bg-amber-500" />
-              <h2 className="font-bold text-sm text-slate-100">CHỜ NẤU (WAITING)</h2>
-            </div>
-            <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 font-bold text-xs">
-              {waitingItems.length}
-            </span>
-          </div>
-
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            {waitingItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-xl bg-[#1A222D] border border-[#263342] shadow-lg flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-1 rounded-lg bg-orange-500/20 text-orange-400 font-extrabold text-xs">
-                      {item.tableNumber}
-                    </span>
-                    <span
-                      className={`text-xs font-semibold flex items-center space-x-1 ${
-                        item.elapsedMinutes > 10 ? 'text-red-400 animate-pulse' : 'text-slate-400'
-                      }`}
-                    >
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>{item.elapsedMinutes} phút</span>
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-xl font-black text-white">{item.quantity}x</span>
-                    <span className="text-base font-bold text-slate-100">{item.dishName}</span>
-                  </div>
-
-                  {item.modifiers.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {item.modifiers.map((m, idx) => (
-                        <p key={idx} className="text-xs text-amber-300 font-medium">
-                          &bull; {m}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Touch Target >= 48px chuẩn Rule 04: Chuyển thẳng sang READY */}
-                <button
-                  onClick={() => updateStatus(item.id, 'READY')}
-                  className="mt-4 h-12 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-sm text-white flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/30 active:scale-98 transition-transform"
-                >
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span>Hoàn Tất Chế Biến</span>
-                </button>
-              </div>
-            ))}
-          </div>
+      {/* Toast Hoàn Tác 5 Giây */}
+      {undoToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#141210] text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4">
+          <span className="text-sm font-medium">{undoToast.message}</span>
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 text-amber-300 font-bold text-xs rounded transition-all"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Hoàn tác (5s)</span>
+          </button>
         </div>
-
-        {/* Cột 2: Sẵn sàng phục vụ (READY) */}
-        <div className="flex flex-col rounded-2xl bg-[#121820] border border-[#263342] overflow-hidden col-span-2">
-          <div className="p-4 border-b border-[#263342] bg-[#161E28] flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="h-3 w-3 rounded-full bg-emerald-500" />
-              <h2 className="font-bold text-sm text-slate-100">SẴN SÀNG (READY)</h2>
-            </div>
-            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-bold text-xs">
-              {readyItems.length}
-            </span>
-          </div>
-
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            {readyItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-xl bg-[#1A222D] border border-emerald-500/40 shadow-lg flex flex-col justify-between opacity-80 hover:opacity-100 transition-opacity"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-extrabold text-xs">
-                      {item.tableNumber}
-                    </span>
-                    <span className="text-xs font-semibold text-emerald-400">
-                      Sẵn sàng bưng món
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-xl font-black text-white">{item.quantity}x</span>
-                    <span className="text-base font-bold text-slate-100">{item.dishName}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center space-x-2">
-                  <button
-                    onClick={() => updateStatus(item.id, 'WAITING')}
-                    className="h-10 px-3 rounded-xl bg-[#263342] hover:bg-[#324357] text-xs font-semibold text-slate-300 flex items-center justify-center space-x-1"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    <span>Làm lại</span>
-                  </button>
-                  <button
-                    onClick={() => updateStatus(item.id, 'SERVED')}
-                    className="h-10 flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center justify-center"
-                  >
-                    Đã Bưng Xong
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
