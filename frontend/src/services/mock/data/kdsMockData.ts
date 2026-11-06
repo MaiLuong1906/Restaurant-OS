@@ -192,6 +192,60 @@ export const MOCK_TICKETS: readonly Ticket[] = Object.freeze([
   },
 ]);
 
+export const MOCK_DISH_AVAILABILITY: readonly import('../../../types').DishAvailability[] = Object.freeze([
+  {
+    dishId: 'dish-pho-bo-than',
+    dishName: 'Phở Bò Thăn',
+    status: 'SOLD_OUT',
+    remainingPortions: 0,
+    lastStock: 5,
+    waitingTables: [],
+    soldOutAt: '11:20',
+    markedBy: 'Bếp trưởng Minh',
+  },
+  {
+    dishId: 'dish-goi-ngo-sen',
+    dishName: 'Gỏi Ngó Sen Tôm Thịt',
+    status: 'SOLD_OUT',
+    remainingPortions: 0,
+    lastStock: 3,
+    waitingTables: [],
+    soldOutAt: '10:45',
+    markedBy: 'Đầu bếp Lan',
+  },
+  {
+    dishId: 'dish-nem-ran',
+    dishName: 'Nem Rán Phố Cổ',
+    status: 'AVAILABLE',
+    remainingPortions: 12,
+    waitingTables: [
+      { tableName: 'Bàn 02', ticketId: 't02', quantity: 2 },
+      { tableName: 'Bàn 07', ticketId: 't07', quantity: 1 },
+    ],
+  },
+  {
+    dishId: 'dish-banh-xeo',
+    dishName: 'Bánh Xèo',
+    status: 'AVAILABLE',
+    remainingPortions: 8,
+    waitingTables: [{ tableName: 'Bàn 09', ticketId: 't09', quantity: 1 }],
+  },
+  {
+    dishId: 'dish-com-ga',
+    dishName: 'Cơm Gà Xối Mỡ',
+    status: 'AVAILABLE',
+    remainingPortions: 15,
+    waitingTables: [{ tableName: 'Bàn 04', ticketId: 't04', quantity: 1 }],
+  },
+  {
+    dishId: 'dish-canh-chua',
+    dishName: 'Canh Chua Cá',
+    status: 'AVAILABLE',
+    remainingPortions: 6,
+    waitingTables: [{ tableName: 'Bàn 06', ticketId: 't06', quantity: 2 }],
+  },
+]);
+
 export const MOCK_ORDER_CHANGES: readonly import('../../../types').OrderChangeAlertData[] = Object.freeze([
   {
     id: 'alert-t04-1',

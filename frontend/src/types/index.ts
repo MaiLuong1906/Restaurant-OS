@@ -240,3 +240,22 @@ export interface OrderChangeAlertData {
   acknowledged: boolean;
   createdAt?: string;
 }
+
+export type DishAvailabilityStatus = 'AVAILABLE' | 'SOLD_OUT';
+
+export interface WaitingTableRef {
+  tableName: string;
+  ticketId: string;
+  quantity: number;
+}
+
+export interface DishAvailability {
+  dishId: string;
+  dishName: string;
+  status: DishAvailabilityStatus;
+  remainingPortions: number;
+  lastStock?: number;
+  waitingTables: WaitingTableRef[];
+  soldOutAt?: string;
+  markedBy?: string;
+}

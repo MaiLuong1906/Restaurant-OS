@@ -67,4 +67,24 @@ describe('MockKdsService', () => {
     const editedItem = resEdit.ticket.items.find((i) => i.id === editAlert.itemId);
     expect(editedItem?.notes).toBe(editAlert.newNote);
   });
+
+  it('quản lý danh sách hết món: markSoldOut và reopenDish hoạt động chuẩn với idempotencyKey', async () => {
+    const list = await service.listDishAvailability();
+    expect(list.length).toBeGreaterThan(0);
+
+    const availableDish = list.find((d) => d.status === 'AVAILABLE')!;
+    const keySoldOut = 'soldout-key-1';
+    const marked = await service.markSoldOut(availableDish.dishId, keySoldOut);
+    expect(marked.status).toBe('SOLD_OUT');
+    expect(marked.remainingPortions).toBe(0);
+
+    // Reopen dish
+    const keyReopen = 'reopen-key-1';
+    const reopened = await service.reopenDish(availableDish.dishId, 10, keyReopen);
+    expect(reopened.status).toBe('AVAILABLE');
+    expect(reopened.remainingPortions).toBe(10);
+
+    // Reopen invalid quantity phải throw
+    await expect(service.reopenDish(availableDish.dishId, 0, 'key-invalid')).rejects.toThrow();
+  });
 });

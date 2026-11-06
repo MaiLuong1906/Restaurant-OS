@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Ticket, Batch, OrderChangeAlertData } from '@/types';
 import { kdsService } from '@/services/mock';
 import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
@@ -227,6 +228,14 @@ export default function KitchenDisplayScreen() {
               </span>
             )}
           </button>
+
+          {/* Đường vào A7 Hết món */}
+          <Link
+            href="/kds/sold-out"
+            className="h-10 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
+          >
+            <span>Hết món</span>
+          </Link>
         </div>
 
         {/* View Toggle */}
