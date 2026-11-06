@@ -1,5 +1,11 @@
-import { Shift, Payslip, TipRecord } from '../../types';
-import { MOCK_SHIFTS, MOCK_PAYSLIPS, MOCK_TIPS } from './data/staffMockData';
+import { Shift, Payslip, TipRecord, LeaveBalance, LeaveRequest } from '../../types';
+import {
+  MOCK_SHIFTS,
+  MOCK_PAYSLIPS,
+  MOCK_TIPS,
+  MOCK_LEAVE_BALANCE,
+  MOCK_LEAVE_REQUESTS,
+} from './data/staffMockData';
 import { simulateLatency, deepClone, createNotFoundError, createValidationError } from './mockUtils';
 
 export interface StaffService {
@@ -7,17 +13,23 @@ export interface StaffService {
   getPayslips(params?: { month?: string }): Promise<Payslip[]>;
   getPayslipById(payslipId: string): Promise<Payslip>;
   getTips(params?: { from?: string; to?: string }): Promise<TipRecord[]>;
+  getLeaveBalance(): Promise<LeaveBalance>;
+  getLeaveRequests(): Promise<LeaveRequest[]>;
 }
 
 export class MockStaffService implements StaffService {
   private shifts: Shift[];
   private payslips: Payslip[];
   private tips: TipRecord[];
+  private leaveBalance: LeaveBalance;
+  private leaveRequests: LeaveRequest[];
 
   constructor() {
     this.shifts = deepClone(MOCK_SHIFTS as Shift[]);
     this.payslips = deepClone(MOCK_PAYSLIPS as Payslip[]);
     this.tips = deepClone(MOCK_TIPS as TipRecord[]);
+    this.leaveBalance = deepClone(MOCK_LEAVE_BALANCE as LeaveBalance);
+    this.leaveRequests = deepClone(MOCK_LEAVE_REQUESTS as LeaveRequest[]);
   }
 
   async getMySchedule(params?: { from?: string; to?: string }): Promise<Shift[]> {
@@ -70,6 +82,16 @@ export class MockStaffService implements StaffService {
     }
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async getLeaveBalance(): Promise<LeaveBalance> {
+    await simulateLatency(100);
+    return deepClone(this.leaveBalance);
+  }
+
+  async getLeaveRequests(): Promise<LeaveRequest[]> {
+    await simulateLatency(120);
+    return deepClone(this.leaveRequests);
   }
 }
 

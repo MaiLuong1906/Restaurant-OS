@@ -160,6 +160,14 @@ export interface LeaveRequest {
   createdAt: string;
 }
 
+export interface LeaveBalance {
+  staffId: string;
+  totalDays: number;
+  usedDays: number;
+  remainingDays: number;
+  pendingRequestsCount: number;
+}
+
 export interface Payslip {
   id: string;
   staffId: string;

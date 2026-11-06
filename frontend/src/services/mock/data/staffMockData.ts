@@ -117,3 +117,48 @@ export const MOCK_TIPS: readonly TipRecord[] = Object.freeze([
     note: 'Ca sáng',
   },
 ]);
+
+export const MOCK_LEAVE_BALANCE: import('../../../types').LeaveBalance = Object.freeze({
+  staffId: 'staff-1',
+  totalDays: 12,
+  usedDays: 6,
+  remainingDays: 6,
+  pendingRequestsCount: 2,
+});
+
+export const MOCK_LEAVE_REQUESTS: readonly import('../../../types').LeaveRequest[] = Object.freeze([
+  {
+    id: 'leave-1',
+    staffId: 'staff-1',
+    staffName: 'Nhân Viên Vận Hành',
+    type: 'ANNUAL',
+    startDate: '2026-11-12',
+    endDate: '2026-11-12',
+    reason: 'Việc gia đình',
+    status: 'APPROVED',
+    approvedBy: 'Quản lý Hoàng',
+    createdAt: '2026-11-03T08:30:00.000Z',
+  },
+  {
+    id: 'leave-2',
+    staffId: 'staff-1',
+    staffName: 'Nhân Viên Vận Hành',
+    type: 'ANNUAL',
+    startDate: '2026-11-18',
+    endDate: '2026-11-19',
+    reason: 'Khám sức khỏe định kỳ',
+    status: 'PENDING',
+    createdAt: '2026-11-05T09:00:00.000Z',
+  },
+  {
+    id: 'leave-3',
+    staffId: 'staff-1',
+    staffName: 'Nhân Viên Vận Hành',
+    type: 'SICK',
+    startDate: '2026-11-25',
+    endDate: '2026-11-25',
+    reason: 'Nghỉ ốm',
+    status: 'PENDING',
+    createdAt: '2026-11-05T14:15:00.000Z',
+  },
+]);
