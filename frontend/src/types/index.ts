@@ -183,11 +183,21 @@ export interface LeaveBalance {
   pendingRequestsCount: number;
 }
 
+export type PayslipStatus = 'PROVISIONAL' | 'FINAL';
+export type PayslipPaymentStatus = 'EXPECTED' | 'PAID';
+export type TipPaymentStatus = 'UNPAID' | 'PAID';
+
 export interface Payslip {
   id: string;
   staffId: string;
   staffName: string;
   month: string; // YYYY-MM
+  monthLabel?: string;
+  status?: PayslipStatus;
+  paymentStatus?: PayslipPaymentStatus;
+  periodLabel?: string;
+  paymentDateLabel?: string;
+  paymentNote?: string;
   baseSalary: number; // VND integer
   workedHours: number;
   hourlyRate: number; // VND integer
@@ -195,8 +205,17 @@ export interface Payslip {
   bonus: number; // VND integer
   tipAmount: number; // VND integer
   deductions: number; // VND integer
+  bhxhAmount?: number;
+  advanceAmount?: number;
   netSalary: number; // VND integer (thực lĩnh)
   paidAt?: string;
+}
+
+export interface TipDailyEntry {
+  date: string;
+  dateLabel: string;
+  shiftLabel: string;
+  amount: number;
 }
 
 export interface TipRecord {
@@ -207,6 +226,15 @@ export interface TipRecord {
   poolAmount: number; // VND integer
   allocatedAmount: number; // VND integer
   note?: string;
+}
+
+export interface TipMonthSummary {
+  monthKey: string;
+  monthLabel: string;
+  totalAmount: number;
+  paymentStatus: TipPaymentStatus;
+  paymentNote?: string;
+  dailyEntries?: TipDailyEntry[];
 }
 
 export type OrderStatus = 'PLACED' | 'CONFIRMED' | 'PREPARING' | 'SERVED' | 'COMPLETED' | 'CANCELLED';

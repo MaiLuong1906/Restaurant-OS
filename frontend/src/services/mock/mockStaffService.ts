@@ -20,6 +20,7 @@ import {
   DaySchedule,
   CreateLeaveRequest,
   WithdrawLeaveRequest,
+  TipMonthSummary,
 } from '../../types';
 import {
   MOCK_SHIFTS,
@@ -32,6 +33,7 @@ import {
   MOCK_SHIFT_REGISTRATIONS,
   MOCK_SHIFT_SWAPS,
   MOCK_SWAP_PEERS,
+  MOCK_TIP_MONTHS,
 } from './data/staffMockData';
 import { simulateLatency, deepClone, createNotFoundError, createValidationError } from './mockUtils';
 import {
@@ -48,6 +50,7 @@ export interface StaffService {
   getPayslips(params?: { month?: string }): Promise<Payslip[]>;
   getPayslipById(payslipId: string): Promise<Payslip>;
   getTips(params?: { from?: string; to?: string }): Promise<TipRecord[]>;
+  getTipMonths(): Promise<TipMonthSummary[]>;
   getLeaveBalance(): Promise<LeaveBalance>;
   getLeaveRequests(): Promise<LeaveRequest[]>;
   createLeaveRequest(req: CreateLeaveRequest): Promise<LeaveRequest>;
@@ -143,6 +146,11 @@ export class MockStaffService implements StaffService {
     }
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async getTipMonths(): Promise<TipMonthSummary[]> {
+    await simulateLatency(120);
+    return deepClone(MOCK_TIP_MONTHS as TipMonthSummary[]);
   }
 
   async getLeaveBalance(): Promise<LeaveBalance> {

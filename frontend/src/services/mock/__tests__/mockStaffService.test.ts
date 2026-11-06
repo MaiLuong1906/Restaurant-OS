@@ -16,7 +16,7 @@ describe('MockStaffService', () => {
 
   it('phải tính toán số tiền lương là số nguyên VND và công thức netSalary chính xác', async () => {
     const payslips = await service.getPayslips();
-    expect(payslips.length).toBe(3);
+    expect(payslips.length).toBeGreaterThanOrEqual(3);
 
     payslips.forEach((p) => {
       expect(Number.isInteger(p.baseSalary)).toBe(true);
@@ -138,6 +138,22 @@ describe('MockStaffService', () => {
 
     // Không cho rút đơn đã rút hoặc không phải PENDING
     await expect(service.withdrawLeaveRequest({ id: newLeave.id })).rejects.toThrow();
+  });
+
+  it('xử lý phiếu lương & tip B11-B13: getPayslips, getTipMonths, formatVnd', async () => {
+    const payslips = await service.getPayslips();
+    expect(payslips.length).toBeGreaterThanOrEqual(3);
+
+    const nov = payslips.find((p) => p.month === '2026-11');
+    expect(nov).toBeDefined();
+    expect(nov?.netSalary).toBe(4250000);
+    expect(nov?.status).toBe('PROVISIONAL');
+
+    const tipMonths = await service.getTipMonths();
+    expect(tipMonths.length).toBeGreaterThanOrEqual(1);
+    expect(tipMonths[0].totalAmount).toBe(320000);
+    expect(tipMonths[0].paymentStatus).toBe('UNPAID');
+    expect(tipMonths[0].dailyEntries?.length).toBe(4);
   });
 });
 
