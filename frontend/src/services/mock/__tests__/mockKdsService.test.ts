@@ -50,4 +50,21 @@ describe('MockKdsService', () => {
     const repeat = await service.updateItemStatus('t04', 'item-04-1', 'WAITING', key);
     expect(repeat.items.find((i) => i.id === 'item-04-1')?.status).toBe('READY');
   });
+
+  it('xử lý acknowledgeOrderChange: CANCEL_ITEM chuyển item sang REJECTED, EDIT_NOTE cập nhật note', async () => {
+    const pending = await service.getPendingOrderChanges();
+    expect(pending.length).toBeGreaterThan(0);
+
+    const cancelAlert = pending.find((a) => a.variant === 'CANCEL_ITEM')!;
+    const resCancel = await service.acknowledgeOrderChange(cancelAlert.id);
+    expect(resCancel.alert.acknowledged).toBe(true);
+    const cancelledItem = resCancel.ticket.items.find((i) => i.id === cancelAlert.itemId);
+    expect(cancelledItem?.status).toBe('REJECTED');
+
+    const editAlert = pending.find((a) => a.variant === 'EDIT_NOTE')!;
+    const resEdit = await service.acknowledgeOrderChange(editAlert.id);
+    expect(resEdit.alert.acknowledged).toBe(true);
+    const editedItem = resEdit.ticket.items.find((i) => i.id === editAlert.itemId);
+    expect(editedItem?.notes).toBe(editAlert.newNote);
+  });
 });

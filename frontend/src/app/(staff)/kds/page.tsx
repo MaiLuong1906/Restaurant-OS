@@ -1,15 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { Ticket, Batch } from '@/types';
+import { Ticket, Batch, OrderChangeAlertData } from '@/types';
 import { kdsService } from '@/services/mock';
 import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
 import { KdsBatchCard } from '@/components/kds/KdsBatchCard';
 import { TicketDetailDrawer } from '@/components/kds/TicketDetailDrawer';
-import { RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
+import { OrderChangeAlert } from '@/components/kds/OrderChangeAlert';
+import { RotateCcw, AlertCircle, RefreshCw, Bell } from 'lucide-react';
 
 export default function KitchenDisplayScreen() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
+  const [alerts, setAlerts] = React.useState<OrderChangeAlertData[]>([]);
+  const [activeAlertId, setActiveAlertId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
   const [viewMode, setViewMode] = React.useState<'ticket' | 'batch'>('ticket');
@@ -29,8 +32,15 @@ export default function KitchenDisplayScreen() {
     try {
       setLoading(true);
       setError(null);
-      const data = await kdsService.getTickets();
-      setTickets(data);
+      const [ticketsData, alertsData] = await Promise.all([
+        kdsService.getTickets(),
+        kdsService.getPendingOrderChanges(),
+      ]);
+      setTickets(ticketsData);
+      setAlerts(alertsData);
+      if (alertsData.length > 0) {
+        setActiveAlertId(alertsData[0].id);
+      }
     } catch (err) {
       setError((err as Error).message || 'Không thể tải danh sách đơn bếp');
     } finally {
@@ -155,6 +165,23 @@ export default function KitchenDisplayScreen() {
     }, 5000);
   };
 
+  // Xử lý xác nhận cảnh báo hủy/sửa
+  const handleConfirmAlert = async (alertId: string) => {
+    try {
+      const { ticket } = await kdsService.acknowledgeOrderChange(alertId);
+      setTickets((prev) => prev.map((t) => (t.id === ticket.id ? ticket : t)));
+      setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      setActiveAlertId(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeferAlert = (alertId: string) => {
+    kdsService.deferOrderChange(alertId);
+    setActiveAlertId(null);
+  };
+
   // Nút bấm Hoàn tác
   const handleUndo = () => {
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
@@ -169,6 +196,8 @@ export default function KitchenDisplayScreen() {
     t.items.some((i) => i.status === 'WAITING' || i.status === 'READY')
   );
 
+  const pendingAlert = alerts.find((a) => a.id === activeAlertId) || null;
+
   return (
     <div className="min-h-screen bg-ops-bg text-ops-ink flex flex-col font-sans select-none">
       {/* Top Header */}
@@ -178,6 +207,26 @@ export default function KitchenDisplayScreen() {
           <span className="text-xs bg-ops-border text-ops-ink px-2.5 py-1 rounded-full font-bold">
             {activeTickets.length} ticket đang chờ
           </span>
+
+          {/* Nút Chuông cảnh báo */}
+          <button
+            type="button"
+            onClick={() => {
+              if (alerts.length > 0) {
+                setActiveAlertId(alerts[0].id);
+              }
+            }}
+            className="relative p-2 rounded-lg border border-ops-border hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold"
+            aria-label="Cảnh báo thay đổi đơn"
+          >
+            <Bell className="h-4 w-4" />
+            <span>Cảnh báo</span>
+            {alerts.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-danger-600 text-white text-[11px] font-black flex items-center justify-center">
+                {alerts.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* View Toggle */}
@@ -229,14 +278,22 @@ export default function KitchenDisplayScreen() {
           </div>
         ) : viewMode === 'ticket' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeTickets.map((ticket) => (
-              <KdsTicketCard
-                key={ticket.id}
-                ticket={ticket}
-                onSelect={(t) => setSelectedTicketId(t.id)}
-                onComplete={handleCompleteTicket}
-              />
-            ))}
+            {activeTickets.map((ticket) => {
+              const hasAlert = alerts.some((a) => a.ticketId === ticket.id && !a.acknowledged);
+              return (
+                <KdsTicketCard
+                  key={ticket.id}
+                  ticket={ticket}
+                  hasPendingAlert={hasAlert}
+                  onViewAlert={(tId) => {
+                    const alert = alerts.find((a) => a.ticketId === tId && !a.acknowledged);
+                    if (alert) setActiveAlertId(alert.id);
+                  }}
+                  onSelect={(t) => setSelectedTicketId(t.id)}
+                  onComplete={handleCompleteTicket}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -270,11 +327,20 @@ export default function KitchenDisplayScreen() {
       <TicketDetailDrawer
         ticket={tickets.find((t) => t.id === selectedTicketId) || null}
         open={Boolean(selectedTicketId)}
+        hasPendingAlert={alerts.some((a) => a.ticketId === selectedTicketId && !a.acknowledged)}
         onClose={() => setSelectedTicketId(null)}
         onComplete={(ticketId) => {
           handleCompleteTicket(ticketId);
           setSelectedTicketId(null);
         }}
+      />
+
+      {/* A6 Order Change Alert Modal */}
+      <OrderChangeAlert
+        alert={pendingAlert}
+        open={Boolean(pendingAlert)}
+        onConfirm={handleConfirmAlert}
+        onDefer={handleDeferAlert}
       />
     </div>
   );

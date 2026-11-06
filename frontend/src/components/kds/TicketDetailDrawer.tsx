@@ -11,6 +11,7 @@ interface TicketDetailDrawerProps {
   onClose: () => void;
   onComplete: (ticketId: string) => void;
   onReportIncident?: (ticketId: string) => void;
+  hasPendingAlert?: boolean;
 }
 
 export function TicketDetailDrawer({
@@ -19,6 +20,7 @@ export function TicketDetailDrawer({
   onClose,
   onComplete,
   onReportIncident,
+  hasPendingAlert,
 }: TicketDetailDrawerProps) {
   const [allergyExpanded, setAllergyExpanded] = React.useState<boolean>(false);
   const [incidentReported, setIncidentReported] = React.useState<boolean>(false);
@@ -63,7 +65,7 @@ export function TicketDetailDrawer({
   const totalPortions = ticket.items.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCompleteClick = () => {
-    if (isCompleting) return;
+    if (isCompleting || hasPendingAlert) return;
     setIsCompleting(true);
     onComplete(ticket.id);
     onClose();
@@ -213,12 +215,16 @@ export function TicketDetailDrawer({
         <div className="p-6 border-t border-ops-border bg-white space-y-3">
           <button
             type="button"
-            disabled={isCompleting}
+            disabled={isCompleting || hasPendingAlert}
             onClick={handleCompleteClick}
-            className="w-full h-12 rounded-lg bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all disabled:opacity-50"
+            className={`w-full h-12 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all ${
+              hasPendingAlert
+                ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed border border-neutral-300'
+                : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50'
+            }`}
           >
             <Check className="h-5 w-5" />
-            <span>✓ Hoàn tất ticket</span>
+            <span>{hasPendingAlert ? 'Khóa (Có thay đổi chưa xác nhận)' : '✓ Hoàn tất ticket'}</span>
           </button>
 
           <button

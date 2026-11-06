@@ -223,3 +223,20 @@ export interface ApiResponse<T> {
   };
   timestamp: string;
 }
+
+export type OrderChangeVariant = 'CANCEL_ITEM' | 'EDIT_NOTE';
+
+export interface OrderChangeAlertData {
+  id: string;
+  ticketId: string;
+  itemId: string;
+  dishName: string;
+  tableNo: string;
+  quantity: number;
+  variant: OrderChangeVariant;
+  reason?: string;
+  previousNote?: string;
+  newNote?: string;
+  acknowledged: boolean;
+  createdAt?: string;
+}

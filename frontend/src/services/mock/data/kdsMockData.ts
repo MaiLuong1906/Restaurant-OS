@@ -191,3 +191,31 @@ export const MOCK_TICKETS: readonly Ticket[] = Object.freeze([
     ],
   },
 ]);
+
+export const MOCK_ORDER_CHANGES: readonly import('../../../types').OrderChangeAlertData[] = Object.freeze([
+  {
+    id: 'alert-t04-1',
+    ticketId: 't04',
+    itemId: 'item-04-1',
+    dishName: 'Nem Rán Phố Cổ',
+    tableNo: 'Bàn 04',
+    quantity: 1,
+    variant: 'CANCEL_ITEM',
+    reason: 'khách đổi ý',
+    acknowledged: false,
+    createdAt: '2026-11-06T11:45:00.000Z',
+  },
+  {
+    id: 'alert-t06-1',
+    ticketId: 't06',
+    itemId: 'item-06-1',
+    dishName: 'Phở Bò Thăn',
+    tableNo: 'Bàn 06',
+    quantity: 2,
+    variant: 'EDIT_NOTE',
+    previousNote: 'Không hành',
+    newNote: 'Ít hành',
+    acknowledged: false,
+    createdAt: '2026-11-06T11:58:00.000Z',
+  },
+]);
