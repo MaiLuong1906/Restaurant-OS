@@ -12,8 +12,7 @@
        Vàng đồng (bronze) bị XÓA khỏi mọi trang.
      - Nền: website kem #F5F2EA; app vận hành xám ấm rất nhạt #F6F4F0.
      - Radius thống nhất 8px, bóng nhẹ 0 1px 3px rgba(0,0,0,.08).
-     - KDS là NGOẠI LỆ duy nhất: giữ nền tối #0B0F14, nút chính vẫn brand #8C1D2C
-       (đủ tương phản với chữ trắng), chữ nhấn trên nền tối dùng tint sáng của brand.
+     - KDS dùng nền vận hành #F6F4F0 (đồng bộ với hệ thống vận hành chung), nút chính brand #8C1D2C.
      Cảm hứng website vẫn từ bombay-palace.co.uk (chỉ style, không chép ảnh/logo/văn
      bản). Xem BASE_README.md. */
 
@@ -103,13 +102,10 @@
   --color-table-overdue: #d14b3a;
   --color-table-cleaning: #9a8f80;
 
-  /* KDS dark theme (GIỮ nền tối; accent = tint sáng của brand để đọc được trên nền tối,
-     nút chính vẫn brand #8C1D2C, cảnh báo = alert #D14B3A) */
-  /* v7.1 KDS light: dong bo voi web (nen giay #F5F2EA, chu #141210) thay cho
-     nen toi #0B0F14 cu. Card trang, vien #E9E4DC, qua SLA nen do nhat #FDEAE6
-     (cung ops-tint-overdue). Vang "sap tre" dung kds-soon dam hon honey-500
-     de du tuong phan tren nen trang (honey-500 giu nguyen cho cac trang khac). */
-  --color-kds-bg: #f5f2ea;
+  /* KDS theme: Nền vận hành #F6F4F0 (dùng chung hệ thống ops-bg),
+     Card trắng, viền #E9E4DC, chữ #141210, nút chính brand #8C1D2C,
+     cảnh báo = alert #D14B3A, quá SLA nền đỏ nhạt #FDEAE6. */
+  --color-kds-bg: #f6f4f0;
   --color-kds-surface: #ffffff;
   --color-kds-card: #ffffff;
   --color-kds-border: #e9e4dc;
