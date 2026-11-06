@@ -162,3 +162,13 @@ export const MOCK_LEAVE_REQUESTS: readonly import('../../../types').LeaveRequest
     createdAt: '2026-11-05T14:15:00.000Z',
   },
 ]);
+
+export const MOCK_TODAY_ATTENDANCE: import('../../../types').TodayAttendance = {
+  shiftName: 'Ca sáng',
+  shiftHours: '08:00 – 14:00',
+  zone: 'Bếp chính',
+  date: '2026-11-05',
+  status: 'NOT_CHECKED_IN',
+  checkedInAt: null,
+  punctuality: 'Đúng giờ',
+};

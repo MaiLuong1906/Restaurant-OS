@@ -310,3 +310,29 @@ export interface CreateWasteLogRequest {
   recordedByRole?: string;
   idempotencyKey: string;
 }
+
+export type AttendanceCheckInStatus = 'NOT_CHECKED_IN' | 'CHECKED_IN';
+export type AttendanceResultKind = 'SUCCESS' | 'ALREADY_CHECKED_IN' | 'NETWORK_ERROR';
+
+export interface TodayAttendance {
+  shiftName: string;
+  shiftHours: string;
+  zone: string;
+  date: string;
+  status: AttendanceCheckInStatus;
+  checkedInAt: string | null;
+  punctuality?: string;
+  method?: AttendanceMethod;
+}
+
+export interface CheckInRequest {
+  method: AttendanceMethod;
+  idempotencyKey: string;
+}
+
+export interface CheckInResponse {
+  kind: AttendanceResultKind;
+  checkedInAt?: string;
+  method?: AttendanceMethod;
+  message?: string;
+}
