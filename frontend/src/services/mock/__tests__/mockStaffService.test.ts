@@ -56,4 +56,51 @@ describe('MockStaffService', () => {
     const resDup = await service.checkIn({ method: 'PIN', idempotencyKey: 'idem-checkin-2' });
     expect(resDup.kind).toBe('ALREADY_CHECKED_IN');
   });
+
+  it('xử lý lịch ca B6-B8: getWeekSchedule, getScheduleSummary, registerShift, cancelRegistration, createShiftSwap', async () => {
+    const monday = '2026-11-02';
+    const schedule = await service.getWeekSchedule(monday);
+    expect(schedule.days).toHaveLength(7);
+    expect(schedule.weekStartKey).toBe(monday);
+
+    const summary = await service.getScheduleSummary(monday);
+    expect(summary.shiftsThisWeek).toBeGreaterThanOrEqual(0);
+
+    // Register shift: thành công tạo PENDING
+    const openShifts = await service.listOpenShifts('2026-11-06');
+    const available = openShifts.find((o) => o.slotsTaken < o.slotsTotal);
+    if (available) {
+      const regKey = 'idem-reg-1';
+      const reg = await service.registerShift({
+        openShiftId: available.id,
+        dateKey: available.dateKey,
+        idempotencyKey: regKey,
+      });
+      expect(reg.status).toBe('PENDING');
+
+      // Replay idempotency
+      const regReplay = await service.registerShift({
+        openShiftId: available.id,
+        dateKey: available.dateKey,
+        idempotencyKey: regKey,
+      });
+      expect(regReplay.id).toBe(reg.id);
+
+      // Hủy đăng ký ca PENDING
+      const cancelRes = await service.cancelRegistration({ registrationId: reg.id });
+      expect(cancelRes.ok).toBe(true);
+    }
+
+    // Đổi ca B8: tạo PENDING_PEER
+    const peers = await service.listSwapPeers();
+    expect(peers.length).toBeGreaterThan(0);
+    const swap = await service.createShiftSwap({
+      requesterShiftId: 'shift-1',
+      peerId: peers[0].staffId,
+      reason: 'Việc bận',
+      idempotencyKey: 'idem-swap-test-1',
+    });
+    expect(swap.status).toBe('PENDING_PEER');
+  });
 });
+

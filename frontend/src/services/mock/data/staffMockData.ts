@@ -172,3 +172,117 @@ export const MOCK_TODAY_ATTENDANCE: import('../../../types').TodayAttendance = {
   checkedInAt: null,
   punctuality: 'Đúng giờ',
 };
+
+export const MOCK_OPEN_SHIFTS: readonly import('../../../types').OpenShift[] = Object.freeze([
+  {
+    id: 'open-1',
+    dateKey: '2026-11-06',
+    startTime: '17:00',
+    endTime: '22:00',
+    role: 'CHEF',
+    title: 'Ca tối',
+    zone: 'Bếp chính',
+    slotsTotal: 3,
+    slotsTaken: 1,
+    postedById: 'mgr-1',
+    postedAt: '2026-11-04T08:00:00.000Z',
+    note: 'Cần hỗ trợ ra món giờ cao điểm',
+  },
+  {
+    id: 'open-2',
+    dateKey: '2026-11-07',
+    startTime: '11:00',
+    endTime: '15:00',
+    role: 'CHEF',
+    title: 'Ca trưa',
+    zone: 'Bếp chính',
+    slotsTotal: 2,
+    slotsTaken: 0,
+    postedById: 'mgr-1',
+    postedAt: '2026-11-04T08:00:00.000Z',
+  },
+  {
+    id: 'open-3',
+    dateKey: '2026-11-08',
+    startTime: '17:00',
+    endTime: '22:00',
+    role: 'CHEF',
+    title: 'Ca tối',
+    zone: 'Bếp chính',
+    slotsTotal: 2,
+    slotsTaken: 2, // Đã đủ người
+    postedById: 'mgr-1',
+    postedAt: '2026-11-04T08:00:00.000Z',
+  },
+  {
+    id: 'open-4',
+    dateKey: '2026-11-09',
+    startTime: '08:00',
+    endTime: '14:00',
+    role: 'CHEF',
+    title: 'Ca sáng',
+    zone: 'Bếp chính',
+    slotsTotal: 2,
+    slotsTaken: 1,
+    postedById: 'mgr-1',
+    postedAt: '2026-11-04T08:00:00.000Z',
+  },
+]);
+
+export const MOCK_SHIFT_REGISTRATIONS: readonly import('../../../types').ShiftRegistration[] = Object.freeze([
+  {
+    id: 'reg-pending-1',
+    staffId: 'staff-1',
+    openShiftId: 'open-4',
+    dateKey: '2026-11-09',
+    status: 'PENDING',
+    createdAt: '2026-11-05T07:58:00.000Z',
+    idempotencyKey: 'idem-reg-pending-1',
+    note: 'Đăng ký thêm ca đầu tuần',
+  },
+]);
+
+export const MOCK_SHIFT_SWAPS: readonly import('../../../types').ShiftSwapRequest[] = Object.freeze([
+  {
+    id: 'swap-1',
+    requesterId: 'staff-1',
+    requesterShiftId: 'shift-1',
+    peerId: 'peer-2',
+    dateKey: '2026-11-06',
+    reason: 'Việc gia đình',
+    status: 'PENDING_PEER',
+    createdAt: '2026-11-05T07:58:00.000Z',
+    idempotencyKey: 'idem-swap-1',
+  },
+]);
+
+export const MOCK_SWAP_PEERS: readonly import('../../../types').SwapPeerCandidate[] = Object.freeze([
+  {
+    staffId: 'peer-2',
+    staffName: 'Nhân viên bếp A',
+    role: 'CHEF',
+    shiftTitle: 'Ca tối',
+    shiftTime: '17:00 – 22:00',
+    shiftDate: 'Thứ 6, 06/11',
+    zone: 'Bếp chính',
+  },
+  {
+    staffId: 'peer-3',
+    staffName: 'Nhân viên bếp B',
+    role: 'CHEF',
+    shiftTitle: 'Ca sáng',
+    shiftTime: '08:00 – 14:00',
+    shiftDate: 'Thứ 7, 07/11',
+    zone: 'Bếp chính',
+  },
+  {
+    staffId: 'peer-4',
+    staffName: 'Nhân viên bếp C',
+    role: 'CHEF',
+    shiftTitle: 'Ca trưa',
+    shiftTime: '11:00 – 15:00',
+    shiftDate: 'Chủ Nhật, 08/11',
+    zone: 'Bếp phụ',
+  },
+]);
+

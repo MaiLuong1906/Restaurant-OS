@@ -336,3 +336,111 @@ export interface CheckInResponse {
   method?: AttendanceMethod;
   message?: string;
 }
+
+// B6-B8 Types
+export interface OpenShift {
+  id: string;
+  dateKey: string; // YYYY-MM-DD
+  startTime: string;
+  endTime: string;
+  role: StaffRole;
+  title: string;
+  zone: string;
+  slotsTotal: number;
+  slotsTaken: number;
+  postedById: string;
+  postedAt: string;
+  note?: string;
+}
+
+export type ShiftRegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface ShiftRegistration {
+  id: string;
+  staffId: string;
+  openShiftId: string;
+  dateKey: string;
+  status: ShiftRegistrationStatus;
+  createdAt: string;
+  idempotencyKey: string;
+  note?: string;
+}
+
+export interface RegisterShiftRequest {
+  openShiftId: string;
+  dateKey: string;
+  note?: string;
+  idempotencyKey: string;
+}
+
+export interface CancelRegistrationRequest {
+  registrationId: string;
+}
+
+export type ShiftSwapStatus =
+  | 'PENDING_PEER'
+  | 'PENDING_MANAGER'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PEER_DECLINED';
+
+export interface ShiftSwapRequest {
+  id: string;
+  requesterId: string;
+  requesterShiftId: string;
+  peerId: string;
+  peerShiftId?: string;
+  dateKey: string;
+  reason?: string;
+  status: ShiftSwapStatus;
+  createdAt: string;
+  peerConfirmedAt?: string;
+  idempotencyKey: string;
+  rejectionReason?: string;
+  processedBy?: string;
+}
+
+export interface CreateShiftSwapRequest {
+  requesterShiftId: string;
+  peerId: string;
+  peerShiftId?: string;
+  reason?: string;
+  idempotencyKey: string;
+}
+
+export interface ScheduleSummary {
+  shiftsThisWeek: number;
+  hoursThisWeek: number;
+  pendingRegistrations: number;
+  pendingSwaps: number;
+  openShiftsThisWeek: number;
+}
+
+export interface DaySchedule {
+  dateKey: string; // YYYY-MM-DD
+  weekdayLabel: string; // T2, T3, ... CN
+  fullDateLabel: string; // Thứ 2, 05/11
+  dayNumber: number;
+  myShifts: Shift[];
+  openShifts: OpenShift[];
+  registrations: ShiftRegistration[];
+  swaps: ShiftSwapRequest[];
+}
+
+export interface WeekSchedule {
+  weekStartKey: string; // Monday YYYY-MM-DD
+  weekEndKey: string; // Sunday YYYY-MM-DD
+  weekLabel: string; // Tuần 05/11 – 11/11/2026
+  days: DaySchedule[];
+}
+
+export interface SwapPeerCandidate {
+  staffId: string;
+  staffName: string;
+  role: StaffRole;
+  shiftTitle: string;
+  shiftTime: string;
+  shiftDate: string;
+  zone: string;
+}
+
