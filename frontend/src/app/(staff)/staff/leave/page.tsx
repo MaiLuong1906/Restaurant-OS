@@ -311,9 +311,10 @@ export default function LeavePage() {
           <button
             type="button"
             onClick={() => setView('B9')}
-            className="text-sm font-semibold text-[#8C1D2C] hover:underline min-h-[44px] flex items-center gap-1"
+            className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
           >
-            ← Danh sách đơn
+            <ArrowLeft className="h-4 w-4" />
+            <span>Danh sách đơn</span>
           </button>
 
           {!successReq ? (

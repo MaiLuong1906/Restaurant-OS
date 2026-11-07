@@ -7,6 +7,7 @@ import { staffService } from '@/services/mock/mockStaffService';
 import { TodayAttendance, CheckInResponse, AttendanceMethod } from '@/types';
 import {
   ArrowLeft,
+  ArrowRight,
   Camera,
   CheckCircle2,
   Clock,
@@ -470,7 +471,7 @@ export default function AttendancePage() {
           <div className="space-y-6">
             <Link
               href="/staff"
-              className="text-sm font-bold text-ops-brand flex items-center gap-1 hover:underline"
+              className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Trang chủ</span>
@@ -534,9 +535,10 @@ export default function AttendancePage() {
 
             <Link
               href="/staff/schedule"
-              className="text-center block text-sm font-bold text-ops-brand hover:underline"
+              className="w-full min-h-[48px] rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform inline-flex items-center justify-center gap-2"
             >
-              Xem lịch ca &rarr;
+              <span>Xem lịch ca</span>
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         )}
