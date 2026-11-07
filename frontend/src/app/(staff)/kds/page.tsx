@@ -327,12 +327,12 @@ export default function KitchenDisplayScreen() {
 
       {/* Toast Hoàn Tác 5 Giây */}
       {undoToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#141210] text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-6 right-6 z-50 bg-[#141210] text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
           <span className="text-sm font-medium">{undoToast.message}</span>
           <button
             type="button"
             onClick={handleUndo}
-            className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 text-amber-300 font-bold text-xs rounded transition-all"
+            className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 text-amber-300 font-bold text-xs rounded transition-all active:scale-98"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>Hoàn tác (5s)</span>

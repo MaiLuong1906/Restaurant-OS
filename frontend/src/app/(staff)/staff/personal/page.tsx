@@ -571,14 +571,14 @@ export default function PersonalPage() {
       {/* Modal xác nhận đăng xuất */}
       {showLogoutModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
           onClick={() => {
             setShowLogoutModal(false);
             logoutTriggerRef.current?.focus();
           }}
         >
           <div
-            className="w-full max-w-sm bg-white rounded-lg p-6 shadow-xl space-y-4 text-center"
+            className="w-full max-w-sm bg-white rounded-lg p-6 shadow-xl space-y-4 text-center animate-in zoom-in-[0.96] duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
