@@ -76,6 +76,17 @@ export default function PayslipPage() {
       {/* ===================== B11: DANH SÁCH PHIẾU LƯƠNG & TIP ===================== */}
       {view === 'B11' && (
         <div className="max-w-[720px] mx-auto px-4 py-4 space-y-4">
+          {/* Nút back về Trang chủ */}
+          <div>
+            <Link
+              href="/staff"
+              className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
+            >
+              <ArrowLeft className="w-4 h-4 text-[#2B2118]" />
+              <span>Trang chủ</span>
+            </Link>
+          </div>
+
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-xl font-bold text-[#2B2118]">Phiếu lương</h1>
