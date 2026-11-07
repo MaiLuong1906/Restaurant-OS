@@ -57,8 +57,45 @@ export default function PersonalPage() {
   const [pwError, setPwError] = React.useState<string | null>(null);
   const [pwSubmitting, setPwSubmitting] = React.useState<boolean>(false);
 
-  // Logout modal state
+  // Logout modal state & accessibility refs
   const [showLogoutModal, setShowLogoutModal] = React.useState<boolean>(false);
+  const cancelLogoutBtnRef = React.useRef<HTMLButtonElement>(null);
+  const logoutTriggerRef = React.useRef<HTMLButtonElement>(null);
+
+  // Reset password form helper
+  const resetPasswordForm = React.useCallback(() => {
+    setShowPasswordForm(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowCurrentPw(false);
+    setShowNewPw(false);
+    setShowConfirmPw(false);
+    setPwError(null);
+  }, []);
+
+  // Trap focus and handle escape for logout modal
+  React.useEffect(() => {
+    if (!showLogoutModal) return;
+
+    // Focus cancel button initially
+    const timer = setTimeout(() => {
+      cancelLogoutBtnRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowLogoutModal(false);
+        logoutTriggerRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showLogoutModal]);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
@@ -119,19 +156,29 @@ export default function PersonalPage() {
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(staffId);
+        setCopiedId(true);
+        showToast(`Đã sao chép mã nhân viên ${staffId}`);
+        setTimeout(() => setCopiedId(false), 2000);
       } else {
         const textArea = document.createElement('textarea');
         textArea.value = staffId;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
-        document.execCommand('copy');
+        const success = document.execCommand('copy');
         document.body.removeChild(textArea);
+        if (success) {
+          setCopiedId(true);
+          showToast(`Đã sao chép mã nhân viên ${staffId}`);
+          setTimeout(() => setCopiedId(false), 2000);
+        } else {
+          showToast('Không sao chép được mã nhân viên. Hãy thử lại.');
+        }
       }
-      setCopiedId(true);
-      showToast('Đã sao chép mã nhân viên');
-      setTimeout(() => setCopiedId(false), 2000);
     } catch {
-      showToast('Không thể sao chép');
+      showToast('Không sao chép được mã nhân viên. Hãy thử lại.');
     }
   };
 
@@ -140,10 +187,6 @@ export default function PersonalPage() {
     setPwError(null);
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPwError('Vui lòng nhập đầy đủ thông tin');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setPwError('Mật khẩu mới phải có ít nhất 6 ký tự');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -163,10 +206,7 @@ export default function PersonalPage() {
         confirmPassword,
       });
       showToast('Đã đổi mật khẩu thành công');
-      setShowPasswordForm(false);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      resetPasswordForm();
     } catch (err) {
       setPwError((err as Error).message || 'Lỗi khi đổi mật khẩu');
     } finally {
@@ -380,7 +420,7 @@ export default function PersonalPage() {
                 </div>
               </Link>
 
-              {/* Lương & Tip */}
+              {/* Lương & Tip (lối tắt không hiện số tiền) */}
               <Link
                 href="/staff/payslip"
                 className="w-full inline-flex min-h-[56px] items-center justify-between rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
@@ -390,11 +430,8 @@ export default function PersonalPage() {
                   <span>Lương &amp; Tip</span>
                 </div>
                 <div className="flex items-center gap-3 text-right">
-                  <div>
-                    <div className="text-sm font-bold text-[#141210]">
-                      {formatVnd(t11Net)}
-                    </div>
-                    <div className="text-[11px] text-[#7A6A58]">Tip: 320.000đ</div>
+                  <div className="text-sm font-semibold text-[#7A6A58]">
+                    Thông tin lương tháng 11
                   </div>
                   <ChevronRight className="w-4 h-4 text-[#7A6A58]" />
                 </div>
@@ -414,31 +451,31 @@ export default function PersonalPage() {
             <button
               type="button"
               onClick={() => {
-                setShowPasswordForm(!showPasswordForm);
-                setPwError(null);
+                if (showPasswordForm) {
+                  resetPasswordForm();
+                } else {
+                  setShowPasswordForm(true);
+                  setPwError(null);
+                }
               }}
               aria-expanded={showPasswordForm}
+              aria-controls="pwform"
               className="w-full inline-flex min-h-[48px] items-center justify-between rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm hover:bg-neutral-50 transition-colors"
             >
               <div className="flex items-center gap-2.5">
                 <KeyRound className="w-4 h-4 text-[#7A6A58]" />
                 <span>Đổi mật khẩu</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
-                  Chờ chốt
-                </span>
-                <ChevronRight
-                  className={`w-4 h-4 text-[#7A6A58] transition-transform ${
-                    showPasswordForm ? 'rotate-90' : ''
-                  }`}
-                />
-              </div>
+              <ChevronRight
+                className={`w-4 h-4 text-[#7A6A58] transition-transform ${
+                  showPasswordForm ? 'rotate-90' : ''
+                }`}
+              />
             </button>
 
             {/* Form đổi mật khẩu mở rộng */}
             {showPasswordForm && (
-              <div className="p-4 bg-[#F6F4F0] rounded-lg border border-[#E9E4DC] space-y-3">
+              <div id="pwform" className="p-4 bg-[#F6F4F0] rounded-lg border border-[#E9E4DC] space-y-3">
                 {pwError && (
                   <div className="p-2.5 bg-red-50 border border-red-200 text-[#D14B3A] text-xs rounded flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -447,11 +484,12 @@ export default function PersonalPage() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#7A6A58] mb-1">
+                  <label htmlFor="pw-current" className="block text-xs font-semibold text-[#7A6A58] mb-1">
                     Mật khẩu hiện tại
                   </label>
                   <div className="relative">
                     <input
+                      id="pw-current"
                       type={showCurrentPw ? 'text' : 'password'}
                       autoComplete="current-password"
                       value={currentPassword}
@@ -462,6 +500,7 @@ export default function PersonalPage() {
                     <button
                       type="button"
                       onClick={() => setShowCurrentPw(!showCurrentPw)}
+                      aria-label={showCurrentPw ? 'Ẩn mật khẩu hiện tại' : 'Hiện mật khẩu hiện tại'}
                       className="absolute right-2 top-2 p-1.5 text-[#7A6A58]"
                     >
                       {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -470,11 +509,12 @@ export default function PersonalPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#7A6A58] mb-1">
+                  <label htmlFor="pw-new" className="block text-xs font-semibold text-[#7A6A58] mb-1">
                     Mật khẩu mới
                   </label>
                   <div className="relative">
                     <input
+                      id="pw-new"
                       type={showNewPw ? 'text' : 'password'}
                       autoComplete="new-password"
                       value={newPassword}
@@ -485,6 +525,7 @@ export default function PersonalPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewPw(!showNewPw)}
+                      aria-label={showNewPw ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
                       className="absolute right-2 top-2 p-1.5 text-[#7A6A58]"
                     >
                       {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -493,11 +534,12 @@ export default function PersonalPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#7A6A58] mb-1">
+                  <label htmlFor="pw-confirm" className="block text-xs font-semibold text-[#7A6A58] mb-1">
                     Nhập lại mật khẩu mới
                   </label>
                   <div className="relative">
                     <input
+                      id="pw-confirm"
                       type={showConfirmPw ? 'text' : 'password'}
                       autoComplete="new-password"
                       value={confirmPassword}
@@ -508,6 +550,7 @@ export default function PersonalPage() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPw(!showConfirmPw)}
+                      aria-label={showConfirmPw ? 'Ẩn xác nhận mật khẩu' : 'Hiện xác nhận mật khẩu'}
                       className="absolute right-2 top-2 p-1.5 text-[#7A6A58]"
                     >
                       {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -530,10 +573,7 @@ export default function PersonalPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowPasswordForm(false);
-                      setPwError(null);
-                    }}
+                    onClick={resetPasswordForm}
                     className="px-4 py-2.5 bg-white border border-[#E9E4DC] hover:bg-neutral-50 text-[#2B2118] font-bold rounded-lg text-sm min-h-[44px] transition-colors"
                   >
                     Hủy
@@ -544,11 +584,12 @@ export default function PersonalPage() {
 
             {/* Nút Đăng xuất */}
             <button
+              ref={logoutTriggerRef}
               type="button"
               onClick={() => setShowLogoutModal(true)}
-              className="w-full inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg border border-[#D14B3A] bg-white px-4 py-3 text-[#D14B3A] font-bold text-sm hover:bg-red-50 active:scale-98 transition-colors"
+              className="w-full inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm hover:bg-neutral-50 active:scale-98 transition-colors"
             >
-              <LogOut className="w-4 h-4 text-[#D14B3A]" />
+              <LogOut className="w-4 h-4 text-[#7A6A58]" />
               <span>Đăng xuất</span>
             </button>
           </section>
@@ -562,11 +603,33 @@ export default function PersonalPage() {
 
       {/* Modal xác nhận đăng xuất */}
       {showLogoutModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => {
+            setShowLogoutModal(false);
+            logoutTriggerRef.current?.focus();
+          }}
+        >
           <div
             className="w-full max-w-sm bg-white rounded-lg p-6 shadow-xl space-y-4 text-center"
             role="dialog"
             aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Tab') {
+                const focusable = e.currentTarget.querySelectorAll<HTMLButtonElement>('button');
+                if (focusable.length < 2) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                  e.preventDefault();
+                  last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                  e.preventDefault();
+                  first.focus();
+                }
+              }
+            }}
           >
             <h2 className="text-lg font-bold text-[#2B2118]">Đăng xuất khỏi tài khoản này?</h2>
             <p className="text-xs text-[#7A6A58]">
@@ -581,8 +644,12 @@ export default function PersonalPage() {
                 Đăng xuất
               </button>
               <button
+                ref={cancelLogoutBtnRef}
                 type="button"
-                onClick={() => setShowLogoutModal(false)}
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  logoutTriggerRef.current?.focus();
+                }}
                 className="w-full py-3 bg-white border border-[#E9E4DC] hover:bg-neutral-50 text-[#2B2118] font-bold rounded-lg text-sm min-h-[48px] transition-colors"
               >
                 Ở lại
