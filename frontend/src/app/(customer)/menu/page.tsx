@@ -104,7 +104,7 @@ export default function MenuCustomerPage() {
 
         <button
           onClick={() => setIsCartOpen(true)}
-          className="relative p-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/30 transition-transform active:scale-95"
+          className="relative p-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/30 transition-transform active:scale-98"
         >
           <ShoppingBag className="h-5 w-5" />
           {getTotalItemCount() > 0 && (

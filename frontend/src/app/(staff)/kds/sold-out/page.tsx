@@ -277,7 +277,7 @@ export default function SoldOutPage() {
                             <button
                               type="button"
                               onClick={() => handleStepQty(d.dishId, -1)}
-                              className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-95 shadow-xs"
+                              className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-98 shadow-xs"
                               aria-label="Giảm số lượng"
                             >
                               &minus;
@@ -288,7 +288,7 @@ export default function SoldOutPage() {
                             <button
                               type="button"
                               onClick={() => handleStepQty(d.dishId, 1)}
-                              className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-95 shadow-xs"
+                              className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-98 shadow-xs"
                               aria-label="Tăng số lượng"
                             >
                               &#43;

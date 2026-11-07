@@ -42,7 +42,7 @@ export function StaffLayout({
                 key={item.href}
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex-1 min-h-[40px] rounded-md font-bold text-sm flex items-center justify-center transition-colors duration-140 ${
+                className={`flex-1 min-h-[40px] rounded-md font-bold text-sm flex items-center justify-center transition-colors duration-[140ms] ease-[cubic-bezier(0.2,0,0,1)] ${
                   isActive
                     ? 'bg-[#8C1D2C] text-white'
                     : 'text-[#2B2118] hover:bg-neutral-100'
@@ -78,7 +78,7 @@ export function StaffLayout({
               key={item.href}
               href={item.href}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center gap-1 text-[11px] min-h-[48px] ${
+              className={`flex flex-col items-center justify-center gap-1 text-[11px] min-h-[48px] transition-colors duration-[140ms] ease-[cubic-bezier(0.2,0,0,1)] ${
                 isActive
                   ? 'font-bold text-[#8C1D2C]'
                   : 'font-semibold text-[#7A6A58] hover:text-[#2B2118]'
