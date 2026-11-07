@@ -92,57 +92,25 @@ export default function StaffHomePage() {
     new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
 
   return (
-    <div className="min-h-screen bg-[var(--color-ops-bg,#F6F4F0)] text-ops-ink flex flex-col font-sans">
-      <div className="w-full max-w-[480px] md:max-w-4xl mx-auto flex-1 flex flex-col pb-28 md:pb-12 px-4 py-6">
-        {/* Header Lời chào & vai trò */}
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-[#2B2118]">
-              Xin chào, {staffUser?.fullName || 'Đầu bếp'}
-            </h1>
-            <p className="text-xs text-ops-muted mt-0.5">Thứ Năm, 05/11/2026</p>
-            <span className="inline-block mt-2 px-2.5 py-1 rounded bg-white border border-ops-border text-xs font-bold text-[#2B2118] shadow-xs">
-              {staffUser?.role === 'CHEF'
-                ? 'Đầu bếp · Bếp chính'
-                : staffUser?.role === 'MANAGER'
-                ? 'Quản lý · Nhà hàng'
-                : 'Nhân viên vận hành'}
-            </span>
-          </div>
+    <div className="w-full max-w-[480px] md:max-w-4xl mx-auto px-4 py-4">
+      {/* Header Lời chào & vai trò */}
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-[#2B2118]">
+            Xin chào, {staffUser?.fullName || 'Đầu bếp'}
+          </h1>
+          <p className="text-xs text-ops-muted mt-0.5">Thứ Năm, 05/11/2026</p>
+          <span className="inline-block mt-2 px-2.5 py-1 rounded bg-white border border-ops-border text-xs font-bold text-[#2B2118] shadow-xs">
+            {staffUser?.role === 'CHEF'
+              ? 'Đầu bếp · Bếp chính'
+              : staffUser?.role === 'MANAGER'
+              ? 'Quản lý · Nhà hàng'
+              : 'Nhân viên vận hành'}
+          </span>
         </div>
+      </div>
 
-        {/* Topnav cho bản Laptop (cao 40px) */}
-        <nav
-          className="hidden md:flex mb-6 bg-white border border-ops-border rounded-lg p-1 gap-1 shadow-xs"
-          aria-label="Điều hướng Staff Portal (bản laptop)"
-        >
-          <Link
-            href="/staff"
-            className="flex-1 min-h-[40px] rounded-md bg-[#8C1D2C] text-white font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Trang chủ
-          </Link>
-          <Link
-            href="/staff/schedule"
-            className="flex-1 min-h-[40px] rounded-md hover:bg-neutral-100 text-[#2B2118] font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Lịch ca
-          </Link>
-          <Link
-            href="/staff/payslip"
-            className="flex-1 min-h-[40px] rounded-md hover:bg-neutral-100 text-[#2B2118] font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Lương &amp; Tip
-          </Link>
-          <Link
-            href="/staff/personal"
-            className="flex-1 min-h-[40px] rounded-md hover:bg-neutral-100 text-[#2B2118] font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Cá nhân
-          </Link>
-        </nav>
-
-        {loading ? (
+      {loading ? (
           <div className="h-64 flex flex-col items-center justify-center gap-3 text-ops-muted">
             <RefreshCw className="h-8 w-8 animate-spin text-ops-brand" />
             <p className="text-sm font-semibold">Đang nạp dữ liệu bảng tin...</p>
@@ -379,42 +347,6 @@ export default function StaffHomePage() {
             </section>
           </div>
         )}
-      </div>
-
-      {/* Bottom Nav cố định cho mobile (cao 64-68px) */}
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-ops-border grid grid-cols-4 px-2 py-2 shadow-lg z-40"
-        aria-label="Điều hướng Staff Portal (bản điện thoại)"
-      >
-        <Link
-          href="/staff"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-bold text-[#8C1D2C] min-h-[48px]"
-        >
-          <Home className="h-5 w-5" />
-          <span>Trang chủ</span>
-        </Link>
-        <Link
-          href="/staff/schedule"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-ops-muted hover:text-ops-ink min-h-[48px]"
-        >
-          <Calendar className="h-5 w-5" />
-          <span>Lịch ca</span>
-        </Link>
-        <Link
-          href="/staff/payslip"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-ops-muted hover:text-ops-ink min-h-[48px]"
-        >
-          <DollarSign className="h-5 w-5" />
-          <span>Lương &amp; Tip</span>
-        </Link>
-        <Link
-          href="/staff/personal"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-ops-muted hover:text-ops-ink min-h-[48px]"
-        >
-          <User className="h-5 w-5" />
-          <span>Cá nhân</span>
-        </Link>
-      </nav>
     </div>
   );
 }

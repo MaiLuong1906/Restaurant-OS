@@ -222,57 +222,25 @@ export default function PersonalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F4F0] text-[#141210] flex flex-col font-sans">
-      <div className="w-full max-w-[480px] lg:max-w-4xl mx-auto flex-1 flex flex-col pb-28 lg:pb-12 px-4 py-4 space-y-4">
-        {/* Nút back về Trang chủ */}
-        <div>
-          <Link
-            href="/staff"
-            className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
-          >
-            <ArrowLeft className="w-4 h-4 text-[#2B2118]" />
-            <span>Trang chủ</span>
-          </Link>
-        </div>
-
-        {/* Tiêu đề trang */}
-        <div>
-          <h1 className="text-xl font-bold text-[#2B2118]">Cá nhân</h1>
-          <p className="text-xs text-[#7A6A58] mt-0.5">Thông tin hồ sơ và tài khoản của bạn</p>
-        </div>
-
-        {/* Top nav chỉ hiện ở bản Laptop */}
-        <nav
-          className="hidden lg:flex bg-white border border-[#E9E4DC] rounded-lg p-1 gap-1"
-          aria-label="Điều hướng Staff Portal (bản laptop)"
+    <div className="w-full max-w-[480px] lg:max-w-4xl mx-auto px-4 py-4 space-y-4">
+      {/* Nút back về Trang chủ */}
+      <div>
+        <Link
+          href="/staff"
+          className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
         >
-          <Link
-            href="/staff"
-            className="flex-1 min-h-[40px] rounded-md hover:bg-neutral-100 text-[#2B2118] font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Trang chủ
-          </Link>
-          <Link
-            href="/staff/schedule"
-            className="flex-1 min-h-[40px] rounded-md hover:bg-neutral-100 text-[#2B2118] font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Lịch ca
-          </Link>
-          <Link
-            href="/staff/payslip"
-            className="flex-1 min-h-[40px] rounded-md hover:bg-neutral-100 text-[#2B2118] font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Lương &amp; Tip
-          </Link>
-          <Link
-            href="/staff/personal"
-            className="flex-1 min-h-[40px] rounded-md bg-[#8C1D2C] text-white font-bold text-sm flex items-center justify-center transition-colors"
-          >
-            Cá nhân
-          </Link>
-        </nav>
+          <ArrowLeft className="w-4 h-4 text-[#2B2118]" />
+          <span>Trang chủ</span>
+        </Link>
+      </div>
 
-        {/* Lưới nội dung 2 cột laptop / 1 cột mobile */}
+      {/* Tiêu đề trang */}
+      <div>
+        <h1 className="text-xl font-bold text-[#2B2118]">Cá nhân</h1>
+        <p className="text-xs text-[#7A6A58] mt-0.5">Thông tin hồ sơ và tài khoản của bạn</p>
+      </div>
+
+      {/* Lưới nội dung 2 cột laptop / 1 cột mobile */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* ===== Khu vực 1: Hồ sơ ===== */}
           <section className="bg-white rounded-lg border border-[#E9E4DC] p-5 shadow-xs lg:col-span-2 space-y-4">
@@ -599,7 +567,6 @@ export default function PersonalPage() {
         <p className="text-center text-xs text-[#7A6A58] pt-4">
           Restaurant OS · Phiên bản 1.0
         </p>
-      </div>
 
       {/* Modal xác nhận đăng xuất */}
       {showLogoutModal && (
@@ -665,41 +632,6 @@ export default function PersonalPage() {
           {toastMessage}
         </div>
       )}
-
-      {/* Bottom Nav cố định cho mobile */}
-      <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E9E4DC] grid grid-cols-4 px-2 py-2 shadow-lg z-40"
-        aria-label="Điều hướng Staff Portal (bản điện thoại)"
-      >
-        <Link
-          href="/staff"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-[#7A6A58] hover:text-[#2B2118] min-h-[48px]"
-        >
-          <Home className="h-5 w-5" />
-          <span>Trang chủ</span>
-        </Link>
-        <Link
-          href="/staff/schedule"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-[#7A6A58] hover:text-[#2B2118] min-h-[48px]"
-        >
-          <Calendar className="h-5 w-5" />
-          <span>Lịch ca</span>
-        </Link>
-        <Link
-          href="/staff/payslip"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-[#7A6A58] hover:text-[#2B2118] min-h-[48px]"
-        >
-          <DollarSign className="h-5 w-5" />
-          <span>Lương &amp; Tip</span>
-        </Link>
-        <Link
-          href="/staff/personal"
-          className="flex flex-col items-center justify-center gap-1 text-[11px] font-bold text-[#8C1D2C] min-h-[48px]"
-        >
-          <User className="h-5 w-5" />
-          <span>Cá nhân</span>
-        </Link>
-      </nav>
     </div>
   );
 }
