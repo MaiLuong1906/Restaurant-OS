@@ -80,14 +80,14 @@ export function TicketDetailDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity"
+      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={`Chi tiết ${ticket.tableNo} - Ticket #${ticket.id}`}
     >
       <div
-        className="w-full max-w-[520px] min-w-[360px] md:min-w-[480px] bg-white h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-200"
+        className="w-full max-w-[520px] min-w-[360px] md:min-w-[480px] bg-white h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Scrollable Container (Khu vực 1, 2, 3) */}
@@ -106,7 +106,7 @@ export function TicketDetailDrawer({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-11 h-11 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 active:scale-95 flex items-center justify-center text-ops-ink shadow-xs transition-transform"
+                className="w-11 h-11 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 active:scale-98 flex items-center justify-center text-ops-ink shadow-xs transition-transform"
                 aria-label="Đóng drawer, quay lại hàng đợi (không đổi trạng thái ticket)"
               >
                 <X className="h-5 w-5" />

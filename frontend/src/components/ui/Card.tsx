@@ -10,13 +10,27 @@ import { cn } from '@/lib/utils';
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
   description?: string;
+  interactive?: boolean;
 }
 
-export function Card({ title, description, children, className, ...props }: CardProps) {
+export function Card({
+  title,
+  description,
+  children,
+  className,
+  interactive,
+  onClick,
+  ...props
+}: CardProps) {
+  const isInteractive = interactive ?? Boolean(onClick);
+
   return (
     <div
+      onClick={onClick}
       className={cn(
-        'flex flex-col gap-4 rounded-card border border-sand-200 bg-white p-6 shadow-warm break-words transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-warm-lg',
+        'flex flex-col gap-4 rounded-card border border-sand-200 bg-white p-6 shadow-warm break-words',
+        isInteractive &&
+          'cursor-pointer transition-[transform,box-shadow] duration-[200ms] ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 hover:shadow-warm-lg',
         className,
       )}
       {...props}
