@@ -487,3 +487,19 @@ export interface SwapPeerCandidate {
   zone: string;
 }
 
+export interface RecentAttendanceEntry {
+  id: string;
+  dateLabel: string;
+  time: string;
+  methodLabel: string; // 'Quét mặt' | 'Mã PIN'
+  statusLabel: string; // 'Đúng giờ' | 'Đi muộn'
+  isLate: boolean;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+

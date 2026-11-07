@@ -135,7 +135,7 @@ export default function StaffHomePage() {
             Lương &amp; Tip
           </Link>
           <Link
-            href="/staff"
+            href="/staff/personal"
             className="flex-1 min-h-[40px] rounded-md hover:bg-neutral-100 text-[#2B2118] font-bold text-sm flex items-center justify-center transition-colors"
           >
             Cá nhân
@@ -408,7 +408,7 @@ export default function StaffHomePage() {
           <span>Lương &amp; Tip</span>
         </Link>
         <Link
-          href="/staff"
+          href="/staff/personal"
           className="flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-ops-muted hover:text-ops-ink min-h-[48px]"
         >
           <User className="h-5 w-5" />

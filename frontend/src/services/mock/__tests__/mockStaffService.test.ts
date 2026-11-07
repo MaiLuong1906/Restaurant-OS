@@ -155,6 +155,33 @@ describe('MockStaffService', () => {
     expect(tipMonths[0].paymentStatus).toBe('UNPAID');
     expect(tipMonths[0].dailyEntries?.length).toBe(4);
   });
+
+  it('xử lý màn Cá nhân B14: getRecentAttendance, changePassword validation', async () => {
+    const recent = await service.getRecentAttendance();
+    expect(recent.length).toBe(3);
+    expect(recent[0].methodLabel).toBe('Quét mặt');
+    expect(recent[2].isLate).toBe(true);
+
+    // Test change password validation
+    await expect(
+      service.changePassword({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    ).rejects.toThrow();
+
+    await expect(
+      service.changePassword({ currentPassword: 'old', newPassword: '123', confirmPassword: '123' })
+    ).rejects.toThrow();
+
+    await expect(
+      service.changePassword({ currentPassword: 'oldpass', newPassword: 'newpass', confirmPassword: 'wrong' })
+    ).rejects.toThrow();
+
+    const successRes = await service.changePassword({
+      currentPassword: 'oldpassword',
+      newPassword: 'newpassword123',
+      confirmPassword: 'newpassword123',
+    });
+    expect(successRes.ok).toBe(true);
+  });
 });
 
 

@@ -376,3 +376,31 @@ export const MOCK_SWAP_PEERS: readonly import('../../../types').SwapPeerCandidat
   },
 ]);
 
+export const MOCK_RECENT_ATTENDANCE: readonly import('../../../types').RecentAttendanceEntry[] = Object.freeze([
+  {
+    id: 'att-rec-1',
+    dateLabel: '05/11',
+    time: '07:58',
+    methodLabel: 'Quét mặt',
+    statusLabel: 'Đúng giờ',
+    isLate: false,
+  },
+  {
+    id: 'att-rec-2',
+    dateLabel: '04/11',
+    time: '07:55',
+    methodLabel: 'Quét mặt',
+    statusLabel: 'Đúng giờ',
+    isLate: false,
+  },
+  {
+    id: 'att-rec-3',
+    dateLabel: '03/11',
+    time: '08:02',
+    methodLabel: 'Mã PIN',
+    statusLabel: 'Đi muộn',
+    isLate: true,
+  },
+]);
+
+

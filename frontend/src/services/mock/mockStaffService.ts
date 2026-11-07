@@ -21,6 +21,8 @@ import {
   CreateLeaveRequest,
   WithdrawLeaveRequest,
   TipMonthSummary,
+  RecentAttendanceEntry,
+  ChangePasswordRequest,
 } from '../../types';
 import {
   MOCK_SHIFTS,
@@ -34,6 +36,7 @@ import {
   MOCK_SHIFT_SWAPS,
   MOCK_SWAP_PEERS,
   MOCK_TIP_MONTHS,
+  MOCK_RECENT_ATTENDANCE,
 } from './data/staffMockData';
 import { simulateLatency, deepClone, createNotFoundError, createValidationError } from './mockUtils';
 import {
@@ -66,6 +69,8 @@ export interface StaffService {
   registerShift(req: RegisterShiftRequest): Promise<ShiftRegistration>;
   cancelRegistration(req: CancelRegistrationRequest): Promise<{ ok: boolean }>;
   createShiftSwap(req: CreateShiftSwapRequest): Promise<ShiftSwapRequest>;
+  getRecentAttendance(): Promise<RecentAttendanceEntry[]>;
+  changePassword(req: ChangePasswordRequest): Promise<{ ok: boolean }>;
 }
 
 export class MockStaffService implements StaffService {
@@ -520,6 +525,28 @@ export class MockStaffService implements StaffService {
 
     this.swaps.push(newSwap);
     return deepClone(newSwap);
+  }
+
+  async getRecentAttendance(): Promise<RecentAttendanceEntry[]> {
+    await simulateLatency(80);
+    return deepClone(MOCK_RECENT_ATTENDANCE as RecentAttendanceEntry[]);
+  }
+
+  async changePassword(req: ChangePasswordRequest): Promise<{ ok: boolean }> {
+    await simulateLatency(150);
+    if (!req.currentPassword || !req.newPassword || !req.confirmPassword) {
+      throw createValidationError('Vui lòng điền đầy đủ các trường mật khẩu');
+    }
+    if (req.newPassword.length < 6) {
+      throw createValidationError('Mật khẩu mới phải có tối thiểu 6 ký tự');
+    }
+    if (req.newPassword !== req.confirmPassword) {
+      throw createValidationError('Mật khẩu nhập lại không khớp với mật khẩu mới');
+    }
+    if (req.newPassword === req.currentPassword) {
+      throw createValidationError('Mật khẩu mới phải khác mật khẩu hiện tại');
+    }
+    return { ok: true };
   }
 }
 
