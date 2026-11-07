@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { ChefHat, Clock, Flame, CheckCircle2, RotateCcw, ArrowLeft, Layers } from 'lucide-react';
 import Link from 'next/link';
 
+import { OrderItem, OrderItemStatus } from '@/types';
+
 interface KdsItem {
   id: string;
   orderId: string;
@@ -11,7 +13,7 @@ interface KdsItem {
   dishName: string;
   quantity: number;
   modifiers: string[];
-  status: 'WAITING' | 'COOKING' | 'READY';
+  status: OrderItemStatus;
   elapsedMinutes: number;
 }
 
@@ -43,7 +45,7 @@ const INITIAL_KDS_ITEMS: KdsItem[] = [
     dishName: 'Phở Bò Đặc Biệt',
     quantity: 1,
     modifiers: [],
-    status: 'COOKING',
+    status: 'WAITING',
     elapsedMinutes: 8,
   },
   {
@@ -62,14 +64,13 @@ export default function KitchenDisplayScreen() {
   const [items, setItems] = useState<KdsItem[]>(INITIAL_KDS_ITEMS);
   const [viewMode, setViewMode] = useState<'COLUMNS' | 'BATCH'>('COLUMNS');
 
-  const updateStatus = (itemId: string, newStatus: 'WAITING' | 'COOKING' | 'READY') => {
+  const updateStatus = (itemId: string, newStatus: OrderItemStatus) => {
     setItems((prev) =>
       prev.map((it) => (it.id === itemId ? { ...it, status: newStatus } : it))
     );
   };
 
   const waitingItems = items.filter((i) => i.status === 'WAITING');
-  const cookingItems = items.filter((i) => i.status === 'COOKING');
   const readyItems = items.filter((i) => i.status === 'READY');
 
   // Dish Batching Summary: gom các món giống nhau để đầu bếp nấu hàng loạt
@@ -195,79 +196,21 @@ export default function KitchenDisplayScreen() {
                   )}
                 </div>
 
-                {/* Touch Target >= 48px chuẩn Rule 04 */}
-                <button
-                  onClick={() => updateStatus(item.id, 'COOKING')}
-                  className="mt-4 h-12 w-full rounded-xl bg-orange-600 hover:bg-orange-500 font-bold text-sm text-white flex items-center justify-center space-x-2 shadow-lg shadow-orange-600/30 active:scale-98 transition-transform"
-                >
-                  <Flame className="h-5 w-5" />
-                  <span>Bắt Đầu Nấu</span>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Cột 2: Đang nấu */}
-        <div className="flex flex-col rounded-2xl bg-[#121820] border border-[#263342] overflow-hidden">
-          <div className="p-4 border-b border-[#263342] bg-[#161E28] flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="h-3 w-3 rounded-full bg-blue-500 animate-pulse" />
-              <h2 className="font-bold text-sm text-slate-100">ĐANG NẤU (COOKING)</h2>
-            </div>
-            <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-400 font-bold text-xs">
-              {cookingItems.length}
-            </span>
-          </div>
-
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            {cookingItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-xl bg-[#1A222D] border border-blue-500/40 shadow-lg flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-extrabold text-xs">
-                      {item.tableNumber}
-                    </span>
-                    <span className="text-xs font-semibold text-blue-400 flex items-center space-x-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>{item.elapsedMinutes} phút</span>
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-xl font-black text-white">{item.quantity}x</span>
-                    <span className="text-base font-bold text-slate-100">{item.dishName}</span>
-                  </div>
-
-                  {item.modifiers.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {item.modifiers.map((m, idx) => (
-                        <p key={idx} className="text-xs text-amber-300 font-medium">
-                          &bull; {m}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Touch Target >= 48px */}
+                {/* Touch Target >= 48px chuẩn Rule 04: Chuyển thẳng sang READY */}
                 <button
                   onClick={() => updateStatus(item.id, 'READY')}
                   className="mt-4 h-12 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-sm text-white flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/30 active:scale-98 transition-transform"
                 >
                   <CheckCircle2 className="h-5 w-5" />
-                  <span>Xong & Ra Bàn</span>
+                  <span>Hoàn Tất Chế Biến</span>
                 </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Cột 3: Sẵn sàng phục vụ */}
-        <div className="flex flex-col rounded-2xl bg-[#121820] border border-[#263342] overflow-hidden">
+        {/* Cột 2: Sẵn sàng phục vụ (READY) */}
+        <div className="flex flex-col rounded-2xl bg-[#121820] border border-[#263342] overflow-hidden col-span-2">
           <div className="p-4 border-b border-[#263342] bg-[#161E28] flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <span className="h-3 w-3 rounded-full bg-emerald-500" />
@@ -302,14 +245,14 @@ export default function KitchenDisplayScreen() {
 
                 <div className="mt-4 flex items-center space-x-2">
                   <button
-                    onClick={() => updateStatus(item.id, 'COOKING')}
+                    onClick={() => updateStatus(item.id, 'WAITING')}
                     className="h-10 px-3 rounded-xl bg-[#263342] hover:bg-[#324357] text-xs font-semibold text-slate-300 flex items-center justify-center space-x-1"
                   >
                     <RotateCcw className="h-4 w-4" />
-                    <span>Nấu lại</span>
+                    <span>Làm lại</span>
                   </button>
                   <button
-                    onClick={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+                    onClick={() => updateStatus(item.id, 'SERVED')}
                     className="h-10 flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center justify-center"
                   >
                     Đã Bưng Xong

@@ -35,7 +35,7 @@ export interface RestaurantTable {
   status: TableStatus;
 }
 
-export type OrderItemStatus = 'WAITING' | 'COOKING' | 'READY' | 'SERVED' | 'REJECTED';
+export type OrderItemStatus = 'WAITING' | 'READY' | 'SERVED' | 'REJECTED';
 
 export interface OrderItem {
   id: string;
@@ -45,7 +45,7 @@ export interface OrderItem {
   dishId: string;
   dishName: string;
   quantity: number;
-  unitPrice: number; // VND
+  unitPrice: number; // VND integer
   modifiers: {
     name: string;
     selected: string;
@@ -53,10 +53,137 @@ export interface OrderItem {
   }[];
   notes?: string; // Ghi chú nấu nướng (ít ngọt, không cay...)
   allergy?: string; // Cảnh báo dị ứng thực phẩm
-  slaDeadline?: string; // Mốc thời gian trễ SLA
+  slaDeadline?: string; // Mốc thời gian trễ SLA (ISO string)
   stationId?: string; // Trạm bếp phụ trách
   status: OrderItemStatus;
   createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  orderId?: string;
+  tableId: string;
+  tableNo: string;
+  items: OrderItem[];
+  status?: OrderItemStatus;
+  slaDeadline?: string; // Earliest slaDeadline của các items
+  createdAt: string;
+  customerNotes?: string;
+}
+
+export interface Batch {
+  id: string;
+  dishId: string;
+  dishName: string;
+  totalQuantity: number;
+  notes?: string;
+  allergy?: string;
+  status: OrderItemStatus;
+  slaDeadline?: string; // Earliest slaDeadline của các items trong mẻ
+  itemIds: string[];
+  items: OrderItem[];
+}
+
+// --------------------------------------------------------------------
+// DTOs & Models cho Staff Portal & KDS Authentication
+// --------------------------------------------------------------------
+
+export type StaffRole = 'MANAGER' | 'CHEF' | 'STAFF' | 'CASHIER';
+
+export interface StaffUser {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  role: StaffRole;
+  avatarUrl?: string;
+  isActive: boolean;
+}
+
+export interface LoginRequest {
+  phoneNumber: string;
+  password?: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: StaffUser;
+  expiresIn?: number;
+}
+
+export interface KdsPinAuthRequest {
+  pin: string;
+  tabletId?: string;
+}
+
+export type ShiftStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'ABSENT' | 'SWAPPED';
+
+export interface Shift {
+  id: string;
+  staffId: string;
+  staffName: string;
+  role: StaffRole;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  zone?: string;
+  status: ShiftStatus;
+}
+
+export type AttendanceMethod = 'FACE_SCAN' | 'PIN';
+
+export interface AttendanceRecord {
+  id: string;
+  staffId: string;
+  shiftId: string;
+  date: string;
+  checkInTime: string;
+  checkOutTime?: string;
+  method: AttendanceMethod;
+  isLate: boolean;
+  lateMinutes: number;
+  note?: string;
+}
+
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type LeaveType = 'ANNUAL' | 'SICK' | 'UNPAID';
+
+export interface LeaveRequest {
+  id: string;
+  staffId: string;
+  staffName: string;
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: LeaveStatus;
+  approvedBy?: string;
+  createdAt: string;
+}
+
+export interface Payslip {
+  id: string;
+  staffId: string;
+  staffName: string;
+  month: string; // YYYY-MM
+  baseSalary: number; // VND integer
+  workedHours: number;
+  hourlyRate: number; // VND integer
+  allowance: number; // VND integer
+  bonus: number; // VND integer
+  tipAmount: number; // VND integer
+  deductions: number; // VND integer
+  netSalary: number; // VND integer (thực lĩnh)
+  paidAt?: string;
+}
+
+export interface TipRecord {
+  id: string;
+  staffId: string;
+  date: string; // YYYY-MM-DD
+  shiftId?: string;
+  poolAmount: number; // VND integer
+  allocatedAmount: number; // VND integer
+  note?: string;
 }
 
 export type OrderStatus = 'PLACED' | 'CONFIRMED' | 'PREPARING' | 'SERVED' | 'COMPLETED' | 'CANCELLED';
