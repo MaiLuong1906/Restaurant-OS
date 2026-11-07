@@ -92,7 +92,7 @@ export default function PosCashierPage() {
               const statusStyles = {
                 IDLE: 'border-slate-800 bg-slate-900/40 hover:border-slate-700 text-slate-400',
                 OCCUPIED: 'border-orange-500/40 bg-orange-950/20 text-orange-300',
-                BILLING: 'border-purple-500/50 bg-purple-950/30 text-purple-200 animate-pulse',
+                BILLING: 'border-purple-500/50 bg-purple-950/30 text-purple-200',
               }[table.status];
 
               return (

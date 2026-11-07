@@ -25,7 +25,7 @@ export default function TableQrEntryPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-950 via-slate-950 to-black text-white flex flex-col items-center justify-center p-6 text-center">
       <div className="relative mb-6">
-        <div className="h-24 w-24 rounded-3xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center shadow-2xl shadow-orange-500/40 animate-pulse">
+        <div className="h-24 w-24 rounded-3xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center shadow-2xl shadow-orange-500/40">
           <QrCode className="h-12 w-12 text-white" />
         </div>
       </div>
