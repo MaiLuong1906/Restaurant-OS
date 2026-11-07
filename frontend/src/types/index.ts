@@ -223,3 +223,82 @@ export interface ApiResponse<T> {
   };
   timestamp: string;
 }
+
+export type OrderChangeVariant = 'CANCEL_ITEM' | 'EDIT_NOTE';
+
+export interface OrderChangeAlertData {
+  id: string;
+  ticketId: string;
+  itemId: string;
+  dishName: string;
+  tableNo: string;
+  quantity: number;
+  variant: OrderChangeVariant;
+  reason?: string;
+  previousNote?: string;
+  newNote?: string;
+  acknowledged: boolean;
+  createdAt?: string;
+}
+
+export type DishAvailabilityStatus = 'AVAILABLE' | 'SOLD_OUT';
+
+export interface WaitingTableRef {
+  tableName: string;
+  ticketId: string;
+  quantity: number;
+}
+
+export interface DishAvailability {
+  dishId: string;
+  dishName: string;
+  status: DishAvailabilityStatus;
+  remainingPortions: number;
+  lastStock?: number;
+  waitingTables: WaitingTableRef[];
+  soldOutAt?: string;
+  markedBy?: string;
+}
+
+export type WasteReason =
+  | 'Nấu hỏng'
+  | 'Nguyên liệu hết hạn'
+  | 'Rơi vỡ'
+  | 'Khách trả lại'
+  | 'Lý do khác';
+
+export interface WasteDishOption {
+  dishId: string;
+  dishName: string;
+  stockQuantity: number;
+}
+
+export interface WasteTodayStats {
+  logCount: number;
+  portionCount: number;
+}
+
+export interface WasteLogEntry {
+  id: string;
+  dishId: string;
+  dishName: string;
+  quantity: number;
+  reason: WasteReason;
+  note?: string;
+  recordedById: string;
+  recordedByName: string;
+  recordedByRole: string;
+  recordedAt: string;
+  idempotencyKey: string;
+}
+
+export interface CreateWasteLogRequest {
+  dishId: string;
+  quantity: number;
+  reason: WasteReason;
+  note?: string;
+  recordedById?: string;
+  recordedByName?: string;
+  recordedByRole?: string;
+  idempotencyKey: string;
+}
