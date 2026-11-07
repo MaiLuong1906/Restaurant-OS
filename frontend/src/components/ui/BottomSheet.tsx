@@ -30,7 +30,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-brown-900/60"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-brown-900/60 animate-in fade-in duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
       onClick={onClose}
       role="presentation"
     >
@@ -39,7 +39,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-warm-lg',
+          'max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-warm-lg animate-in slide-in-from-bottom duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
           className,
         )}
         onClick={(e) => e.stopPropagation()}

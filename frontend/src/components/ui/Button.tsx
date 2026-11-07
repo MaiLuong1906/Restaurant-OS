@@ -56,7 +56,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-playful font-semibold transition-[transform,box-shadow,background-color,border-color] duration-200 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-cream disabled:cursor-not-allowed disabled:hover:scale-100',
+        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-playful font-semibold transition-[transform,box-shadow,background-color,border-color] duration-[140ms] ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-px active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-cream disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:scale-100',
         variants[variant],
         sizes[size],
         className,
