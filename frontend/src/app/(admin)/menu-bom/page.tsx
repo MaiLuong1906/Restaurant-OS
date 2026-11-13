@@ -40,7 +40,7 @@ const INITIAL_DISHES: DishItem[] = [
     category: 'Món Chính / À la carte',
     price: 480000,
     isAvailable: true,
-    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300&auto=format&fit=crop&q=80',
     ingredients: [
       { id: 'ing-1', name: 'Thịt bò Wagyu Nhật A4', sku: 'RAW-WAGYU-A4', grossQty: 0.22, netQty: 0.20, unit: 'kg', unitCost: 650000, yieldLossPct: 9.1 },
       { id: 'ing-2', name: 'Nấm Truffle đen ngâm dầu', sku: 'RAW-TRUFFLE-OIL', grossQty: 0.015, netQty: 0.015, unit: 'lít', unitCost: 1200000, yieldLossPct: 0.0 },
@@ -54,7 +54,7 @@ const INITIAL_DISHES: DishItem[] = [
     category: 'Cơm Đặc Biệt',
     price: 360000,
     isAvailable: true,
-    image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=150&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=300&auto=format&fit=crop&q=80',
     ingredients: [
       { id: 'ing-21', name: 'Thịt đùi cừu New Zealand', sku: 'RAW-LAMB-NZ', grossQty: 0.25, netQty: 0.22, unit: 'kg', unitCost: 320000, yieldLossPct: 12.0 },
       { id: 'ing-22', name: 'Gạo thơm Basmati Ấn Độ', sku: 'RAW-RICE-BASMATI', grossQty: 0.15, netQty: 0.15, unit: 'kg', unitCost: 65000, yieldLossPct: 0.0 },
@@ -67,7 +67,7 @@ const INITIAL_DISHES: DishItem[] = [
     category: 'Món Nướng Lò Đất',
     price: 420000,
     isAvailable: true,
-    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=150&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&auto=format&fit=crop&q=80',
     ingredients: [
       { id: 'ing-31', name: 'Tôm sú tươi loại 1 (King Prawn)', sku: 'RAW-PRAWN-K1', grossQty: 0.30, netQty: 0.24, unit: 'kg', unitCost: 380000, yieldLossPct: 20.0 },
       { id: 'ing-32', name: 'Sốt sữa chua ướp Masala', sku: 'RAW-YOGURT-MASALA', grossQty: 0.08, netQty: 0.08, unit: 'lít', unitCost: 120000, yieldLossPct: 0.0 },
@@ -79,7 +79,7 @@ const INITIAL_DISHES: DishItem[] = [
     category: 'Rượu Vang Hảo Hạng',
     price: 8500000,
     isAvailable: true,
-    image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=150&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=300&auto=format&fit=crop&q=80',
     ingredients: [
       { id: 'ing-41', name: 'Rượu vang Château Margaux 2015', sku: 'WINE-MARGAUX-15', grossQty: 1.0, netQty: 1.0, unit: 'chai', unitCost: 3570000, yieldLossPct: 0.0 },
     ],
@@ -318,7 +318,7 @@ export default function AdminMenuBomPage() {
                         <img
                           src={dish.image}
                           alt={dish.name}
-                          className="w-12 h-12 rounded-lg object-cover aspect-square border border-stone-200 shrink-0"
+                          className="w-14 h-14 rounded-lg object-cover aspect-square border border-stone-200 shrink-0 shadow-2xs bg-stone-100"
                         />
                         <div>
                           <strong className="text-stone-900 text-sm font-bold block">{dish.name}</strong>
@@ -331,17 +331,33 @@ export default function AdminMenuBomPage() {
                         </div>
                       </div>
 
-                      {/* Availability Toggle */}
+                      {/* Availability Toggle Switch */}
                       <button
+                        type="button"
+                        role="switch"
+                        aria-checked={dish.isAvailable}
                         onClick={(e) => handleToggleSoldOut(dish.id, e)}
-                        className={`px-2.5 py-1 rounded text-xs font-bold shrink-0 border cursor-pointer transition-colors ${
-                          dish.isAvailable
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                            : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
-                        }`}
-                        title="Nhấp để bật/tắt trạng thái mở bán"
+                        className="flex items-center gap-2 group cursor-pointer shrink-0 px-2 py-1 rounded-lg hover:bg-stone-100 transition-colors"
+                        title={dish.isAvailable ? 'Món đang mở bán (Bấm để tạm dừng)' : 'Món đang tạm hết (Bấm để mở bán lại)'}
                       >
-                        {dish.isAvailable ? 'Đang Bán' : 'Tạm Hết Món'}
+                        <span
+                          className={`text-xs font-bold transition-colors ${
+                            dish.isAvailable ? 'text-emerald-700' : 'text-stone-500'
+                          }`}
+                        >
+                          {dish.isAvailable ? 'Đang bán' : 'Tạm hết'}
+                        </span>
+                        <div
+                          className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors ${
+                            dish.isAvailable ? 'bg-emerald-600' : 'bg-stone-300'
+                          }`}
+                        >
+                          <div
+                            className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                              dish.isAvailable ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </div>
                       </button>
                     </div>
                   );
@@ -404,7 +420,7 @@ export default function AdminMenuBomPage() {
                 <thead>
                   <tr className="bg-stone-100 border-y border-stone-200 text-stone-700 font-mono text-xs uppercase">
                     <th className="py-3 px-3 font-bold">Nguyên Liệu & SKU</th>
-                    <th className="py-3 px-2 font-bold text-right">Định Lượng Thô</th>
+                    <th className="py-3 px-3 font-bold text-right">Định Lượng Thô</th>
                     <th className="py-3 px-2 font-bold text-right">Hao Hụt %</th>
                     <th className="py-3 px-2 font-bold text-right">Đơn Giá</th>
                     <th className="py-3 px-3 font-bold text-right">Thành Tiền</th>
@@ -420,15 +436,19 @@ export default function AdminMenuBomPage() {
                           <strong className="text-stone-900 block font-bold text-xs">{ing.name}</strong>
                           <span className="font-mono text-xs text-stone-500 font-medium">{ing.sku}</span>
                         </td>
-                        <td className="py-3 px-2 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={ing.grossQty}
-                            onChange={(e) => handleUpdateQty(ing.id, Number(e.target.value) || 0)}
-                            className="w-20 px-2 py-1 bg-white border border-stone-300 rounded text-right font-mono text-xs font-bold text-stone-900 focus:outline-none focus:border-ops-brand shadow-2xs"
-                          />
-                          <span className="text-xs text-stone-600 font-medium ml-1.5">{ing.unit}</span>
+                        <td className="py-3 px-3 text-right">
+                          <div className="inline-flex items-center justify-end bg-white border border-stone-300 rounded-lg px-2 py-1 shadow-2xs w-28 focus-within:border-ops-brand focus-within:ring-1 focus-within:ring-ops-brand transition-all">
+                            <input
+                              type="number"
+                              step="0.001"
+                              value={ing.grossQty}
+                              onChange={(e) => handleUpdateQty(ing.id, Number(e.target.value) || 0)}
+                              className="w-16 text-right font-mono text-xs font-bold text-stone-900 outline-none bg-transparent"
+                            />
+                            <span className="text-xs text-stone-500 font-semibold w-7 text-left pl-1.5 border-l border-stone-200 ml-1">
+                              {ing.unit}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-3 px-2 text-right text-stone-700 font-semibold">
                           {ing.yieldLossPct}%
@@ -442,8 +462,9 @@ export default function AdminMenuBomPage() {
                         <td className="py-3 px-2 text-center">
                           <button
                             onClick={() => handleRemoveIngredient(ing.id)}
-                            className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                            className="p-1.5 text-stone-500 hover:text-rose-600 hover:bg-rose-50 border border-stone-200 hover:border-rose-200 rounded-lg transition-all cursor-pointer shadow-2xs"
                             title="Xóa nguyên liệu khỏi BOM"
+                            aria-label="Xóa nguyên liệu"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
