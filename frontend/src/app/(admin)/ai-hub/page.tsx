@@ -2,24 +2,13 @@
 
 import * as React from 'react';
 import {
-  Sparkles,
   Wifi,
   Printer,
   Mic,
   QrCode,
   Zap,
   Cpu,
-  RefreshCw,
-  Power,
-  CheckCircle2,
-  AlertTriangle,
   Radio,
-  Volume2,
-  ArrowRight,
-  Send,
-  Plus,
-  Minus,
-  Check,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 

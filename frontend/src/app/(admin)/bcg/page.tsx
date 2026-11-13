@@ -3,16 +3,12 @@
 import * as React from 'react';
 import {
   Sparkles,
-  LayoutGrid,
   Star,
   Coins,
   HelpCircle,
   AlertOctagon,
-  ArrowUpRight,
-  TrendingUp,
   Filter,
   X,
-  Pencil,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 

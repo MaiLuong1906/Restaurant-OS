@@ -2,19 +2,10 @@
 
 import * as React from 'react';
 import {
-  Boxes,
-  Plus,
   Truck,
   CheckSquare,
-  AlertTriangle,
   Search,
-  CheckCircle2,
   X,
-  FileText,
-  Thermometer,
-  Scale,
-  RefreshCw,
-  Archive,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 

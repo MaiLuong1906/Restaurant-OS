@@ -8,14 +8,9 @@ import {
   UserPlus,
   CheckCircle2,
   XCircle,
-  Pencil,
-  RotateCcw,
   X,
-  Lock,
   Search,
   KeyRound,
-  UserCheck,
-  UserX,
 } from 'lucide-react';
 
 interface UserAccount {

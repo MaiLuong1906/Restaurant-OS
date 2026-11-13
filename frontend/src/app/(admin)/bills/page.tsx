@@ -8,17 +8,13 @@ import {
   Printer,
   Download,
   Eye,
-  AlertTriangle,
   CheckCircle2,
-  Clock,
   Ban,
   Receipt,
   QrCode,
-  ArrowUpDown,
   Lock,
   X,
   Send,
-  Calendar,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 
@@ -45,6 +41,7 @@ interface Bill {
   paymentMethod: 'VIETQR DYNAMIC' | 'THẺ TÍN DỤNG' | 'TIỀN MẶT' | 'CHUYỂN KHOẢN';
   status: 'PAID' | 'PENDING' | 'VOIDED' | 'REFUNDED';
   cqtVerified: boolean;
+  voidReason?: string;
 }
 
 const INITIAL_BILLS: Bill[] = [
@@ -196,6 +193,7 @@ const INITIAL_BILLS: Bill[] = [
 ];
 
 export default function AdminBillsPage() {
+  const MANAGER_PIN = '1234'; // PIN demo — thay bằng xác thực API trong production
   const [bills, setBills] = React.useState<Bill[]>(INITIAL_BILLS);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
@@ -227,10 +225,14 @@ export default function AdminBillsPage() {
       showToast('Vui lòng nhập đủ 4 chữ số PIN Quản lý!');
       return;
     }
+    if (pin !== MANAGER_PIN) {
+      showToast('PIN không đúng');
+      return;
+    }
     if (!voidBillId) return;
 
     setBills((prev) =>
-      prev.map((b) => (b.id === voidBillId ? { ...b, status: 'VOIDED', cqtVerified: false } : b))
+      prev.map((b) => (b.id === voidBillId ? { ...b, status: 'VOIDED', cqtVerified: false, voidReason: voidReason } : b))
     );
     setVoidModalOpen(false);
     showToast(`Đã duyệt hủy hóa đơn ${voidBillId} thành công và hoàn nguyên định lượng kho BOM!`);
@@ -535,6 +537,9 @@ export default function AdminBillsPage() {
                           <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-200 rounded font-mono text-xs font-bold">
                             ĐÃ HỦY (VOID)
                           </span>
+                        )}
+                        {bill.status === 'VOIDED' && bill.voidReason && (
+                          <span className="text-xs text-stone-500 block mt-0.5">{bill.voidReason}</span>
                         )}
                       </td>
                       <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>

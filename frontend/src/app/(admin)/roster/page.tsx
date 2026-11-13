@@ -11,11 +11,7 @@ import {
   Zap,
   Plus,
   X,
-  Check,
-  Clock,
-  ArrowRightLeft,
   CalendarDays,
-  Pencil,
 } from 'lucide-react';
 
 interface ApprovalItem {

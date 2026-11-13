@@ -3,14 +3,9 @@
 import * as React from 'react';
 import Link from 'next/link';
 import {
-  TrendingUp,
-  AlertTriangle,
-  Clock,
   ArrowRight,
   ShieldAlert,
   Receipt,
-  CheckCircle2,
-  TableProperties,
   X,
   Lock,
   Search,
@@ -32,6 +27,7 @@ interface DashboardAction {
 }
 
 export default function AdminDashboardPage() {
+  const MANAGER_PIN = '1234'; // PIN demo
   const [period, setPeriod] = React.useState<'live' | 'week' | 'month'>('live');
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
 
@@ -209,6 +205,10 @@ export default function AdminDashboardPage() {
     const pin = pinDigits.join('');
     if (pin.length < 4) {
       showToast('Vui lòng nhập đủ 4 chữ số PIN Quản lý');
+      return;
+    }
+    if (pin !== MANAGER_PIN) {
+      showToast('PIN không đúng');
       return;
     }
     setActions((prev) =>

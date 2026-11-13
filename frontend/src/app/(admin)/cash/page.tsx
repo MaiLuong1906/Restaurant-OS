@@ -1,20 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import {
   PlusCircle,
   Lock,
-  Receipt,
-  CheckCircle2,
-  AlertTriangle,
   X,
-  ShieldCheck,
-  Clock,
-  DollarSign,
-  FileText,
   Search,
-  Printer,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 

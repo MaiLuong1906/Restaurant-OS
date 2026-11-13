@@ -1,20 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import {
   Split,
   Plus,
-  Users,
   Clock,
   Printer,
   Receipt,
   X,
-  CheckCircle2,
-  AlertTriangle,
-  UserPlus,
-  ArrowRight,
-  ShieldAlert,
   CalendarDays,
   CreditCard,
 } from 'lucide-react';

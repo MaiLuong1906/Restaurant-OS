@@ -2,16 +2,9 @@
 
 import * as React from 'react';
 import {
-  Landmark,
   Download,
-  FileText,
   TrendingUp,
-  CheckCircle2,
-  AlertCircle,
   Sparkles,
-  Calendar,
-  DollarSign,
-  PieChart,
   X,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
