@@ -274,210 +274,214 @@ export default function AdminMenuBomPage() {
         </div>
 
         {/* 2-Column Split: Catalog Left (5 cols) & BOM Formulation Right (7 cols) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
           {/* Left Column: Dish Catalog (5 cols) */}
-          <div className="lg:col-span-5 flex flex-col gap-4">
-            <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-stone-200">
-                <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">
-                  Danh Mục Món Ăn ({filteredDishes.length})
-                </span>
-                <span className="text-xs font-semibold text-stone-500">Chọn món xem công thức BOM</span>
-              </div>
+          <div className="lg:col-span-5 flex flex-col h-full">
+            <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-2xs space-y-3 h-full flex flex-col justify-between">
+              <div className="space-y-3 flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between pb-2 border-b border-stone-200 shrink-0">
+                  <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">
+                    Danh Mục Món Ăn ({filteredDishes.length})
+                  </span>
+                  <span className="text-xs font-semibold text-stone-500">Chọn món xem công thức BOM</span>
+                </div>
 
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm món ăn, nhóm thực đơn..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-sans text-stone-900 placeholder:text-stone-500 focus:outline-none focus:border-ops-brand"
-                />
-              </div>
+                {/* Search Bar */}
+                <div className="relative shrink-0">
+                  <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm món ăn, nhóm thực đơn..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-sans text-stone-900 placeholder:text-stone-500 focus:outline-none focus:border-ops-brand"
+                  />
+                </div>
 
-              {/* Dishes List */}
-              <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
-                {filteredDishes.map((dish) => {
-                  const dishCogs = Math.round(
-                    dish.ingredients.reduce((sum, ing) => sum + ing.grossQty * ing.unitCost, 0)
-                  );
-                  const isCurrent = dish.id === selectedDish.id;
-                  return (
-                    <div
-                      key={dish.id}
-                      onClick={() => setSelectedDishId(dish.id)}
-                      className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                        isCurrent
-                          ? 'bg-stone-50 border-ops-brand shadow-xs'
-                          : 'bg-white border-stone-200 hover:bg-stone-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={dish.image}
-                          alt={dish.name}
-                          className="w-14 h-14 rounded-lg object-cover aspect-square border border-stone-200 shrink-0 shadow-2xs bg-stone-100"
-                        />
-                        <div>
-                          <strong className="text-stone-900 text-sm font-bold block">{dish.name}</strong>
-                          <span className="text-xs text-stone-600 font-medium">{dish.category}</span>
-                          <div className="flex items-center gap-2 pt-1 font-mono text-xs">
-                            <span className="font-extrabold text-stone-900">{formatVND(dish.price)}</span>
-                            <span className="text-stone-400">•</span>
-                            <span className="text-stone-600 font-semibold">Cost: {formatVND(dishCogs)}</span>
+                {/* Dishes List */}
+                <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+                  {filteredDishes.map((dish) => {
+                    const dishCogs = Math.round(
+                      dish.ingredients.reduce((sum, ing) => sum + ing.grossQty * ing.unitCost, 0)
+                    );
+                    const isCurrent = dish.id === selectedDish.id;
+                    return (
+                      <div
+                        key={dish.id}
+                        onClick={() => setSelectedDishId(dish.id)}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                          isCurrent
+                            ? 'bg-stone-50 border-ops-brand shadow-xs'
+                            : 'bg-white border-stone-200 hover:bg-stone-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={dish.image}
+                            alt={dish.name}
+                            className="w-14 h-14 rounded-lg object-cover aspect-square border border-stone-200 shrink-0 shadow-2xs bg-stone-100"
+                          />
+                          <div>
+                            <strong className="text-stone-900 text-sm font-bold block">{dish.name}</strong>
+                            <span className="text-xs text-stone-600 font-medium">{dish.category}</span>
+                            <div className="flex items-center gap-2 pt-1 font-mono text-xs">
+                              <span className="font-extrabold text-stone-900">{formatVND(dish.price)}</span>
+                              <span className="text-stone-400">•</span>
+                              <span className="text-stone-600 font-semibold">Cost: {formatVND(dishCogs)}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Availability Toggle Switch */}
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={dish.isAvailable}
-                        onClick={(e) => handleToggleSoldOut(dish.id, e)}
-                        className="flex items-center gap-2 group cursor-pointer shrink-0 px-2 py-1 rounded-lg hover:bg-stone-100 transition-colors"
-                        title={dish.isAvailable ? 'Món đang mở bán (Bấm để tạm dừng)' : 'Món đang tạm hết (Bấm để mở bán lại)'}
-                      >
-                        <span
-                          className={`text-xs font-bold transition-colors ${
-                            dish.isAvailable ? 'text-emerald-700' : 'text-stone-500'
-                          }`}
+                        {/* Availability Toggle Switch */}
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={dish.isAvailable}
+                          onClick={(e) => handleToggleSoldOut(dish.id, e)}
+                          className="flex items-center gap-2 group cursor-pointer shrink-0 px-2 py-1 rounded-lg hover:bg-stone-100 transition-colors"
+                          title={dish.isAvailable ? 'Món đang mở bán (Bấm để tạm dừng)' : 'Món đang tạm hết (Bấm để mở bán lại)'}
                         >
-                          {dish.isAvailable ? 'Đang bán' : 'Tạm hết'}
-                        </span>
-                        <div
-                          className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors ${
-                            dish.isAvailable ? 'bg-emerald-600' : 'bg-stone-300'
-                          }`}
-                        >
-                          <div
-                            className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                              dish.isAvailable ? 'translate-x-4' : 'translate-x-0'
+                          <span
+                            className={`text-xs font-bold transition-colors ${
+                              dish.isAvailable ? 'text-emerald-700' : 'text-stone-500'
                             }`}
-                          />
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
+                          >
+                            {dish.isAvailable ? 'Đang bán' : 'Tạm hết'}
+                          </span>
+                          <div
+                            className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors ${
+                              dish.isAvailable ? 'bg-emerald-600' : 'bg-stone-300'
+                            }`}
+                          >
+                            <div
+                              className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                                dish.isAvailable ? 'translate-x-4' : 'translate-x-0'
+                              }`}
+                            />
+                          </div>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Right Column: BOM Formulation & Food Cost Editor (7 cols) */}
-          <div className="lg:col-span-7 bg-white rounded-xl border border-stone-200 p-5 sm:p-6 shadow-2xs space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-200">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-ops text-lg font-bold text-stone-900">{selectedDish.name}</h2>
-                  <span className="px-2 py-0.5 rounded bg-stone-100 text-stone-700 font-mono text-xs font-bold border border-stone-200">
-                    {selectedDish.category}
+          <div className="lg:col-span-7 bg-white rounded-xl border border-stone-200 p-5 sm:p-6 shadow-2xs space-y-4 h-full flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-200">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-ops text-lg font-bold text-stone-900">{selectedDish.name}</h2>
+                    <span className="px-2 py-0.5 rounded bg-stone-100 text-stone-700 font-mono text-xs font-bold border border-stone-200">
+                      {selectedDish.category}
+                    </span>
+                  </div>
+                  <span className="text-xs font-semibold text-stone-600">Định lượng tiêu chuẩn cho 01 suất phục vụ</span>
+                </div>
+
+                <button
+                  onClick={handleAddIngredient}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 border border-stone-200 hover:bg-stone-200 text-stone-800 rounded-lg font-mono text-xs uppercase font-bold cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 text-ops-brand" />
+                  <span>Thêm Nguyên Liệu</span>
+                </button>
+              </div>
+
+              {/* Financial Summary Ribbon */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-stone-50 rounded-xl border border-stone-200">
+                <div>
+                  <span className="font-mono text-xs uppercase text-stone-600 block font-bold tracking-wider">Giá Bán Niêm Yết</span>
+                  <span className="font-mono text-lg font-extrabold text-stone-900 mt-1 block">
+                    {formatVND(selectedDish.price)}
                   </span>
                 </div>
-                <span className="text-xs font-semibold text-stone-600">Định lượng tiêu chuẩn cho 01 suất phục vụ</span>
+                <div>
+                  <span className="font-mono text-xs uppercase text-stone-600 block font-bold tracking-wider">Tổng Giá Vốn (COGS)</span>
+                  <span className="font-mono text-lg font-extrabold text-ops-brand mt-1 block">
+                    {formatVND(totalCogs)}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-mono text-xs uppercase text-stone-600 block font-bold tracking-wider">Tỷ Lệ Food Cost</span>
+                  <span
+                    className={`font-mono text-lg font-extrabold mt-1 block ${
+                      foodCostPct <= 32 ? 'text-emerald-700' : 'text-rose-700'
+                    }`}
+                  >
+                    {foodCostPct}% {foodCostPct <= 32 ? '(Đạt chuẩn)' : '(Vượt target 32%)'}
+                  </span>
+                </div>
               </div>
 
-              <button
-                onClick={handleAddIngredient}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 border border-stone-200 hover:bg-stone-200 text-stone-800 rounded-lg font-mono text-xs uppercase font-bold cursor-pointer transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5 text-ops-brand" />
-                <span>Thêm Nguyên Liệu</span>
-              </button>
-            </div>
-
-            {/* Financial Summary Ribbon */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-stone-50 rounded-xl border border-stone-200">
-              <div>
-                <span className="font-mono text-xs uppercase text-stone-600 block font-bold tracking-wider">Giá Bán Niêm Yết</span>
-                <span className="font-mono text-lg font-extrabold text-stone-900 mt-1 block">
-                  {formatVND(selectedDish.price)}
-                </span>
+              {/* Ingredients BOM Table with fixed scrollable height */}
+              <div className="overflow-x-auto h-[245px] overflow-y-auto border border-stone-200 rounded-lg shadow-2xs bg-white">
+                <table className="w-full text-left text-xs border-collapse min-w-[550px]">
+                  <thead className="sticky top-0 z-10 bg-stone-100 shadow-2xs">
+                    <tr className="border-b border-stone-200 text-stone-700 font-mono text-xs uppercase">
+                      <th className="py-3 px-3 font-bold bg-stone-100">Nguyên Liệu & SKU</th>
+                      <th className="py-3 px-3 font-bold text-right bg-stone-100">Định Lượng Thô</th>
+                      <th className="py-3 px-2 font-bold text-right bg-stone-100">Hao Hụt %</th>
+                      <th className="py-3 px-2 font-bold text-right bg-stone-100">Đơn Giá</th>
+                      <th className="py-3 px-3 font-bold text-right bg-stone-100">Thành Tiền</th>
+                      <th className="py-3 px-2 text-center font-bold bg-stone-100">Xóa</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-200 font-mono">
+                    {selectedDish.ingredients.map((ing) => {
+                      const lineCost = Math.round(ing.grossQty * ing.unitCost);
+                      return (
+                        <tr key={ing.id} className="hover:bg-stone-50 transition-colors">
+                          <td className="py-3 px-3 font-sans">
+                            <strong className="text-stone-900 block font-bold text-xs">{ing.name}</strong>
+                            <span className="font-mono text-xs text-stone-500 font-medium">{ing.sku}</span>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="inline-flex items-center justify-end bg-white border border-stone-300 rounded-lg px-2 py-1 shadow-2xs w-28 focus-within:border-ops-brand focus-within:ring-1 focus-within:ring-ops-brand transition-all">
+                              <input
+                                type="number"
+                                step="0.001"
+                                value={ing.grossQty}
+                                onChange={(e) => handleUpdateQty(ing.id, Number(e.target.value) || 0)}
+                                className="w-16 text-right font-mono text-xs font-bold text-stone-900 outline-none bg-transparent"
+                              />
+                              <span className="text-xs text-stone-500 font-semibold w-7 text-left pl-1.5 border-l border-stone-200 ml-1">
+                                {ing.unit}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-right text-stone-700 font-semibold">
+                            {ing.yieldLossPct}%
+                          </td>
+                          <td className="py-3 px-2 text-right text-stone-700 font-semibold">
+                            {formatVND(ing.unitCost)}
+                          </td>
+                          <td className="py-3 px-3 text-right font-extrabold text-stone-900 text-xs">
+                            {formatVND(lineCost)}
+                          </td>
+                          <td className="py-3 px-2 text-center">
+                            <button
+                              onClick={() => handleRemoveIngredient(ing.id)}
+                              className="p-1.5 text-stone-500 hover:text-rose-600 hover:bg-rose-50 border border-stone-200 hover:border-rose-200 rounded-lg transition-all cursor-pointer shadow-2xs"
+                              title="Xóa nguyên liệu khỏi BOM"
+                              aria-label="Xóa nguyên liệu"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <span className="font-mono text-xs uppercase text-stone-600 block font-bold tracking-wider">Tổng Giá Vốn (COGS)</span>
-                <span className="font-mono text-lg font-extrabold text-ops-brand mt-1 block">
-                  {formatVND(totalCogs)}
-                </span>
-              </div>
-              <div>
-                <span className="font-mono text-xs uppercase text-stone-600 block font-bold tracking-wider">Tỷ Lệ Food Cost</span>
-                <span
-                  className={`font-mono text-lg font-extrabold mt-1 block ${
-                    foodCostPct <= 32 ? 'text-emerald-700' : 'text-rose-700'
-                  }`}
-                >
-                  {foodCostPct}% {foodCostPct <= 32 ? '(Đạt chuẩn)' : '(Vượt target 32%)'}
-                </span>
-              </div>
-            </div>
-
-            {/* Ingredients BOM Table with dedicated vertical scrollbar */}
-            <div className="overflow-x-auto max-h-[380px] overflow-y-auto border border-stone-200 rounded-lg shadow-2xs">
-              <table className="w-full text-left text-xs border-collapse min-w-[550px]">
-                <thead className="sticky top-0 z-10 bg-stone-100 shadow-2xs">
-                  <tr className="border-b border-stone-200 text-stone-700 font-mono text-xs uppercase">
-                    <th className="py-3 px-3 font-bold bg-stone-100">Nguyên Liệu & SKU</th>
-                    <th className="py-3 px-3 font-bold text-right bg-stone-100">Định Lượng Thô</th>
-                    <th className="py-3 px-2 font-bold text-right bg-stone-100">Hao Hụt %</th>
-                    <th className="py-3 px-2 font-bold text-right bg-stone-100">Đơn Giá</th>
-                    <th className="py-3 px-3 font-bold text-right bg-stone-100">Thành Tiền</th>
-                    <th className="py-3 px-2 text-center font-bold bg-stone-100">Xóa</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-200 font-mono">
-                  {selectedDish.ingredients.map((ing) => {
-                    const lineCost = Math.round(ing.grossQty * ing.unitCost);
-                    return (
-                      <tr key={ing.id} className="hover:bg-stone-50 transition-colors">
-                        <td className="py-3 px-3 font-sans">
-                          <strong className="text-stone-900 block font-bold text-xs">{ing.name}</strong>
-                          <span className="font-mono text-xs text-stone-500 font-medium">{ing.sku}</span>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <div className="inline-flex items-center justify-end bg-white border border-stone-300 rounded-lg px-2 py-1 shadow-2xs w-28 focus-within:border-ops-brand focus-within:ring-1 focus-within:ring-ops-brand transition-all">
-                            <input
-                              type="number"
-                              step="0.001"
-                              value={ing.grossQty}
-                              onChange={(e) => handleUpdateQty(ing.id, Number(e.target.value) || 0)}
-                              className="w-16 text-right font-mono text-xs font-bold text-stone-900 outline-none bg-transparent"
-                            />
-                            <span className="text-xs text-stone-500 font-semibold w-7 text-left pl-1.5 border-l border-stone-200 ml-1">
-                              {ing.unit}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2 text-right text-stone-700 font-semibold">
-                          {ing.yieldLossPct}%
-                        </td>
-                        <td className="py-3 px-2 text-right text-stone-700 font-semibold">
-                          {formatVND(ing.unitCost)}
-                        </td>
-                        <td className="py-3 px-3 text-right font-extrabold text-stone-900 text-xs">
-                          {formatVND(lineCost)}
-                        </td>
-                        <td className="py-3 px-2 text-center">
-                          <button
-                            onClick={() => handleRemoveIngredient(ing.id)}
-                            className="p-1.5 text-stone-500 hover:text-rose-600 hover:bg-rose-50 border border-stone-200 hover:border-rose-200 rounded-lg transition-all cursor-pointer shadow-2xs"
-                            title="Xóa nguyên liệu khỏi BOM"
-                            aria-label="Xóa nguyên liệu"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
             </div>
 
             {/* Save Button */}
-            <div className="flex items-center justify-between pt-4 border-t border-stone-200">
+            <div className="flex items-center justify-between pt-3 border-t border-stone-200">
               <span className="text-xs text-ops-muted">
                 * Mọi thay đổi định lượng được đồng bộ tự động tới thuật toán trừ tồn kho POS
               </span>
