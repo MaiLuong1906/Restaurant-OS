@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import {
+  AttendanceMethod,
   CashDrawerLog,
+  CashPayoutEntry,
+  CashierAttendanceEntry,
   CashierTable,
   CashierTableArea,
   DiscountRule,
@@ -12,11 +15,14 @@ import {
 import { getStompClient } from '../lib/stomp';
 import { fetchApi } from '../lib/api-client';
 import {
+  SSR_FALLBACK_DATE,
   formatShortDateVN,
+  formatTimeHHMM,
   formatTimeHHMMSS,
   generateIdempotencyKey,
   getRealtimeShiftMeta,
   getUpcomingTimeSlot,
+  resolveReservationTargetDate,
 } from '../lib/utils';
 
 export const PRESET_DISCOUNTS: DiscountRule[] = [
@@ -185,15 +191,16 @@ const INITIAL_TABLES: CashierTable[] = [
 ];
 
 function createInitialReservations(now: Date = new Date()): TableReservation[] {
-  const todayStr = formatShortDateVN(now);
+  const slot1 = getUpcomingTimeSlot(20, now);
+  const slot2 = getUpcomingTimeSlot(45, now);
   return [
     {
       id: 'res_01',
       customerName: 'Nguyễn Minh Quân',
       phone: '0903 456 789',
       partySize: 2,
-      reservedTime: getUpcomingTimeSlot(20, now),
-      reservedDate: todayStr,
+      reservedTime: slot1,
+      reservedDate: resolveReservationTargetDate(slot1, now).reservedDate,
       area: 'Sảnh Tầng 1',
       tableId: 't3',
       tableLabel: 'Bàn 03',
@@ -207,8 +214,8 @@ function createInitialReservations(now: Date = new Date()): TableReservation[] {
       customerName: 'Trần Thanh Hương (Đoàn VIP)',
       phone: '0988 112 334',
       partySize: 6,
-      reservedTime: getUpcomingTimeSlot(45, now),
-      reservedDate: todayStr,
+      reservedTime: slot2,
+      reservedDate: resolveReservationTargetDate(slot2, now).reservedDate,
       area: 'Sảnh Tầng 1',
       tableId: 't5',
       tableLabel: 'Bàn 05',
@@ -259,7 +266,102 @@ function createInitialShift(now: Date = new Date()): ShiftSettlementRecord {
         idempotencyKey: 'init-drawer-001',
       },
     ],
+    payoutLogs: [
+      {
+        id: 'pay_01',
+        timestamp: log2Time,
+        amount: 100000,
+        note: 'Chi tạm ứng mua đá viên & chanh tươi cho quầy pha chế',
+        createdBy: 'Thu ngân Minh Anh',
+        idempotencyKey: 'init-payout-001',
+      },
+    ],
   };
+}
+
+function parseMinutesOfDay(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+function createInitialAttendance(
+  shift: ShiftSettlementRecord,
+  now: Date = new Date()
+): { current: CashierAttendanceEntry; logs: CashierAttendanceEntry[] } {
+  const todayStr = formatShortDateVN(now);
+  const yesterday = formatShortDateVN(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+  const twoDaysAgo = formatShortDateVN(new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000));
+  const threeDaysAgo = formatShortDateVN(new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000));
+
+  const current: CashierAttendanceEntry = {
+    id: `att_${shift.shiftId}`,
+    staffId: 'cashier_minh_anh',
+    staffName: shift.cashierName,
+    shiftId: shift.shiftId,
+    shiftName: shift.shiftName,
+    date: todayStr,
+    checkInTime: shift.checkedInAt,
+    method: 'PIN',
+    isLate: false,
+    lateMinutes: 0,
+    status: 'WORKING',
+    breakMinutes: 0,
+    note: 'Nhận két và kiểm đếm tiền đầu ca',
+    idempotencyKey: 'init-att-today',
+  };
+
+  const history: CashierAttendanceEntry[] = [
+    current,
+    {
+      id: 'att_hist_01',
+      staffId: 'cashier_minh_anh',
+      staffName: shift.cashierName,
+      shiftId: 'shift_hist_01',
+      shiftName: 'Ca chiều • Sảnh Tầng 1',
+      date: yesterday,
+      checkInTime: '13:54',
+      checkOutTime: '18:05',
+      method: 'FACE_SCAN',
+      isLate: false,
+      lateMinutes: 0,
+      status: 'CHECKED_OUT',
+      breakMinutes: 15,
+      note: 'Đúng giờ, bàn giao két đủ',
+    },
+    {
+      id: 'att_hist_02',
+      staffId: 'cashier_minh_anh',
+      staffName: shift.cashierName,
+      shiftId: 'shift_hist_02',
+      shiftName: 'Ca tối • Sảnh Tầng 1',
+      date: twoDaysAgo,
+      checkInTime: '18:06',
+      checkOutTime: '22:08',
+      method: 'PIN',
+      isLate: true,
+      lateMinutes: 6,
+      status: 'CHECKED_OUT',
+      breakMinutes: 0,
+      note: 'Kẹt xe đầu ca tối',
+    },
+    {
+      id: 'att_hist_03',
+      staffId: 'cashier_minh_anh',
+      staffName: shift.cashierName,
+      shiftId: 'shift_hist_03',
+      shiftName: 'Ca sáng • Sảnh Tầng 1',
+      date: threeDaysAgo,
+      checkInTime: '08:52',
+      checkOutTime: '14:00',
+      method: 'FACE_SCAN',
+      isLate: false,
+      lateMinutes: 0,
+      status: 'CHECKED_OUT',
+      breakMinutes: 20,
+    },
+  ];
+
+  return { current, logs: history };
 }
 
 export function computeTableSubtotal(table: CashierTable): number {
@@ -290,7 +392,11 @@ interface PosStoreState {
   tables: CashierTable[];
   reservations: TableReservation[];
   shift: ShiftSettlementRecord;
+  currentAttendance: CashierAttendanceEntry;
+  attendanceLogs: CashierAttendanceEntry[];
   selectedTableId: string;
+  hasHydratedClock: boolean;
+  isCashDrawerOpen: boolean;
   isConnected: boolean;
   isLoading: boolean;
   lastSyncedAt: number | null;
@@ -315,6 +421,7 @@ interface PosStoreState {
   selectTable: (tableId: string) => void;
   clearToast: () => void;
   setToast: (message: string) => void;
+  syncRealtimeClockSeed: () => void;
 
   // Realtime STOMP + REST Reconnect Sync (Rule 03)
   initializeWebSocket: () => void;
@@ -340,6 +447,8 @@ interface PosStoreState {
   unlockTableState: (tableId: string) => void;
   applyDiscountRule: (tableId: string, rule: DiscountRule) => void;
   triggerCashDrawerOpening: (reason: string) => CashDrawerLog;
+  closeCashDrawer: (reason?: string) => CashDrawerLog;
+  toggleCashDrawer: (openReason?: string) => CashDrawerLog;
   printReceiptEscPos: (
     tableId: string,
     method: PaymentMethodType,
@@ -354,16 +463,29 @@ interface PosStoreState {
   }) => void;
   markTableCleanDone: (tableId: string) => void;
 
-  // UC5: Settle Cash & Balance Shift
+  // UC5: Settle Cash & Balance Shift & Internal Payout Note
+  recordInternalPayout: (amount: number, note: string) => CashPayoutEntry | null;
   settleShiftAndBalance: (actualCountedCash: number, discrepancyReason: string) => void;
   reopenShiftDemo: () => void;
+
+  // UC6: Cashier Timekeeping (Chấm công vào ca / nghỉ ca / tan ca)
+  clockInAttendance: (method: AttendanceMethod, pinCode?: string, note?: string) => boolean;
+  toggleBreakAttendance: () => void;
+  clockOutAttendance: (note?: string) => void;
 }
+
+const initialShiftSeed = createInitialShift(SSR_FALLBACK_DATE);
+const initialAttendanceSeed = createInitialAttendance(initialShiftSeed, SSR_FALLBACK_DATE);
 
 export const usePosStore = create<PosStoreState>((set, get) => ({
   tables: INITIAL_TABLES,
-  reservations: createInitialReservations(),
-  shift: createInitialShift(),
+  reservations: createInitialReservations(SSR_FALLBACK_DATE),
+  shift: initialShiftSeed,
+  currentAttendance: initialAttendanceSeed.current,
+  attendanceLogs: initialAttendanceSeed.logs,
   selectedTableId: 't4',
+  hasHydratedClock: false,
+  isCashDrawerOpen: false,
   isConnected: false,
   isLoading: false,
   lastSyncedAt: null,
@@ -373,6 +495,19 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
   selectTable: (tableId) => set({ selectedTableId: tableId }),
   clearToast: () => set({ lastActionToast: null }),
   setToast: (message) => set({ lastActionToast: message }),
+  syncRealtimeClockSeed: () => {
+    if (get().hasHydratedClock) return;
+    const now = new Date();
+    const liveShift = createInitialShift(now);
+    const liveAttendance = createInitialAttendance(liveShift, now);
+    set({
+      shift: liveShift,
+      reservations: createInitialReservations(now),
+      currentAttendance: liveAttendance.current,
+      attendanceLogs: liveAttendance.logs,
+      hasHydratedClock: true,
+    });
+  },
 
   syncWithBackend: async () => {
     set({ isLoading: true });
@@ -450,13 +585,20 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     const targetTable = tables.find((t) => t.id === input.tableId);
     const depositInt = Math.max(0, Math.round(input.depositAmount));
 
+    const now = new Date();
+    const todayStr = formatShortDateVN(now);
+    const resolvedDate =
+      input.reservedDate === todayStr
+        ? resolveReservationTargetDate(input.reservedTime, now).reservedDate
+        : input.reservedDate;
+
     const newReservation: TableReservation = {
       id: `res_${Date.now().toString().slice(-4)}`,
       customerName: input.customerName.trim(),
       phone: input.phone.trim(),
       partySize: input.partySize,
       reservedTime: input.reservedTime,
-      reservedDate: input.reservedDate,
+      reservedDate: resolvedDate,
       area: input.area,
       tableId: input.tableId,
       tableLabel: targetTable?.label ?? 'Bàn đặt',
@@ -506,7 +648,7 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
         drawerOpenLogs: nextDrawerLogs,
       },
       selectedTableId: input.tableId,
-      lastActionToast: `Đã tạo đặt bàn ${newReservation.tableLabel} cho ${newReservation.customerName}${
+      lastActionToast: `Đã tạo đặt bàn ${newReservation.tableLabel} lúc ${newReservation.reservedTime} (${newReservation.reservedDate}) cho ${newReservation.customerName}${
         depositInt > 0 ? ` (Đã thu cọc ${depositInt.toLocaleString('vi-VN')} ₫)` : ''
       }.`,
     });
@@ -842,6 +984,7 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     };
 
     set({
+      isCashDrawerOpen: true,
       shift: {
         ...shift,
         drawerOpenLogs: [newLog, ...shift.drawerOpenLogs],
@@ -856,6 +999,42 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     }).catch(() => {});
 
     return newLog;
+  },
+
+  closeCashDrawer: (reason = 'Đóng két tiền tại quầy thu ngân') => {
+    const idempotencyKey = generateIdempotencyKey();
+    const { shift } = get();
+    const newLog: CashDrawerLog = {
+      id: `drw_${Date.now()}`,
+      timestamp: formatTimeHHMMSS(new Date()),
+      reason: reason.trim() || 'Đóng két tiền tại quầy thu ngân',
+      triggeredBy: shift.cashierName,
+      idempotencyKey,
+    };
+
+    set({
+      isCashDrawerOpen: false,
+      shift: {
+        ...shift,
+        drawerOpenLogs: [newLog, ...shift.drawerOpenLogs],
+      },
+      lastActionToast: 'Đã xác nhận đóng két tiền thu ngân.',
+    });
+
+    fetchApi('/pos/hardware/cash-drawer/close', {
+      method: 'POST',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(newLog),
+    }).catch(() => {});
+
+    return newLog;
+  },
+
+  toggleCashDrawer: (openReason = 'Mở ngăn kéo tiền tại quầy thu ngân') => {
+    if (get().isCashDrawerOpen) {
+      return get().closeCashDrawer('Đóng két tiền tại quầy thu ngân');
+    }
+    return get().triggerCashDrawerOpening(openReason);
   },
 
   // UC4 <<extend>> Print Receipt via ESC/POS
@@ -978,6 +1157,64 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     });
   },
 
+  // UC5: Ghi nhận phiếu chi nội bộ có ghi chú & Settle Cash
+  recordInternalPayout: (amount, note) => {
+    const amountInt = Math.max(0, Math.round(amount));
+    const trimmedNote = note.trim();
+    if (amountInt <= 0 || !trimmedNote) {
+      set({
+        lastActionToast: 'Vui lòng nhập số tiền chi hợp lệ và ghi chú lý do chi nội bộ.',
+      });
+      return null;
+    }
+
+    const idempotencyKey = generateIdempotencyKey();
+    const { shift } = get();
+    const timestamp = formatTimeHHMMSS(new Date());
+
+    const newPayout: CashPayoutEntry = {
+      id: `pay_${Date.now()}`,
+      timestamp,
+      amount: amountInt,
+      note: trimmedNote,
+      createdBy: shift.cashierName,
+      idempotencyKey,
+    };
+
+    const newDrawerLog: CashDrawerLog = {
+      id: `drw_${Date.now()}`,
+      timestamp,
+      reason: `Chi nội bộ -${amountInt.toLocaleString('vi-VN')} ₫ (${trimmedNote})`,
+      triggeredBy: shift.cashierName,
+      idempotencyKey,
+    };
+
+    set({
+      shift: {
+        ...shift,
+        cashRefundsOrPayouts: shift.cashRefundsOrPayouts + amountInt,
+        payoutLogs: [newPayout, ...shift.payoutLogs],
+        drawerOpenLogs: [newDrawerLog, ...shift.drawerOpenLogs],
+      },
+      lastActionToast: `Đã ghi nhận chi nội bộ -${amountInt.toLocaleString(
+        'vi-VN'
+      )} ₫: "${trimmedNote}"`,
+    });
+
+    fetchApi('/pos/shifts/payouts', {
+      method: 'POST',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        shiftId: shift.shiftId,
+        amount: amountInt,
+        note: trimmedNote,
+        idempotencyKey,
+      }),
+    }).catch(() => {});
+
+    return newPayout;
+  },
+
   // UC5: Settle Cash & Balance Shift
   settleShiftAndBalance: (actualCountedCash, discrepancyReason) => {
     const idempotencyKey = generateIdempotencyKey();
@@ -1018,6 +1255,153 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
       },
       lastActionToast: 'Đã mở lại ca thu ngân (Chế độ Demo).',
     });
+  },
+
+  // UC6: Cashier Timekeeping (Chấm công Thu ngân)
+  clockInAttendance: (method, pinCode, note) => {
+    if (method === 'PIN' && (!pinCode || pinCode.trim().length < 4)) {
+      set({
+        lastActionToast: 'Vui lòng nhập đủ mã PIN gồm ít nhất 4 chữ số để chấm công vào ca.',
+      });
+      return false;
+    }
+
+    const now = new Date();
+    const idempotencyKey = generateIdempotencyKey();
+    const checkInTime = formatTimeHHMM(now);
+    const { shift, attendanceLogs } = get();
+    const lateDiff = Math.max(
+      0,
+      parseMinutesOfDay(checkInTime) - parseMinutesOfDay(shift.startTime)
+    );
+    const isLate = lateDiff > 5 && lateDiff < 240;
+    const lateMinutes = isLate ? lateDiff : 0;
+
+    const entry: CashierAttendanceEntry = {
+      id: `att_${Date.now()}`,
+      staffId: 'cashier_minh_anh',
+      staffName: shift.cashierName,
+      shiftId: shift.shiftId,
+      shiftName: shift.shiftName,
+      date: formatShortDateVN(now),
+      checkInTime,
+      method,
+      isLate,
+      lateMinutes,
+      status: 'WORKING',
+      breakMinutes: 0,
+      note: note?.trim() || undefined,
+      idempotencyKey,
+    };
+
+    const filteredLogs = attendanceLogs.filter((l) => l.id !== entry.id);
+
+    set({
+      currentAttendance: entry,
+      attendanceLogs: [entry, ...filteredLogs],
+      shift: {
+        ...shift,
+        checkedInAt: checkInTime,
+      },
+      lastActionToast: `Chấm công vào ca thành công lúc ${checkInTime} (${
+        method === 'FACE_SCAN' ? 'Quét khuôn mặt' : 'Mã PIN'
+      }).`,
+    });
+
+    fetchApi('/pos/attendance/clock-in', {
+      method: 'POST',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        staffId: entry.staffId,
+        shiftId: entry.shiftId,
+        method,
+        checkInTime,
+        note: entry.note,
+        idempotencyKey,
+      }),
+    }).catch(() => {});
+
+    return true;
+  },
+
+  toggleBreakAttendance: () => {
+    const now = new Date();
+    const { currentAttendance, attendanceLogs } = get();
+    if (
+      currentAttendance.status === 'NOT_CHECKED_IN' ||
+      currentAttendance.status === 'CHECKED_OUT'
+    ) {
+      return;
+    }
+
+    const nowHHMM = formatTimeHHMM(now);
+    const isResuming = currentAttendance.status === 'ON_BREAK';
+    let addedBreakMin = 0;
+
+    if (isResuming && currentAttendance.breakStartedAt) {
+      const diff =
+        parseMinutesOfDay(nowHHMM) - parseMinutesOfDay(currentAttendance.breakStartedAt);
+      addedBreakMin = Math.max(1, diff);
+    }
+
+    const updated: CashierAttendanceEntry = {
+      ...currentAttendance,
+      status: isResuming ? 'WORKING' : 'ON_BREAK',
+      breakStartedAt: isResuming ? undefined : nowHHMM,
+      breakMinutes: currentAttendance.breakMinutes + addedBreakMin,
+    };
+
+    set({
+      currentAttendance: updated,
+      attendanceLogs: attendanceLogs.map((l) => (l.id === updated.id ? updated : l)),
+      lastActionToast: isResuming
+        ? `Đã chấm công quay lại làm việc lúc ${nowHHMM}.`
+        : `Đã bắt đầu nghỉ giữa ca lúc ${nowHHMM}.`,
+    });
+  },
+
+  clockOutAttendance: (note) => {
+    const now = new Date();
+    const idempotencyKey = generateIdempotencyKey();
+    const checkOutTime = formatTimeHHMM(now);
+    const { currentAttendance, attendanceLogs } = get();
+
+    let extraBreak = 0;
+    if (currentAttendance.status === 'ON_BREAK' && currentAttendance.breakStartedAt) {
+      extraBreak = Math.max(
+        1,
+        parseMinutesOfDay(checkOutTime) - parseMinutesOfDay(currentAttendance.breakStartedAt)
+      );
+    }
+
+    const updated: CashierAttendanceEntry = {
+      ...currentAttendance,
+      checkOutTime,
+      status: 'CHECKED_OUT',
+      breakStartedAt: undefined,
+      breakMinutes: currentAttendance.breakMinutes + extraBreak,
+      note: note?.trim() ? note.trim() : currentAttendance.note,
+      idempotencyKey,
+    };
+
+    set({
+      currentAttendance: updated,
+      attendanceLogs: attendanceLogs.map((l) => (l.id === updated.id ? updated : l)),
+      lastActionToast: `Đã chấm công tan ca (Check-out) lúc ${checkOutTime}.`,
+    });
+
+    fetchApi('/pos/attendance/clock-out', {
+      method: 'POST',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        attendanceId: updated.id,
+        shiftId: updated.shiftId,
+        checkOutTime,
+        breakMinutes: updated.breakMinutes,
+        note: updated.note,
+        idempotencyKey,
+      }),
+    }).catch(() => {});
   },
 }));
 

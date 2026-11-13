@@ -83,11 +83,15 @@ export default function PosCashierPage() {
     tables,
     reservations,
     shift,
+    currentAttendance,
+    attendanceLogs,
     selectedTableId,
+    isCashDrawerOpen,
     lastActionToast,
     lastPrintedReceipt,
     selectTable,
     clearToast,
+    syncRealtimeClockSeed,
     initializeWebSocket,
     createReservation,
     checkInReservation,
@@ -101,23 +105,30 @@ export default function PosCashierPage() {
     unlockTableState,
     applyDiscountRule,
     triggerCashDrawerOpening,
+    toggleCashDrawer,
     printReceiptEscPos,
     processCounterSettlement,
     markTableCleanDone,
+    recordInternalPayout,
     settleShiftAndBalance,
     reopenShiftDemo,
+    clockInAttendance,
+    toggleBreakAttendance,
+    clockOutAttendance,
   } = usePosStore();
 
   const [activeTab, setActiveTab] = React.useState<CashierNavTab>('home');
   const [reservationSubTab, setReservationSubTab] = React.useState<'create' | 'checkin'>('create');
+  const [shiftSubTab, setShiftSubTab] = React.useState<'settlement' | 'attendance'>('settlement');
   const [areaFilter, setAreaFilter] = React.useState<'ALL' | CashierTableArea>('ALL');
   const [statusFilter, setStatusFilter] = React.useState<'ALL' | CashierTableStatus>('ALL');
   const [splitMergeOpen, setSplitMergeOpen] = React.useState(false);
   const [settlementOpen, setSettlementOpen] = React.useState(false);
 
   React.useEffect(() => {
+    syncRealtimeClockSeed();
     initializeWebSocket();
-  }, [initializeWebSocket]);
+  }, [syncRealtimeClockSeed, initializeWebSocket]);
 
   React.useEffect(() => {
     if (!lastActionToast) return;
@@ -152,7 +163,7 @@ export default function PosCashierPage() {
     <div className="min-h-screen bg-cream font-sans text-ink">
       {/* Top Header & Taskbar duy nhất trên Máy tính (Desktop >= md) */}
       <header className="sticky top-0 z-40 border-b border-sand-200 bg-white/95 shadow-warm-sm backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 md:px-8">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-sm font-extrabold text-white shadow-warm-sm">
               ROS
@@ -175,7 +186,7 @@ export default function PosCashierPage() {
             {(
               [
                 { id: 'home', label: 'Trang chủ', icon: Home },
-                { id: 'reservation', label: 'Lịch ca & Đặt bàn', icon: Calendar },
+                { id: 'reservation', label: 'Đặt bàn', icon: Calendar },
                 { id: 'pos', label: 'Quầy POS & Bill', icon: DollarSign },
                 { id: 'shift', label: 'Kết ca & Cá nhân', icon: User },
               ] as const
@@ -203,11 +214,19 @@ export default function PosCashierPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => triggerCashDrawerOpening('Mở két nhanh từ thanh công cụ')}
-              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-sand-300 bg-cream px-3.5 py-1.5 text-xs font-bold text-ink hover:bg-cream-dark"
+              onClick={() => toggleCashDrawer('Mở két nhanh từ thanh công cụ')}
+              className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                isCashDrawerOpen
+                  ? 'border-primary-400 bg-primary-50 text-primary-600 hover:bg-primary-100'
+                  : 'border-sand-300 bg-cream text-ink hover:bg-cream-dark'
+              }`}
             >
-              <LockOpen className="h-4 w-4 text-primary-500" />
-              <span>Mở két</span>
+              {isCashDrawerOpen ? (
+                <Lock className="h-4 w-4 text-primary-600" />
+              ) : (
+                <LockOpen className="h-4 w-4 text-primary-500" />
+              )}
+              <span>{isCashDrawerOpen ? 'Đóng két' : 'Mở két'}</span>
             </button>
           </div>
         </div>
@@ -219,6 +238,8 @@ export default function PosCashierPage() {
           tables={tables}
           reservations={reservations}
           shift={shift}
+          currentAttendance={currentAttendance}
+          isCashDrawerOpen={isCashDrawerOpen}
           onEnterPos={(tableId) => {
             if (tableId) selectTable(tableId);
             setActiveTab('pos');
@@ -236,15 +257,22 @@ export default function PosCashierPage() {
             setActiveTab('pos');
             setSplitMergeOpen(true);
           }}
-          onOpenShiftSettlement={() => setActiveTab('shift')}
+          onOpenShiftSettlement={() => {
+            setShiftSubTab('settlement');
+            setActiveTab('shift');
+          }}
+          onOpenAttendance={() => {
+            setShiftSubTab('attendance');
+            setActiveTab('shift');
+          }}
           onTriggerCashDrawer={() =>
-            triggerCashDrawerOpening('Mở két tiền từ màn hình Trang chủ Thu ngân')
+            toggleCashDrawer('Mở két tiền từ màn hình Trang chủ Thu ngân')
           }
         />
       ) : null}
 
       {activeTab === 'pos' ? (
-        <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 pb-24 md:px-6 md:pb-8 lg:grid-cols-12">
+        <main className="mx-auto grid max-w-[1440px] grid-cols-1 gap-6 px-4 py-6 pb-24 md:px-8 md:pb-8 lg:grid-cols-12">
           {/* CỘT TRÁI (7 cols): Sơ đồ bàn + Lọc khu vực & Trạng thái */}
           <section className="flex flex-col gap-4 lg:col-span-7">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sand-200 bg-white p-5 shadow-warm">
@@ -680,9 +708,17 @@ export default function PosCashierPage() {
       {activeTab === 'shift' ? (
         <ShiftSettlementView
           shift={shift}
+          currentAttendance={currentAttendance}
+          attendanceLogs={attendanceLogs}
+          initialTab={shiftSubTab}
+          isCashDrawerOpen={isCashDrawerOpen}
           onSettleShift={settleShiftAndBalance}
+          onRecordPayout={recordInternalPayout}
           onReopenShiftDemo={reopenShiftDemo}
-          onTriggerCashDrawer={triggerCashDrawerOpening}
+          onTriggerCashDrawer={(reason) => toggleCashDrawer(reason)}
+          onClockIn={clockInAttendance}
+          onToggleBreak={toggleBreakAttendance}
+          onClockOut={clockOutAttendance}
         />
       ) : null}
 
@@ -764,7 +800,7 @@ export default function PosCashierPage() {
             }`}
           >
             <Calendar className="h-5 w-5" />
-            <span>Lịch ca &amp; Đặt bàn</span>
+            <span>Đặt bàn</span>
           </button>
 
           <button

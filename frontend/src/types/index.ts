@@ -311,6 +311,15 @@ export interface CashDrawerLog {
   idempotencyKey: string;
 }
 
+export interface CashPayoutEntry {
+  id: string;
+  timestamp: string;
+  amount: number; // VND integer (> 0)
+  note: string;
+  createdBy: string;
+  idempotencyKey: string;
+}
+
 export interface ShiftSettlementRecord {
   shiftId: string;
   shiftName: string;
@@ -330,6 +339,22 @@ export interface ShiftSettlementRecord {
   status: 'OPEN' | 'SETTLED';
   settledAt?: string;
   drawerOpenLogs: CashDrawerLog[];
+  payoutLogs: CashPayoutEntry[];
+}
+
+export type CashierAttendanceStatus =
+  | 'NOT_CHECKED_IN'
+  | 'WORKING'
+  | 'ON_BREAK'
+  | 'CHECKED_OUT';
+
+export interface CashierAttendanceEntry extends AttendanceRecord {
+  staffName: string;
+  shiftName: string;
+  status: CashierAttendanceStatus;
+  breakMinutes: number;
+  breakStartedAt?: string;
+  idempotencyKey?: string;
 }
 
 export type OrderChangeVariant = 'CANCEL_ITEM' | 'EDIT_NOTE';

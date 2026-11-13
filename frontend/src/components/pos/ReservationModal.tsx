@@ -19,9 +19,15 @@ import {
   TableReservation,
 } from '@/types';
 import {
-  formatShortDateVN,
+  SSR_FALLBACK_DATE,
+  formatIsoDate,
+  formatIsoToShortVN,
+  formatTimeHHMM,
   formatVND,
+  getDateRelativeLabel,
   getUpcomingTimeSlot,
+  isPastReservationDateTime,
+  resolveReservationTargetDate,
 } from '@/lib/utils';
 
 interface ReservationModalProps {
@@ -46,6 +52,10 @@ interface ReservationModalProps {
 
 const AREAS: CashierTableArea[] = ['Sảnh Tầng 1', 'Tầng 2 VIP', 'Sân vườn'];
 const DEPOSIT_PRESETS = [0, 200000, 300000, 500000];
+const HOURS_24 = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
+const MINUTES_STEP_5 = Array.from({ length: 12 }, (_, idx) =>
+  String(idx * 5).padStart(2, '0')
+);
 
 export function ReservationView({
   tables,
@@ -61,18 +71,29 @@ export function ReservationView({
     setActiveSubTab(initialTab);
   }, [initialTab]);
 
-  const timeSlots = React.useMemo(() => {
-    const now = new Date();
-    const dynamicSlots = [
-      getUpcomingTimeSlot(15, now),
-      getUpcomingTimeSlot(30, now),
-      getUpcomingTimeSlot(60, now),
-      getUpcomingTimeSlot(90, now),
-      '11:30',
-      '18:00',
-      '19:30',
-    ];
-    return Array.from(new Set(dynamicSlots));
+  const [now, setNow] = React.useState<Date>(SSR_FALLBACK_DATE);
+  const [reservedTime, setReservedTime] = React.useState<string>(() =>
+    getUpcomingTimeSlot(30, SSR_FALLBACK_DATE)
+  );
+  const [selectedIsoDate, setSelectedIsoDate] = React.useState<string>(() =>
+    formatIsoDate(SSR_FALLBACK_DATE)
+  );
+  const [autoShiftNotice, setAutoShiftNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const liveNow = new Date();
+    const initialSlot = getUpcomingTimeSlot(30, liveNow);
+    const initialTarget = resolveReservationTargetDate(initialSlot, liveNow);
+    setNow(liveNow);
+    setReservedTime(initialSlot);
+    setSelectedIsoDate(initialTarget.isoDate);
+    if (initialTarget.isTomorrow) {
+      setAutoShiftNotice(
+        `Khung giờ gần nhất (${initialSlot}) đã qua nửa đêm nên ngày nhận bàn được chuyển sang ngày mai (${initialTarget.reservedDate}).`
+      );
+    }
+    const timer = window.setInterval(() => setNow(new Date()), 30000);
+    return () => window.clearInterval(timer);
   }, []);
 
   // Form states for UC1: Create Table Reservation
@@ -80,12 +101,79 @@ export function ReservationView({
   const [phone, setPhone] = React.useState('');
   const [partySize, setPartySize] = React.useState<number>(4);
   const [area, setArea] = React.useState<CashierTableArea>('Sảnh Tầng 1');
-  const [reservedTime, setReservedTime] = React.useState<string>(() =>
-    getUpcomingTimeSlot(30, new Date())
+
+  const todayIso = React.useMemo(() => formatIsoDate(now), [now]);
+  const reservedDate = React.useMemo(
+    () => formatIsoToShortVN(selectedIsoDate),
+    [selectedIsoDate]
   );
-  const [reservedDate, setReservedDate] = React.useState<string>(() =>
-    formatShortDateVN(new Date())
+  const dateRelativeLabel = React.useMemo(
+    () => getDateRelativeLabel(selectedIsoDate, now),
+    [selectedIsoDate, now]
   );
+
+  const handleTimeChange = (nextTime: string) => {
+    const freshNow = new Date();
+    const freshTodayIso = formatIsoDate(freshNow);
+    setReservedTime(nextTime);
+
+    if (
+      selectedIsoDate === freshTodayIso &&
+      isPastReservationDateTime(freshTodayIso, nextTime, freshNow)
+    ) {
+      const tomorrowTarget = resolveReservationTargetDate(nextTime, freshNow);
+      setSelectedIsoDate(tomorrowTarget.isoDate);
+      setAutoShiftNotice(
+        `Khung giờ ${nextTime} đã qua so với giờ hiện tại (${formatTimeHHMM(
+          freshNow
+        )}) — ngày nhận bàn tự động chuyển sang ngày mai (${tomorrowTarget.reservedDate}).`
+      );
+      return;
+    }
+
+    setAutoShiftNotice(null);
+  };
+
+  const handleDateChange = (rawIso: string) => {
+    if (!rawIso) return;
+    const freshNow = new Date();
+    const freshTodayIso = formatIsoDate(freshNow);
+    const clampedIso = rawIso < freshTodayIso ? freshTodayIso : rawIso;
+
+    if (
+      clampedIso === freshTodayIso &&
+      isPastReservationDateTime(freshTodayIso, reservedTime, freshNow)
+    ) {
+      const nextUpcoming = getUpcomingTimeSlot(15, freshNow);
+      if (!isPastReservationDateTime(freshTodayIso, nextUpcoming, freshNow)) {
+        setSelectedIsoDate(freshTodayIso);
+        setReservedTime(nextUpcoming);
+        setAutoShiftNotice(
+          `Giờ ${reservedTime} đã qua trong hôm nay (${formatTimeHHMM(
+            freshNow
+          )}) — đã tự chỉnh sang ${nextUpcoming} hôm nay.`
+        );
+      } else {
+        const tomorrowTarget = resolveReservationTargetDate(nextUpcoming, freshNow);
+        setSelectedIsoDate(tomorrowTarget.isoDate);
+        setReservedTime(nextUpcoming);
+        setAutoShiftNotice(
+          `Đã gần cuối ngày (${formatTimeHHMM(
+            freshNow
+          )}), không còn khung giờ hợp lệ trong hôm nay — giữ ngày nhận bàn sang ngày mai (${tomorrowTarget.reservedDate}).`
+        );
+      }
+      return;
+    }
+
+    setSelectedIsoDate(clampedIso);
+    setAutoShiftNotice(null);
+  };
+
+  const [selectedHourRaw, selectedMinRaw] = reservedTime.split(':');
+  const selectedHour = HOURS_24.includes(selectedHourRaw) ? selectedHourRaw : '19';
+  const snappedMinNum = Math.floor((Number(selectedMinRaw) || 0) / 5) * 5;
+  const selectedMinute = String(snappedMinNum).padStart(2, '0');
   const [collectDeposit, setCollectDeposit] = React.useState(true);
   const [depositAmount, setDepositAmount] = React.useState<number>(200000);
   const [depositMethod, setDepositMethod] = React.useState<PaymentMethodType>('VIETQR');
@@ -123,6 +211,10 @@ export function ReservationView({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!/^\d{2}:\d{2}$/.test(reservedTime)) {
+      setFormError('Vui lòng chọn khung giờ nhận bàn hợp lệ (HH:mm).');
+      return;
+    }
     if (!customerName.trim()) {
       setFormError('Vui lòng nhập họ tên khách đặt bàn.');
       return;
@@ -136,6 +228,14 @@ export function ReservationView({
       return;
     }
 
+    const freshNow = new Date();
+    if (isPastReservationDateTime(selectedIsoDate, reservedTime, freshNow)) {
+      setFormError(
+        'Thời gian nhận bàn đã qua so với hiện tại. Vui lòng chọn ngày hoặc khung giờ trong tương lai.'
+      );
+      return;
+    }
+
     const chosenTable = tables.find((t) => t.id === selectedTableId);
     setFormError(null);
     onCreateReservation({
@@ -143,7 +243,7 @@ export function ReservationView({
       phone,
       partySize,
       reservedTime,
-      reservedDate,
+      reservedDate: formatIsoToShortVN(selectedIsoDate),
       area: chosenTable?.area ?? area,
       tableId: selectedTableId,
       depositAmount: collectDeposit ? depositAmount : 0,
@@ -160,7 +260,7 @@ export function ReservationView({
   const confirmedCount = reservations.filter((r) => r.status === 'CONFIRMED').length;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 pb-24 md:px-6 md:pb-8">
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-4 py-6 pb-24 md:px-8 md:pb-8">
       {/* Header */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
@@ -173,29 +273,29 @@ export function ReservationView({
         </div>
 
         {/* Bộ chuyển đổi giữa UC1 (Tạo đặt bàn) và UC2 (Check-in bàn đặt) */}
-        <div className="inline-flex rounded-xl border border-sand-200 bg-white p-1 shadow-warm-sm">
+        <div className="inline-flex shrink-0 rounded-xl border border-sand-200 bg-white p-1 shadow-warm-sm">
           <button
             type="button"
             onClick={() => setActiveSubTab('create')}
-            className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-4 text-xs font-bold transition-colors ${
+            className={`flex min-h-11 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-4 text-xs font-bold transition-colors ${
               activeSubTab === 'create'
                 ? 'bg-primary-500 text-white shadow-warm-sm'
                 : 'text-muted hover:text-ink'
             }`}
           >
-            <CalendarPlus className="h-4 w-4" />
+            <CalendarPlus className="h-4 w-4 shrink-0" />
             <span>Tạo đặt bàn & Thu cọc</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSubTab('checkin')}
-            className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-4 text-xs font-bold transition-colors ${
+            className={`flex min-h-11 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-4 text-xs font-bold transition-colors ${
               activeSubTab === 'checkin'
                 ? 'bg-primary-500 text-white shadow-warm-sm'
                 : 'text-muted hover:text-ink'
             }`}
           >
-            <UserCheck className="h-4 w-4" />
+            <UserCheck className="h-4 w-4 shrink-0" />
             <span>Check-in bàn đặt ({confirmedCount})</span>
           </button>
         </div>
@@ -208,28 +308,18 @@ export function ReservationView({
         >
           {/* Cột trái: Kiểm tra bàn trống (<<include>> Check Table Availability) + Thông tin khách */}
           <div className="flex flex-col gap-5 rounded-2xl border border-sand-200 bg-white p-6 shadow-warm lg:col-span-7">
-            <div className="flex items-center justify-between border-b border-sand-200/80 pb-4">
-              <div className="flex items-center gap-2.5">
-                <SearchCheck className="h-5 w-5 text-primary-500" />
-                <div>
-                  <h2 className="text-lg font-bold text-ink">
-                    1. Kiểm tra bàn trống (Check Table Availability)
-                  </h2>
-                  <p className="text-xs text-muted">
-                    Tự động lọc bàn trống (`IDLE`) đủ số ghế theo khu vực & khung giờ
-                  </p>
-                </div>
-              </div>
-              <span className="rounded-md bg-primary-50 px-2.5 py-1 text-[11px] font-bold text-primary-500">
-                &lt;&lt;include&gt;&gt;
-              </span>
+            <div className="flex items-center gap-2.5 border-b border-sand-200/80 pb-4">
+              <SearchCheck className="h-5 w-5 text-primary-500" />
+              <h2 className="text-lg font-bold text-ink">
+                1. Kiểm tra bàn trống
+              </h2>
             </div>
 
-            {/* Chọn số khách & Khu vực */}
+            {/* Hàng 1: Số lượng khách & Khu vực ưu tiên */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-ink">
-                  Số lượng khách (Party Size)
+              <div className="flex flex-col">
+                <label className="mb-2 block text-xs font-bold text-ink">
+                  Số lượng khách
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[2, 4, 6, 8].map((num) => (
@@ -237,7 +327,7 @@ export function ReservationView({
                       key={num}
                       type="button"
                       onClick={() => setPartySize(num)}
-                      className={`ops-nums min-h-12 cursor-pointer rounded-xl border text-sm font-bold transition-colors ${
+                      className={`ops-nums flex h-12 cursor-pointer items-center justify-center whitespace-nowrap rounded-xl border px-1.5 text-xs font-bold transition-colors sm:text-sm ${
                         partySize === num
                           ? 'border-ink bg-ink text-white'
                           : 'border-sand-300 bg-cream/60 text-ink hover:bg-cream-dark'
@@ -249,50 +339,112 @@ export function ReservationView({
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-ink">
-                  Khung giờ nhận bàn ({reservedDate})
+              <div className="flex flex-col">
+                <label className="mb-2 block text-xs font-bold text-ink">
+                  Khu vực ưu tiên
                 </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {timeSlots.map((slot) => (
+                <div className="grid grid-cols-3 gap-2">
+                  {AREAS.map((a) => (
                     <button
-                      key={slot}
+                      key={a}
                       type="button"
-                      onClick={() => setReservedTime(slot)}
-                      className={`ops-nums min-h-10 cursor-pointer rounded-lg border px-2.5 text-xs font-bold transition-colors ${
-                        reservedTime === slot
-                          ? 'border-primary-500 bg-primary-500 text-white'
+                      onClick={() => setArea(a)}
+                      className={`flex h-12 cursor-pointer items-center justify-center whitespace-nowrap rounded-xl border px-2 text-xs font-bold transition-colors ${
+                        area === a
+                          ? 'border-ink bg-ink text-white'
                           : 'border-sand-300 bg-white text-ink hover:bg-cream'
                       }`}
                     >
-                      {slot}
+                      {a}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Bộ lọc khu vực */}
-            <div>
-              <label className="mb-1.5 block text-xs font-bold text-ink">
-                Khu vực ưu tiên
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {AREAS.map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => setArea(a)}
-                    className={`min-h-11 cursor-pointer rounded-xl border px-3 text-xs font-bold transition-colors ${
-                      area === a
-                        ? 'border-ink bg-ink text-white'
-                        : 'border-sand-300 bg-white text-ink hover:bg-cream'
-                    }`}
+            {/* Hàng 2: Ngày nhận bàn & Giờ nhận bàn tự chọn 24h */}
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col">
+                  <label
+                    htmlFor="reservation-custom-date"
+                    className="mb-2 block text-xs font-bold text-ink"
                   >
-                    {a}
-                  </button>
-                ))}
+                    Ngày nhận bàn
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="reservation-custom-date"
+                      type="date"
+                      min={todayIso}
+                      value={selectedIsoDate}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      className="ops-nums h-12 min-w-0 flex-1 cursor-pointer rounded-xl border border-sand-300 bg-white px-3 text-sm font-extrabold text-ink outline-none focus:border-primary-500"
+                    />
+                    <span
+                      suppressHydrationWarning
+                      className={`flex h-12 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border px-3 text-xs font-bold ${
+                        dateRelativeLabel === 'Hôm nay'
+                          ? 'border-sage-200 bg-sage-100 text-sage-700'
+                          : 'border-amber-300 bg-amber-50 text-amber-800'
+                      }`}
+                    >
+                      {dateRelativeLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col">
+                  <label
+                    htmlFor="reservation-custom-hour"
+                    className="mb-2 block text-xs font-bold text-ink"
+                    suppressHydrationWarning
+                  >
+                    Giờ nhận bàn tự chọn 24h ({reservedDate})
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      id="reservation-custom-hour"
+                      aria-label="Chọn giờ (24h)"
+                      value={selectedHour}
+                      onChange={(e) => handleTimeChange(`${e.target.value}:${selectedMinute}`)}
+                      className="ops-nums h-12 min-w-0 flex-1 cursor-pointer rounded-xl border border-sand-300 bg-white px-2.5 text-sm font-extrabold text-ink outline-none focus:border-primary-500"
+                    >
+                      {HOURS_24.map((hh) => (
+                        <option key={hh} value={hh}>
+                          {hh} giờ
+                        </option>
+                      ))}
+                    </select>
+
+                    <span className="font-extrabold text-muted">:</span>
+
+                    <select
+                      id="reservation-custom-minute"
+                      aria-label="Chọn phút (bước 5 phút)"
+                      value={selectedMinute}
+                      onChange={(e) => handleTimeChange(`${selectedHour}:${e.target.value}`)}
+                      className="ops-nums h-12 min-w-0 flex-1 cursor-pointer rounded-xl border border-sand-300 bg-white px-2.5 text-sm font-extrabold text-ink outline-none focus:border-primary-500"
+                    >
+                      {MINUTES_STEP_5.map((mm) => (
+                        <option key={mm} value={mm}>
+                          {mm} phút
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
+
+              {autoShiftNotice ? (
+                <div
+                  className="flex items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50/80 px-3.5 py-2 text-xs font-medium text-amber-900"
+                  suppressHydrationWarning
+                >
+                  <Clock className="h-4 w-4 shrink-0 text-amber-700" />
+                  <span>{autoShiftNotice}</span>
+                </div>
+              ) : null}
             </div>
 
             {/* Kết quả kiểm tra bàn trống */}
@@ -315,22 +467,17 @@ export function ReservationView({
                         key={t.id}
                         type="button"
                         onClick={() => setSelectedTableId(t.id)}
-                        className={`flex min-h-16 cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${
+                        className={`flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-all ${
                           isPicked
                             ? 'border-2 border-primary-500 bg-white shadow-warm'
                             : 'border-sand-300 bg-white/80 hover:border-ink'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="ops-nums text-sm font-extrabold text-ink">
-                            {t.label}
-                          </span>
-                          <span className="rounded bg-sage-100 px-1.5 py-0.5 text-[10px] font-bold text-sage-700">
-                            Trống
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted">
-                          Sức chứa: {t.seats} ghế • {t.area}
+                        <span className="ops-nums text-sm font-extrabold text-ink">
+                          {t.label}
+                        </span>
+                        <span className="rounded bg-sage-100 px-1.5 py-0.5 text-[10px] font-bold text-sage-700">
+                          Trống
                         </span>
                       </button>
                     );
@@ -410,30 +557,15 @@ export function ReservationView({
           {/* Cột phải: Thu tiền cọc đặt bàn (<<extend>> Collect Booking Deposit) & Xác nhận */}
           <div className="flex flex-col justify-between gap-5 rounded-2xl border border-sand-200 bg-white p-6 shadow-warm lg:col-span-5">
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-sand-200/80 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <Wallet className="h-5 w-5 text-primary-500" />
-                  <div>
-                    <h2 className="text-lg font-bold text-ink">
-                      2. Thu tiền cọc (Collect Booking Deposit)
-                    </h2>
-                    <p className="text-xs text-muted">
-                      Số nguyên VND — tự động trừ vào hóa đơn khi khách thanh toán
-                    </p>
-                  </div>
-                </div>
-                <span className="rounded-md bg-sand-200 px-2.5 py-1 text-[11px] font-bold text-brown-700">
-                  &lt;&lt;extend&gt;&gt;
-                </span>
+              <div className="flex items-center gap-2.5 border-b border-sand-200/80 pb-4">
+                <Wallet className="h-5 w-5 text-primary-500" />
+                <h2 className="text-lg font-bold text-ink">
+                  2. Thu tiền cọc
+                </h2>
               </div>
 
               <label className="flex cursor-pointer items-center justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5">
-                <div>
-                  <p className="text-sm font-bold text-ink">Yêu cầu thu tiền đặt cọc</p>
-                  <p className="text-xs text-muted">
-                    Giữ bàn chắc chắn cho khung giờ cao điểm / bàn VIP
-                  </p>
-                </div>
+                <p className="text-sm font-bold text-ink">Yêu cầu thu tiền đặt cọc</p>
                 <input
                   type="checkbox"
                   checked={collectDeposit}
@@ -519,8 +651,8 @@ export function ReservationView({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted">Thời gian & Số khách:</span>
-                    <span className="ops-nums font-bold text-ink">
-                      {reservedTime} ({reservedDate}) • {partySize} khách
+                    <span className="ops-nums font-bold text-ink" suppressHydrationWarning>
+                      {reservedTime} ({reservedDate} • {dateRelativeLabel}) • {partySize} khách
                     </span>
                   </div>
                   <div className="flex justify-between border-t border-sand-200 pt-1.5">
@@ -554,7 +686,7 @@ export function ReservationView({
           <div className="mb-4 flex flex-col justify-between gap-2 border-b border-sand-200/80 pb-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-lg font-bold text-ink">
-                Danh sách Đặt Bàn Trước (Check-in Reserved Table)
+                Danh sách Đặt Bàn Trước
               </h2>
               <p className="text-xs text-muted">
                 Khi khách đến, bấm Check-in để mở bàn ngay và tự động chuyển tiền cọc vào hóa đơn bàn

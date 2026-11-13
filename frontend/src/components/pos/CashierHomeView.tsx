@@ -5,15 +5,23 @@ import {
   AlertTriangle,
   CalendarPlus,
   Check,
+  Clock,
   CreditCard,
   GitMerge,
+  Lock,
   LockOpen,
   UserCheck,
   Wallet,
 } from 'lucide-react';
-import { CashierTable, ShiftSettlementRecord, TableReservation } from '@/types';
+import {
+  CashierAttendanceEntry,
+  CashierTable,
+  ShiftSettlementRecord,
+  TableReservation,
+} from '@/types';
 import { computeTablePayable, computeTableSubtotal } from '@/stores/usePosStore';
 import {
+  SSR_FALLBACK_DATE,
   formatTimeHHMMSS,
   formatVND,
   formatVietnameseFullDate,
@@ -23,11 +31,14 @@ interface CashierHomeViewProps {
   tables: CashierTable[];
   reservations: TableReservation[];
   shift: ShiftSettlementRecord;
+  currentAttendance: CashierAttendanceEntry;
+  isCashDrawerOpen?: boolean;
   onEnterPos: (tableId?: string) => void;
   onOpenNewReservation: () => void;
   onOpenCheckInList: () => void;
   onOpenSplitMerge: (tableId: string) => void;
   onOpenShiftSettlement: () => void;
+  onOpenAttendance: () => void;
   onTriggerCashDrawer: () => void;
 }
 
@@ -35,14 +46,17 @@ export function CashierHomeView({
   tables,
   reservations,
   shift,
+  currentAttendance,
+  isCashDrawerOpen = false,
   onEnterPos,
   onOpenNewReservation,
   onOpenCheckInList,
   onOpenSplitMerge,
   onOpenShiftSettlement,
+  onOpenAttendance,
   onTriggerCashDrawer,
 }: CashierHomeViewProps) {
-  const [now, setNow] = React.useState<Date>(() => new Date());
+  const [now, setNow] = React.useState<Date>(SSR_FALLBACK_DATE);
 
   React.useEffect(() => {
     setNow(new Date());
@@ -69,7 +83,7 @@ export function CashierHomeView({
     shift.cashRefundsOrPayouts;
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 pb-24 md:px-6 md:pb-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 pb-24 md:px-8 md:pb-8">
       {/* Header chào mừng chuẩn B2-home.png + Thời gian thực */}
       <section className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
@@ -86,15 +100,22 @@ export function CashierHomeView({
           </div>
         </div>
 
-        {/* Nút thao tác nhanh mở két & tạo đặt bàn */}
+        {/* Nút thao tác nhanh mở/đóng két & tạo đặt bàn */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onTriggerCashDrawer}
-            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-sand-300 bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-warm-sm transition-colors hover:bg-cream-dark"
+            className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-warm-sm transition-colors ${isCashDrawerOpen
+                ? 'border-primary-400 bg-primary-50 text-primary-600 hover:bg-primary-100'
+                : 'border-sand-300 bg-white text-ink hover:bg-cream-dark'
+              }`}
           >
-            <LockOpen className="h-4 w-4 text-primary-500" />
-            <span>Mở két tiền</span>
+            {isCashDrawerOpen ? (
+              <Lock className="h-4 w-4 text-primary-600" />
+            ) : (
+              <LockOpen className="h-4 w-4 text-primary-500" />
+            )}
+            <span>{isCashDrawerOpen ? 'Đóng két tiền' : 'Mở két tiền'}</span>
           </button>
           <button
             type="button"
@@ -118,11 +139,10 @@ export function CashierHomeView({
                 <p className="mt-0.5 text-sm text-muted">{shift.shiftName}</p>
               </div>
               <span
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
-                  shift.status === 'OPEN'
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold ${shift.status === 'OPEN'
                     ? 'bg-sage-100 text-sage-700'
                     : 'bg-sand-200 text-brown-700'
-                }`}
+                  }`}
               >
                 {shift.status === 'OPEN' ? 'Đang mở ca' : 'Đã chốt ca'}
               </span>
@@ -157,16 +177,34 @@ export function CashierHomeView({
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-sand-100 pt-4">
             <div className="flex items-center gap-2 text-sm font-bold text-primary-500">
               <Check className="h-4 w-4 stroke-[2.5] text-sage-700" />
-              <span>Đã vào ca lúc {shift.checkedInAt}</span>
+              <span>
+                {currentAttendance.status === 'WORKING'
+                  ? `Đã vào ca lúc ${currentAttendance.checkInTime}`
+                  : currentAttendance.status === 'ON_BREAK'
+                    ? `Đang nghỉ giữa ca (từ ${currentAttendance.breakStartedAt ?? '--:--'})`
+                    : currentAttendance.status === 'CHECKED_OUT'
+                      ? `Đã tan ca lúc ${currentAttendance.checkOutTime ?? '--:--'}`
+                      : 'Chưa chấm công vào ca'}
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={onOpenShiftSettlement}
-              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-cream px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-cream-dark"
-            >
-              <Wallet className="h-3.5 w-3.5 text-primary-500" />
-              <span>Đối soát & Kết ca</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onOpenAttendance}
+                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-cream"
+              >
+                <Clock className="h-3.5 w-3.5 text-sage-700" />
+                <span>Chấm công</span>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenShiftSettlement}
+                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-cream px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-cream-dark"
+              >
+                <Wallet className="h-3.5 w-3.5 text-primary-500" />
+                <span>Đối soát & Kết ca</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -223,13 +261,13 @@ export function CashierHomeView({
       <section className="rounded-2xl border border-sand-200 bg-white p-5 shadow-warm">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-bold text-ink">
-             Nghiệp vụ Thu ngân (Cashier Use Cases)
+            Nghiệp vụ Thu ngân (Cashier Use Cases)
           </h2>
           <span className="text-xs font-medium text-muted">
             Bấm để thao tác trực tiếp
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <button
             type="button"
             onClick={onOpenNewReservation}
@@ -282,8 +320,20 @@ export function CashierHomeView({
 
           <button
             type="button"
+            onClick={onOpenAttendance}
+            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
+          >
+            <Clock className="h-5 w-5 text-sage-700" />
+            <div className="mt-2">
+              <p className="text-xs font-bold text-ink">Chấm công Ca</p>
+              <p className="text-xs text-muted">Vào ca • Nghỉ ca • Tan ca</p>
+            </div>
+          </button>
+
+          <button
+            type="button"
             onClick={onOpenShiftSettlement}
-            className="col-span-2 flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm sm:col-span-1"
+            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
           >
             <Wallet className="h-5 w-5 text-brown-700" />
             <div className="mt-2">
@@ -343,11 +393,10 @@ export function CashierHomeView({
                   </div>
 
                   <span
-                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${
-                      isOverdue
+                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${isOverdue
                         ? 'border-danger-200 bg-kds-overdue-bg text-danger-600'
                         : 'border-sand-200 bg-cream text-brown-700'
-                    }`}
+                      }`}
                   >
                     {isOverdue ? 'Quá SLA' : 'Chờ thu'}
                   </span>

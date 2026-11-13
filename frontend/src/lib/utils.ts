@@ -42,11 +42,53 @@ const VN_WEEKDAYS = [
   'Thứ Bảy',
 ] as const;
 
+/**
+ * Mốc thời gian cố định dùng cho lượt render đầu tiên (SSR/Hydration) để
+ * đảm bảo HTML server và client khớp tuyệt đối, sau đó đồng bộ clock thực ở useEffect.
+ */
+export const SSR_FALLBACK_DATE = new Date(2026, 10, 13, 18, 0, 0);
+
 export function formatShortDateVN(date: Date = new Date()): string {
   const d = String(date.getDate()).padStart(2, '0');
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const y = date.getFullYear();
   return `${d}/${m}/${y}`;
+}
+
+export function formatIsoDate(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function formatIsoToShortVN(isoDate: string): string {
+  const parts = isoDate.split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+export function getDateRelativeLabel(
+  isoDate: string,
+  baseDate: Date = new Date()
+): string {
+  const todayIso = formatIsoDate(baseDate);
+  const tomorrow = new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate() + 1
+  );
+  const tomorrowIso = formatIsoDate(tomorrow);
+
+  if (isoDate === todayIso) return 'Hôm nay';
+  if (isoDate === tomorrowIso) return 'Ngày mai';
+
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+    const parsed = new Date(y, m - 1, d);
+    return VN_WEEKDAYS[parsed.getDay()];
+  }
+  return '';
 }
 
 export function formatVietnameseFullDate(date: Date = new Date()): string {
@@ -72,6 +114,47 @@ export function getUpcomingTimeSlot(offsetMinutes: number, baseDate: Date = new 
   const roundedMin = Math.ceil(future.getMinutes() / 15) * 15;
   future.setMinutes(roundedMin, 0, 0);
   return formatTimeHHMM(future);
+}
+
+export function isPastReservationDateTime(
+  isoDate: string,
+  slotHHMM: string,
+  baseDate: Date = new Date()
+): boolean {
+  const todayIso = formatIsoDate(baseDate);
+  if (isoDate < todayIso) return true;
+  if (isoDate > todayIso) return false;
+
+  const [slotHour, slotMin] = slotHHMM.split(':').map(Number);
+  const slotTotalMin =
+    (Number.isFinite(slotHour) ? slotHour : 0) * 60 +
+    (Number.isFinite(slotMin) ? slotMin : 0);
+  const nowTotalMin = baseDate.getHours() * 60 + baseDate.getMinutes();
+  return slotTotalMin <= nowTotalMin;
+}
+
+/**
+ * Tự động xác định ngày nhận bàn dựa theo giờ đặt so với thời điểm hiện tại.
+ * Nếu khung giờ đã qua (nhỏ hơn hoặc bằng giờ hiện tại), chuyển sang ngày hôm sau.
+ */
+export function resolveReservationTargetDate(
+  slotHHMM: string,
+  baseDate: Date = new Date()
+): { reservedDate: string; isoDate: string; isTomorrow: boolean } {
+  const isTomorrow = isPastReservationDateTime(
+    formatIsoDate(baseDate),
+    slotHHMM,
+    baseDate
+  );
+  const targetDate = isTomorrow
+    ? new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + 1)
+    : baseDate;
+
+  return {
+    reservedDate: formatShortDateVN(targetDate),
+    isoDate: formatIsoDate(targetDate),
+    isTomorrow,
+  };
 }
 
 export function getRealtimeShiftMeta(now: Date = new Date()): {
