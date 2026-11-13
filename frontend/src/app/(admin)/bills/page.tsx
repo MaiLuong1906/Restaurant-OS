@@ -358,12 +358,15 @@ export default function AdminBillsPage() {
                           </span>
                         )}
                         {bill.status === 'VOIDED' && (
-                          <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-200 rounded font-mono text-xs font-bold">
-                            ĐÃ HỦY (VOID)
+                          <span
+                            className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-200 rounded font-mono text-xs font-bold inline-flex items-center gap-1.5 cursor-help"
+                            title={bill.voidReason ? `Lý do hủy: ${bill.voidReason}` : 'Hóa đơn đã bị hủy'}
+                          >
+                            <span>ĐÃ HỦY (VOID)</span>
+                            {bill.voidReason && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                            )}
                           </span>
-                        )}
-                        {bill.status === 'VOIDED' && bill.voidReason && (
-                          <span className="text-xs text-stone-500 block mt-0.5">{bill.voidReason}</span>
                         )}
                       </td>
                       <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -514,6 +517,21 @@ export default function AdminBillsPage() {
                     </div>
                   </div>
                   <QrCode className="w-6 h-6 text-emerald-800 shrink-0" />
+                </div>
+              )}
+
+              {/* Voided Notification Banner */}
+              {selectedBill.status === 'VOIDED' && (
+                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded text-[11px] space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                    <Ban className="w-4 h-4 text-rose-700 shrink-0" />
+                    <span>HÓA ĐƠN ĐÃ ĐƯỢC DUYỆT HỦY (VOID)</span>
+                  </div>
+                  {selectedBill.voidReason && (
+                    <p className="text-rose-700 font-sans pl-5 font-medium">
+                      Lý do hủy: <span className="font-semibold text-rose-900">{selectedBill.voidReason}</span>
+                    </p>
+                  )}
                 </div>
               )}
             </div>
