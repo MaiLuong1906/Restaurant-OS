@@ -206,10 +206,38 @@ export default function AdminBillsPage() {
   const [voidBillId, setVoidBillId] = React.useState<string | null>(null);
   const [voidReason, setVoidReason] = React.useState('Khách đổi món trước chế biến');
   const [voidPin, setVoidPin] = React.useState(['', '', '', '']);
+  const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedBill(null);
+        setVoidModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Focus first PIN input when void modal opens
+  React.useEffect(() => {
+    if (voidModalOpen) {
+      setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
+    }
+  }, [voidModalOpen]);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3200);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3200);
   };
 
   const handleOpenVoidModal = (billId: string) => {
@@ -582,7 +610,12 @@ export default function AdminBillsPage() {
       {/* MODAL 1: CHI TIẾT HÓA ĐƠN & PHIẾU IN NHIỆT                            */}
       {/* ===================================================================== */}
       {selectedBill && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Phiếu Hóa Đơn ${selectedBill.id}`}
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs"
+        >
           <div className="bg-white rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-stone-200 space-y-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-stone-200">
@@ -594,6 +627,7 @@ export default function AdminBillsPage() {
               </div>
               <button
                 onClick={() => setSelectedBill(null)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-stone-100 text-stone-500 hover:text-stone-900 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -633,8 +667,8 @@ export default function AdminBillsPage() {
                   <span>Tên món</span>
                   <span className="text-right">SL x Đơn giá = Thành tiền</span>
                 </div>
-                {selectedBill.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-baseline text-xs">
+                {selectedBill.items.map((item) => (
+                  <div key={item.name} className="flex justify-between items-baseline text-xs">
                     <span className="font-semibold text-stone-900 max-w-[200px] truncate">{item.name}</span>
                     <span className="font-bold text-stone-800 text-right">
                       {item.qty} x {formatVND(item.price)} = {formatVND(item.qty * item.price)}
@@ -720,7 +754,12 @@ export default function AdminBillsPage() {
       {/* MODAL 2: DUYỆT HỦY / HOÀN TIỀN VỚI MÃ PIN QUẢN LÝ                     */}
       {/* ===================================================================== */}
       {voidModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Xác Thực Hủy Hóa Đơn ${voidBillId}`}
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
+        >
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-stone-200 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-stone-200">
               <div className="flex items-center gap-2">
@@ -731,6 +770,7 @@ export default function AdminBillsPage() {
               </div>
               <button
                 onClick={() => setVoidModalOpen(false)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-stone-100 text-stone-500 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -766,7 +806,9 @@ export default function AdminBillsPage() {
                   {[0, 1, 2, 3].map((i) => (
                     <input
                       key={i}
-                      id={`void-pin-${i}`}
+                      ref={(el) => {
+                        pinInputRefs.current[i] = el;
+                      }}
                       type="password"
                       maxLength={1}
                       value={voidPin[i]}
@@ -776,7 +818,12 @@ export default function AdminBillsPage() {
                         next[i] = val;
                         setVoidPin(next);
                         if (val && i < 3) {
-                          document.getElementById(`void-pin-${i + 1}`)?.focus();
+                          pinInputRefs.current[i + 1]?.focus();
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace' && !voidPin[i] && i > 0) {
+                          pinInputRefs.current[i - 1]?.focus();
                         }
                       }}
                       className="w-11 h-12 text-center text-lg font-mono font-bold bg-stone-50 border border-stone-300 rounded-lg focus:outline-none focus:border-ops-brand text-stone-900"

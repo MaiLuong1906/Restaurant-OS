@@ -9,6 +9,16 @@ import {
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 
+interface PnlWaterfallItem {
+  id: string;
+  name: string;
+  amount: number;
+  pct: number;
+  target: number;
+  status: string;
+  details: string;
+}
+
 interface PnlPeriodData {
   rev: number;
   revGrowth: string;
@@ -18,15 +28,7 @@ interface PnlPeriodData {
   laborPct: number;
   ebitda: number;
   ebitdaPct: number;
-  waterfall: {
-    id: string;
-    name: string;
-    amount: number;
-    pct: number;
-    target: number;
-    status: string;
-    details: string;
-  }[];
+  waterfall: PnlWaterfallItem[];
 }
 
 const PERIOD_DATA: Record<'month' | 'quarter' | 'year', PnlPeriodData> = {
@@ -88,12 +90,31 @@ const PERIOD_DATA: Record<'month' | 'quarter' | 'year', PnlPeriodData> = {
 
 export default function AdminPnlPage() {
   const [period, setPeriod] = React.useState<'month' | 'quarter' | 'year'>('month');
-  const [selectedCostLine, setSelectedCostLine] = React.useState<any | null>(null);
+  const [selectedCostLine, setSelectedCostLine] = React.useState<PnlWaterfallItem | null>(null);
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedCostLine(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   const currentData = PERIOD_DATA[period];
@@ -319,9 +340,9 @@ export default function AdminPnlPage() {
                 <span className="font-mono text-xs text-emerald-700 font-bold">+6% Tăng trưởng</span>
               </div>
               <div className="h-44 flex items-end justify-between gap-2 pt-4 px-2">
-                {MONTHLY_TREND.map((item, idx) => (
+                {MONTHLY_TREND.map((item) => (
                   <div
-                    key={idx}
+                    key={item.month}
                     onClick={() => showToast(`Biên lợi nhuận ${item.month}: ${item.pct}% EBITDA`)}
                     className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end cursor-pointer group"
                   >
@@ -358,7 +379,12 @@ export default function AdminPnlPage() {
 
       {/* Modal: Chi Tiết Dòng Chi Phí Waterfall */}
       {selectedCostLine && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chi Tiết Dòng Chi Phí ${selectedCostLine.name}`}
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-ops-border">
               <div>
@@ -367,6 +393,7 @@ export default function AdminPnlPage() {
               </div>
               <button
                 onClick={() => setSelectedCostLine(null)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />

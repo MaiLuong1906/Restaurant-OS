@@ -94,9 +94,20 @@ export default function AdminAiHubPage() {
     },
   ]);
 
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const asyncTimersRef = React.useRef<NodeJS.Timeout[]>([]);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      asyncTimersRef.current.forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handlePingDevice = (deviceId: string) => {
@@ -114,11 +125,12 @@ export default function AdminAiHubPage() {
       prev.map((d) => (d.id === deviceId ? { ...d, queue: d.queue + 1 } : d))
     );
     showToast(`Đã đẩy 1 lệnh in trang thử nghiệm đến thiết bị.`);
-    setTimeout(() => {
+    const t = setTimeout(() => {
       setDevices((prev) =>
         prev.map((d) => (d.id === deviceId ? { ...d, queue: Math.max(0, d.queue - 1) } : d))
       );
     }, 2500);
+    asyncTimersRef.current.push(t);
   };
 
   const handleRestartDevice = (deviceId: string) => {
@@ -126,12 +138,13 @@ export default function AdminAiHubPage() {
       prev.map((d) => (d.id === deviceId ? { ...d, status: 'RESTARTING' } : d))
     );
     showToast(`Đang gửi tín hiệu khởi động lại thiết bị qua mạng LAN...`);
-    setTimeout(() => {
+    const t = setTimeout(() => {
       setDevices((prev) =>
         prev.map((d) => (d.id === deviceId ? { ...d, status: 'ONLINE' } : d))
       );
       showToast(`Thiết bị đã khởi động lại và kết nối mạng LAN thành công!`);
     }, 2000);
+    asyncTimersRef.current.push(t);
   };
 
   const predictedGuests = weatherFactor === 'weekend' ? 84 : weatherFactor === 'rain' ? 58 : 72;

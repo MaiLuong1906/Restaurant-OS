@@ -26,6 +26,20 @@ interface DashboardAction {
   linkText?: string;
 }
 
+interface RecentOrder {
+  id: string;
+  time: string;
+  table: string;
+  items: string;
+  method: string;
+  total: number;
+  subtotal: number;
+  vat: number;
+  waiter: string;
+  status: string;
+  statusClass: string;
+}
+
 export default function AdminDashboardPage() {
   const MANAGER_PIN = '1234'; // PIN demo
   const [period, setPeriod] = React.useState<'live' | 'week' | 'month'>('live');
@@ -35,16 +49,44 @@ export default function AdminDashboardPage() {
   const [pinModalOpen, setPinModalOpen] = React.useState(false);
   const [pinDigits, setPinDigits] = React.useState(['', '', '', '']);
   const [actionToApprove, setActionToApprove] = React.useState<string | null>(null);
+  const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  // Selected Order for Detail Modal
-  const [selectedOrder, setSelectedOrder] = React.useState<any | null>(null);
+  // Selected Order for Detail Modal (Strictly Typed)
+  const [selectedOrder, setSelectedOrder] = React.useState<RecentOrder | null>(null);
 
   // Filter Search
   const [searchQuery, setSearchQuery] = React.useState('');
 
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPinModalOpen(false);
+        setSelectedOrder(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Focus first PIN input when PIN modal opens
+  React.useEffect(() => {
+    if (pinModalOpen) {
+      setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
+    }
+  }, [pinModalOpen]);
+
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   // Urgent Actions State
@@ -605,7 +647,12 @@ export default function AdminDashboardPage() {
 
       {/* Modal: Xác thực PIN Quản Lý */}
       {pinModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xác Thực PIN Duyệt Ngoại Lệ"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -614,6 +661,7 @@ export default function AdminDashboardPage() {
               </div>
               <button
                 onClick={() => setPinModalOpen(false)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -628,7 +676,9 @@ export default function AdminDashboardPage() {
                 {[0, 1, 2, 3].map((i) => (
                   <input
                     key={i}
-                    id={`dash-pin-${i}`}
+                    ref={(el) => {
+                      pinInputRefs.current[i] = el;
+                    }}
                     type="password"
                     maxLength={1}
                     value={pinDigits[i]}
@@ -638,7 +688,12 @@ export default function AdminDashboardPage() {
                       next[i] = val;
                       setPinDigits(next);
                       if (val && i < 3) {
-                        document.getElementById(`dash-pin-${i + 1}`)?.focus();
+                        pinInputRefs.current[i + 1]?.focus();
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' && !pinDigits[i] && i > 0) {
+                        pinInputRefs.current[i - 1]?.focus();
                       }
                     }}
                     className="w-11 h-12 text-center text-xl font-mono font-bold bg-ops-bg border border-ops-border rounded-lg focus:outline-none focus:border-ops-brand"
@@ -668,7 +723,12 @@ export default function AdminDashboardPage() {
 
       {/* Modal: Chi Tiết Đơn Hàng */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chi Tiết Hóa Đơn ${selectedOrder.id}`}
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -679,6 +739,7 @@ export default function AdminDashboardPage() {
               </div>
               <button
                 onClick={() => setSelectedOrder(null)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />

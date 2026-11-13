@@ -139,9 +139,31 @@ export default function AdminRosterPage() {
     },
   ]);
 
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditingShift(null);
+        setNewShiftModalOpen(false);
+        setSelectedApproval(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handleApprove = (id: string) => {
@@ -557,7 +579,12 @@ export default function AdminRosterPage() {
 
       {/* Modal: Quick Edit Shift */}
       {editingShift && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Điều Chỉnh Ca Trực"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-sm w-full p-5 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div>
@@ -568,6 +595,7 @@ export default function AdminRosterPage() {
               </div>
               <button
                 onClick={() => setEditingShift(null)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -600,7 +628,12 @@ export default function AdminRosterPage() {
 
       {/* Modal: Phân Công Ca Mới */}
       {newShiftModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Phân Công Ca Làm Việc Mới"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -609,6 +642,7 @@ export default function AdminRosterPage() {
               </div>
               <button
                 onClick={() => setNewShiftModalOpen(false)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -695,12 +729,18 @@ export default function AdminRosterPage() {
 
       {/* Detail Approval Modal */}
       {selectedApproval && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={selectedApproval.title}
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-ops-border">
               <h3 className="font-ops text-base font-bold text-ops-ink">{selectedApproval.title}</h3>
               <button
                 onClick={() => setSelectedApproval(null)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded-lg hover:bg-ops-bg text-ops-muted hover:text-ops-ink flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />

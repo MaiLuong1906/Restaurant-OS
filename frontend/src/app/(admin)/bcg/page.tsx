@@ -47,10 +47,29 @@ export default function AdminBcgPage() {
   const [filterMenu, setFilterMenu] = React.useState<'all' | 'dinner' | 'lunch'>('all');
   const [selectedDish, setSelectedDish] = React.useState<BcgDish | null>(null);
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedDish(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handleUpdateQuadrant = (dishId: string, newQuad: BcgDish['quadrant']) => {
@@ -317,7 +336,12 @@ export default function AdminBcgPage() {
 
       {/* Modal: Điều Chỉnh Chiến Lược Món Ăn */}
       {selectedDish && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chiến Lược Món ${selectedDish.name}`}
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-ops-border">
               <div>
@@ -326,6 +350,7 @@ export default function AdminBcgPage() {
               </div>
               <button
                 onClick={() => setSelectedDish(null)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />

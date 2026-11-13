@@ -76,10 +76,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pinPurpose, setPinPurpose] = React.useState('Xác thực quyền quản trị');
   const [pinInput, setPinInput] = React.useState('');
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const showToast = React.useCallback((msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(msg);
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
     }, 3200);
   }, []);
@@ -307,7 +315,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* ===================================================================== */}
       {pinModalOpen && (
         <div
-          role="presentation"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xác Thực Mã PIN Quản Lý"
           className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs"
         >
           <div className="bg-white border border-ops-border rounded-xl shadow-2xl w-full max-w-sm p-4 sm:p-6 max-h-[90vh] overflow-y-auto flex flex-col gap-4">

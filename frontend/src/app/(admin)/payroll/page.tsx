@@ -80,23 +80,57 @@ const INITIAL_STAFF_PAYROLL: StaffPayroll[] = [
   },
 ];
 
+interface StaffPayrollDetail extends StaffPayroll {
+  tipShare: number;
+  totalNet: number;
+}
+
 export default function AdminPayrollPage() {
+  const MANAGER_PIN = '1234'; // PIN demo
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
   const [showPinModal, setShowPinModal] = React.useState(false);
   const [pinDigits, setPinDigits] = React.useState(['', '', '', '']);
   const [isLocked, setIsLocked] = React.useState(false);
+  const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Tip Pool Setting
   const [tipPoolTotal, setTipPoolTotal] = React.useState(18450000);
   const [deptFilter, setDeptFilter] = React.useState<'ALL' | 'BOH' | 'FOH' | 'Cashier'>('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  // Selected Staff for Detailed Modal
-  const [selectedStaff, setSelectedStaff] = React.useState<any | null>(null);
+  // Selected Staff for Detailed Modal (Strictly Typed)
+  const [selectedStaff, setSelectedStaff] = React.useState<StaffPayrollDetail | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedStaff(null);
+        setShowPinModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Auto-focus PIN input when modal opens
+  React.useEffect(() => {
+    if (showPinModal) {
+      setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
+    }
+  }, [showPinModal]);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handlePinInput = (index: number, val: string) => {
@@ -105,7 +139,7 @@ export default function AdminPayrollPage() {
     next[index] = val.slice(-1);
     setPinDigits(next);
     if (val && index < 3) {
-      document.getElementById(`payroll-pin-${index + 1}`)?.focus();
+      pinInputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -113,6 +147,10 @@ export default function AdminPayrollPage() {
     const pin = pinDigits.join('');
     if (pin.length < 4) {
       showToast('Vui lòng nhập đủ 4 chữ số PIN Quản lý');
+      return;
+    }
+    if (pin !== MANAGER_PIN) {
+      showToast('Mã PIN Quản lý không chính xác!');
       return;
     }
     setIsLocked(true);
@@ -351,7 +389,12 @@ export default function AdminPayrollPage() {
 
       {/* Modal: Chi Tiết Thu Nhập Nhân Sự */}
       {selectedStaff && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chi Tiết Thu Nhập ${selectedStaff.name}`}
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-ops-border">
               <div>
@@ -360,6 +403,7 @@ export default function AdminPayrollPage() {
               </div>
               <button
                 onClick={() => setSelectedStaff(null)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -412,7 +456,12 @@ export default function AdminPayrollPage() {
 
       {/* PIN Modal */}
       {showPinModal && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xác Nhận PIN Quản Lý"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -421,7 +470,8 @@ export default function AdminPayrollPage() {
               </div>
               <button
                 onClick={() => setShowPinModal(false)}
-                className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center"
+                aria-label="Đóng modal"
+                className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -434,11 +484,18 @@ export default function AdminPayrollPage() {
               {[0, 1, 2, 3].map((i) => (
                 <input
                   key={i}
-                  id={`payroll-pin-${i}`}
+                  ref={(el) => {
+                    pinInputRefs.current[i] = el;
+                  }}
                   type="password"
                   maxLength={1}
                   value={pinDigits[i]}
                   onChange={(e) => handlePinInput(i, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Backspace' && !pinDigits[i] && i > 0) {
+                      pinInputRefs.current[i - 1]?.focus();
+                    }
+                  }}
                   className="w-11 h-12 text-center text-xl font-mono font-bold bg-ops-bg border border-ops-border rounded-lg focus:outline-none focus:border-primary-500"
                 />
               ))}
@@ -447,13 +504,13 @@ export default function AdminPayrollPage() {
             <div className="flex justify-end gap-2 pt-2 border-t border-ops-border">
               <button
                 onClick={() => setShowPinModal(false)}
-                className="px-3 py-1.5 bg-white border border-ops-border text-ops-muted text-xs font-mono uppercase rounded"
+                className="px-3 py-1.5 bg-white border border-ops-border text-ops-muted text-xs font-mono uppercase rounded cursor-pointer"
               >
                 Hủy
               </button>
               <button
                 onClick={confirmPayrollLock}
-                className="px-4 py-1.5 bg-primary-500 hover:bg-[#6F1623] text-white text-xs font-mono uppercase rounded font-bold"
+                className="px-4 py-1.5 bg-primary-500 hover:bg-[#6F1623] text-white text-xs font-mono uppercase rounded font-bold cursor-pointer"
               >
                 Xác nhận chốt
               </button>

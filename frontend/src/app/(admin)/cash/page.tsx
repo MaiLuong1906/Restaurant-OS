@@ -36,10 +36,30 @@ export default function AdminCashPage() {
   // Search Filter
   const [searchQuery, setSearchQuery] = React.useState('');
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPettyCashModalOpen(false);
+        setShiftCloseModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   // Base financial variables
@@ -294,7 +314,12 @@ export default function AdminCashPage() {
 
       {/* Modal: Lập Phiếu Chi Két */}
       {pettyCashModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Lập Phiếu Chi Két"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -303,6 +328,7 @@ export default function AdminCashPage() {
               </div>
               <button
                 onClick={() => setPettyCashModalOpen(false)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -378,7 +404,12 @@ export default function AdminCashPage() {
 
       {/* Modal: Biên Bản Chốt Ca Trực */}
       {shiftCloseModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Biên Bản Kiểm Két Chốt Ca"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -387,6 +418,7 @@ export default function AdminCashPage() {
               </div>
               <button
                 onClick={() => setShiftCloseModalOpen(false)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />

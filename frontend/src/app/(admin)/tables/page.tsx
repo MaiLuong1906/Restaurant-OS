@@ -171,10 +171,31 @@ export default function AdminTablesPage() {
   });
 
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Modal a11y: Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedTableId(null);
+        setMergeModalOpen(false);
+        setBookingModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   const selectedTable = selectedTableId ? tables[selectedTableId] : null;
@@ -506,7 +527,12 @@ export default function AdminTablesPage() {
 
       {/* Slide-out Table Detail Drawer */}
       {selectedTable && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chi Tiết ${selectedTable.name}`}
+          className="fixed inset-0 z-50 overflow-hidden flex justify-end"
+        >
           <div
             role="presentation"
             onClick={() => setSelectedTableId(null)}
@@ -526,6 +552,7 @@ export default function AdminTablesPage() {
               </div>
               <button
                 onClick={() => setSelectedTableId(null)}
+                aria-label="Đóng chi tiết bàn"
                 className="w-8 h-8 rounded-lg hover:bg-ops-bg text-ops-muted hover:text-ops-ink flex items-center justify-center cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -577,7 +604,7 @@ export default function AdminTablesPage() {
                   <div className="space-y-2">
                     {selectedTable.orders.map((ord, idx) => (
                       <div
-                        key={idx}
+                        key={`${selectedTable.id}-${ord.name}-${idx}`}
                         className="p-3 rounded-lg bg-ops-bg border border-ops-border flex items-start justify-between"
                       >
                         <div>
@@ -656,7 +683,12 @@ export default function AdminTablesPage() {
 
       {/* Modal: Tách / Gộp Bàn */}
       {mergeModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Điều Phối / Gộp Bàn Ăn"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -665,6 +697,7 @@ export default function AdminTablesPage() {
               </div>
               <button
                 onClick={() => setMergeModalOpen(false)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -712,12 +745,14 @@ export default function AdminTablesPage() {
 
             <div className="flex justify-end gap-2 pt-3 border-t border-ops-border">
               <button
+                type="button"
                 onClick={() => setMergeModalOpen(false)}
                 className="px-3 py-1.5 bg-white border border-ops-border text-ops-muted text-xs font-mono uppercase rounded cursor-pointer"
               >
                 Hủy
               </button>
               <button
+                type="button"
                 onClick={handleConfirmMerge}
                 className="px-4 py-1.5 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-mono uppercase rounded font-bold cursor-pointer"
               >
@@ -730,7 +765,12 @@ export default function AdminTablesPage() {
 
       {/* Modal: Tiếp Nhận Đặt Bàn Mới */}
       {bookingModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tiếp Nhận Đặt Chỗ Mới"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
@@ -739,6 +779,7 @@ export default function AdminTablesPage() {
               </div>
               <button
                 onClick={() => setBookingModalOpen(false)}
+                aria-label="Đóng modal"
                 className="w-7 h-7 rounded hover:bg-ops-bg text-ops-muted flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
