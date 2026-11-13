@@ -211,72 +211,74 @@ export default function AdminInventoryPage() {
 
           {/* Stock Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+            <table className="w-full text-left border-collapse min-w-[980px]">
               <thead>
-                <tr className="bg-stone-100 border-y border-stone-200 text-stone-700 font-mono text-xs uppercase">
-                  <th className="py-3 px-3 font-bold">Mặt Hàng &amp; Quy Cách</th>
-                  <th className="py-3 px-3 font-bold border-r border-stone-200">Vị Trí Lưu Kho</th>
-                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Tồn Thực Tế</th>
-                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Mức An Toàn</th>
-                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Đơn Giá Nhập</th>
-                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Tổng Giá Trị</th>
-                  <th className="py-3 px-3 text-center font-bold">Trạng Thái</th>
-                  <th className="py-3 px-3 text-center font-bold">Thao Tác</th>
+                <tr className="bg-stone-100 border-y border-stone-200 text-stone-800 font-mono text-xs uppercase tracking-wider">
+                  <th className="py-3.5 px-4 font-bold">Mặt Hàng &amp; Quy Cách</th>
+                  <th className="py-3.5 px-4 font-bold border-r border-stone-200">Vị Trí Lưu Kho</th>
+                  <th className="py-3.5 px-4 text-right font-bold border-r border-stone-200">Tồn Thực Tế</th>
+                  <th className="py-3.5 px-4 text-right font-bold border-r border-stone-200">Mức An Toàn</th>
+                  <th className="py-3.5 px-4 text-right font-bold border-r border-stone-200">Đơn Giá Nhập</th>
+                  <th className="py-3.5 px-4 text-right font-bold border-r border-stone-200">Tổng Giá Trị</th>
+                  <th className="py-3.5 px-4 text-center font-bold">Trạng Thái</th>
+                  <th className="py-3.5 px-4 text-center font-bold">Thao Tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-ops-border font-mono">
+              <tbody className="divide-y divide-stone-200 font-mono text-sm">
                 {filteredItems.map((item) => (
-                  <tr key={item.sku} className="hover:bg-ops-bg transition-colors">
-                    <td className="py-3 px-3 font-sans">
-                      <div className="flex items-center gap-3">
+                  <tr key={item.sku} className="hover:bg-stone-50/80 transition-colors">
+                    <td className="py-4 px-4 font-sans">
+                      <div className="flex items-center gap-3.5">
                         <img
                           src={item.image}
                           alt={item.name}
-                          className="w-10 h-10 rounded-lg object-cover border border-ops-border shrink-0"
+                          className="w-12 h-12 rounded-lg object-cover border border-stone-200 shrink-0 shadow-2xs"
                         />
                         <div>
-                          <strong className="text-ops-ink block">{item.name}</strong>
-                          <span className="text-[11px] text-ops-muted">{item.specs}</span>
-                          <span className="font-mono text-[10px] text-ops-brand font-semibold block pt-0.5">
+                          <strong className="text-stone-900 text-sm font-bold block">{item.name}</strong>
+                          <span className="text-xs text-stone-600 block pt-0.5">{item.specs}</span>
+                          <span className="font-mono text-xs text-ops-brand font-bold block pt-0.5">
                             {item.sku}
                           </span>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-3 font-sans text-ops-muted border-r border-stone-200/60">{item.location}</td>
-                    <td className="py-3 px-3 text-right font-bold text-ops-ink text-sm border-r border-stone-200/60">
-                      {item.actualStock} {item.unit}
+                    <td className="py-4 px-4 font-sans text-xs sm:text-sm font-medium text-stone-700 border-r border-stone-200/80">
+                      {item.location}
                     </td>
-                    <td className="py-3 px-3 text-right text-stone-600 font-medium border-r border-stone-200/60">
-                      {item.safetyStock} {item.unit}
+                    <td className="py-4 px-4 text-right font-extrabold text-stone-900 text-base border-r border-stone-200/80">
+                      {item.actualStock} <span className="text-xs font-semibold text-stone-500">{item.unit}</span>
                     </td>
-                    <td className="py-3 px-3 text-right text-stone-700 font-semibold border-r border-stone-200/60">
+                    <td className="py-4 px-4 text-right text-stone-600 font-semibold text-sm border-r border-stone-200/80">
+                      {item.safetyStock} <span className="text-xs text-stone-500">{item.unit}</span>
+                    </td>
+                    <td className="py-4 px-4 text-right text-stone-800 font-semibold text-sm border-r border-stone-200/80">
                       {formatVND(item.costPrice)}
                     </td>
-                    <td className="py-3 px-3 text-right font-bold text-stone-900 border-r border-stone-200/60">
+                    <td className="py-4 px-4 text-right font-extrabold text-stone-900 text-sm sm:text-base border-r border-stone-200/80">
                       {formatVND(item.totalValue)}
                     </td>
-                    <td className="py-3 px-3 text-center font-sans">
+                    <td className="py-4 px-4 text-center font-sans">
                       <span
-                        className={`px-2.5 py-1 rounded text-xs font-bold border inline-block ${
+                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border inline-block tracking-wide shadow-2xs ${
                           item.status === 'SAFE'
                             ? 'bg-emerald-100/90 text-emerald-900 border-emerald-300'
                             : item.status === 'LOW'
-                            ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
-                            : 'bg-rose-100 text-rose-900 border-rose-300 font-extrabold animate-pulse'
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-rose-100 text-rose-900 border-rose-300 animate-pulse'
                         }`}
                       >
                         {item.status === 'SAFE' ? 'AN TOÀN' : item.status === 'LOW' ? 'SẮP HẾT' : 'BÁO ĐỘNG'}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-4 px-4 text-center">
                       <button
                         onClick={() => {
                           setPoForm((prev) => ({ ...prev, sku: item.sku }));
                           setPoModalOpen(true);
                         }}
                         title={`Tạo đơn nhập hàng cho ${item.name}`}
-                        className="p-1.5 bg-stone-100 hover:bg-stone-900 hover:text-white border border-stone-200 text-stone-700 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center shadow-2xs"
+                        className="w-8 h-8 inline-flex items-center justify-center p-1.5 bg-stone-100 hover:bg-stone-900 hover:text-white border border-stone-200 text-stone-700 rounded-lg transition-colors cursor-pointer shadow-2xs"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
