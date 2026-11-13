@@ -96,3 +96,112 @@ export interface ApiResponse<T> {
   };
   timestamp: string;
 }
+
+// ====================================================================
+// Cashier & POS Domain Types (Use Cases: Reservation, Check-in, Split/Merge,
+// Counter Settlement, Lock Table, Discount, ESC/POS, Cash Drawer, Shift Balance)
+// ====================================================================
+
+export type CashierTableStatus =
+  | 'IDLE'
+  | 'RESERVED'
+  | 'OCCUPIED'
+  | 'LOCKED'
+  | 'OVERDUE'
+  | 'CLEANING';
+
+export type CashierTableArea = 'Sảnh Tầng 1' | 'Tầng 2 VIP' | 'Sân vườn';
+
+export type PaymentMethodType = 'CASH' | 'VIETQR' | 'CARD';
+
+export interface CashierInvoiceItem {
+  id: string;
+  name: string;
+  qty: number;
+  unitPrice: number; // VND integer
+  status: 'WAITING' | 'COOKING' | 'SERVED';
+  note?: string;
+}
+
+export interface InvoiceSplitPart {
+  id: string;
+  label: string;
+  amount: number; // VND integer
+  status: 'UNPAID' | 'PAID';
+  itemIds?: string[];
+}
+
+export interface DiscountRule {
+  id: string;
+  code: string;
+  label: string;
+  type: 'PERCENT' | 'FIXED';
+  value: number; // % hoặc số nguyên VND
+}
+
+export interface CashierTable {
+  id: string;
+  label: string;
+  seats: number;
+  area: CashierTableArea;
+  status: CashierTableStatus;
+  guests: number;
+  seatedMin: number;
+  staff: string;
+  items: CashierInvoiceItem[];
+  depositAmount: number; // VND integer (tiền cọc đã thu từ đặt bàn)
+  discountAmount: number; // VND integer (chiết khấu đã áp dụng)
+  discountLabel?: string;
+  reservationId?: string;
+  lockedBy?: string;
+  splits?: InvoiceSplitPart[];
+  allergyAlert?: string;
+}
+
+export type ReservationStatus = 'CONFIRMED' | 'CHECKED_IN' | 'CANCELLED';
+
+export interface TableReservation {
+  id: string;
+  customerName: string;
+  phone: string;
+  partySize: number;
+  reservedTime: string;
+  reservedDate: string;
+  area: CashierTableArea;
+  tableId: string;
+  tableLabel: string;
+  depositAmount: number; // VND integer
+  depositMethod: PaymentMethodType;
+  note?: string;
+  status: ReservationStatus;
+}
+
+export interface CashDrawerLog {
+  id: string;
+  timestamp: string;
+  reason: string;
+  triggeredBy: string;
+  idempotencyKey: string;
+}
+
+export interface ShiftSettlementRecord {
+  shiftId: string;
+  shiftName: string;
+  area: string;
+  startTime: string;
+  endTime: string;
+  nextShift: string;
+  checkedInAt: string;
+  cashierName: string;
+  openingCash: number; // VND integer
+  cashSales: number; // VND integer
+  qrAndCardSales: number; // VND integer
+  depositCashCollected: number; // VND integer
+  cashRefundsOrPayouts: number; // VND integer
+  actualCountedCash: number | null; // VND integer
+  discrepancyReason: string;
+  status: 'OPEN' | 'SETTLED';
+  settledAt?: string;
+  drawerOpenLogs: CashDrawerLog[];
+}
+
