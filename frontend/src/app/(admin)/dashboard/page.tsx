@@ -349,10 +349,10 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Main Operational Area: Hourly Chart (Left 8 cols) & Action Feed (Right 4 cols) */}
-      <div className="px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* Left: 12-hour revenue chart */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <div className="bg-white border border-stone-200 rounded-xl p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
+        <div className="lg:col-span-8 flex flex-col h-full">
+          <div className="bg-white border border-stone-200 rounded-xl p-5 sm:p-6 shadow-2xs flex flex-col justify-between h-full">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-200">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 bg-ops-brand rounded-xs" />
@@ -440,8 +440,8 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Right: Urgent Action Feed */}
-        <div className="lg:col-span-4 flex flex-col gap-4">
-          <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs h-full flex flex-col">
+        <div className="lg:col-span-4 flex flex-col h-full">
+          <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs h-full flex flex-col justify-between">
             <div className="flex items-center justify-between pb-3 border-b border-stone-200">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5 text-ops-brand" />
