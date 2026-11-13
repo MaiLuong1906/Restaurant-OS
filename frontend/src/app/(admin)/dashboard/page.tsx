@@ -9,6 +9,7 @@ import {
   X,
   Lock,
   Search,
+  Printer,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 import { DASHBOARD_METRICS } from '@/services/mock';
@@ -158,7 +159,7 @@ export default function AdminDashboardPage() {
       vat: 161481,
       waiter: 'Mai Thị Hoa',
       status: 'CHỜ THANH TOÁN',
-      statusClass: 'bg-amber-50 text-amber-800 border-amber-300',
+      statusClass: 'bg-amber-100 text-amber-900 border-amber-300 font-bold',
     },
     {
       id: '#ORD-9022',
@@ -440,7 +441,7 @@ export default function AdminDashboardPage() {
 
         {/* Right: Urgent Action Feed */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs">
+          <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs h-full flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-stone-200">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5 text-ops-brand" />
@@ -451,7 +452,7 @@ export default function AdminDashboardPage() {
               </span>
             </div>
 
-            <div className="divide-y divide-stone-200 text-xs">
+            <div className="divide-y divide-stone-200 text-xs flex-1">
               {actions.map((act) => (
                 <div key={act.id} className="py-3.5 space-y-2">
                   <div className="flex items-center justify-between">
@@ -473,7 +474,7 @@ export default function AdminDashboardPage() {
                     ) : act.type === 'void' ? (
                       <button
                         onClick={() => handleOpenPin(act.id)}
-                        className="px-3 py-1.5 bg-ops-brand hover:bg-ops-brand-dark text-white rounded-md font-mono text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                        className="px-3.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-md font-mono text-xs font-bold shadow-xs cursor-pointer transition-colors"
                       >
                         Duyệt PIN
                       </button>
@@ -514,10 +515,10 @@ export default function AdminDashboardPage() {
               </div>
               <Link
                 href="/cash"
-                className="font-mono text-xs text-ops-brand hover:underline uppercase flex items-center gap-1 font-bold whitespace-nowrap"
+                className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 rounded-lg text-xs font-bold font-mono uppercase flex items-center gap-1.5 shadow-2xs transition-colors whitespace-nowrap"
               >
                 <span>Xem sổ két</span>
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight className="h-3.5 w-3.5 text-stone-600" />
               </Link>
             </div>
           </div>
@@ -532,7 +533,7 @@ export default function AdminDashboardPage() {
                   <th className="py-3 px-3 font-bold">Món chính</th>
                   <th className="py-3 px-3 font-bold whitespace-nowrap">Phương thức</th>
                   <th className="py-3 px-3 text-right font-bold whitespace-nowrap">Tổng tiền</th>
-                  <th className="py-3 px-3 text-right font-bold whitespace-nowrap">Trạng thái</th>
+                  <th className="py-3 px-3 text-center font-bold whitespace-nowrap">Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
@@ -556,7 +557,7 @@ export default function AdminDashboardPage() {
                     <td className="py-3.5 px-3 text-right font-mono text-stone-900 font-extrabold whitespace-nowrap text-sm">
                       {formatVND(ord.total)}
                     </td>
-                    <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
                       <span className={`px-2.5 py-1 rounded font-mono text-xs font-bold border ${ord.statusClass}`}>
                         {ord.status}
                       </span>
@@ -683,43 +684,70 @@ export default function AdminDashboardPage() {
                 <span className="text-stone-600 font-medium">Nhân viên phụ trách:</span>
                 <span className="text-stone-900 font-bold">{selectedOrder.waiter}</span>
               </div>
-              <div className="py-2">
-                <span className="text-stone-700 block mb-1 font-mono uppercase text-xs font-bold tracking-wider">
-                  Danh mục món ăn:
+              <div className="py-2 space-y-1.5">
+                <span className="text-stone-700 block text-xs font-bold uppercase tracking-wider">
+                  Chi tiết món đã gọi:
                 </span>
-                <p className="p-3 bg-stone-50 rounded-lg border border-stone-200 font-semibold text-stone-900 text-xs leading-relaxed">
-                  {selectedOrder.items}
-                </p>
-              </div>
-              <div className="space-y-1.5 pt-2 font-mono text-xs">
-                <div className="flex justify-between text-stone-600 font-medium">
-                  <span>Tiền hàng trước thuế:</span>
-                  <span className="text-stone-800 font-semibold">{formatVND(selectedOrder.subtotal)}</span>
+                <div className="bg-stone-50 rounded-lg border border-stone-200 overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-stone-100/80 border-b border-stone-200 text-stone-600 font-bold">
+                      <tr>
+                        <th className="py-2 px-3">Tên món</th>
+                        <th className="py-2 px-3 text-right">SL</th>
+                        <th className="py-2 px-3 text-right">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-200">
+                      {selectedOrder.items.split(', ').map((itemStr, i) => {
+                        const parts = itemStr.split(' x');
+                        const name = parts[0];
+                        const qty = parts[1] || '1';
+                        const itemCount = selectedOrder.items.split(', ').length || 1;
+                        const approxPrice = Math.round(selectedOrder.subtotal / itemCount);
+                        return (
+                          <tr key={i} className="text-stone-800">
+                            <td className="py-2 px-3 font-medium">{name}</td>
+                            <td className="py-2 px-3 text-right font-mono font-bold text-stone-600">x{qty}</td>
+                            <td className="py-2 px-3 text-right font-mono font-bold text-stone-900">
+                              {formatVND(approxPrice)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="flex justify-between text-stone-600 font-medium">
+              </div>
+              <div className="space-y-2 pt-2 text-sm">
+                <div className="flex justify-between text-stone-700 font-medium">
+                  <span>Tiền hàng trước thuế:</span>
+                  <span className="font-mono text-stone-900 font-semibold">{formatVND(selectedOrder.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-stone-700 font-medium">
                   <span>Thuế VAT (8%):</span>
-                  <span className="text-stone-800 font-semibold">{formatVND(selectedOrder.vat)}</span>
+                  <span className="font-mono text-stone-900 font-semibold">{formatVND(selectedOrder.vat)}</span>
                 </div>
                 <div className="flex justify-between text-base font-extrabold text-stone-900 pt-2 border-t border-stone-200">
                   <span>Tổng thanh toán:</span>
-                  <span className="text-ops-brand text-lg">{formatVND(selectedOrder.total)}</span>
+                  <span className="text-ops-brand text-lg font-mono font-black">{formatVND(selectedOrder.total)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-stone-200">
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-stone-200">
               <button
                 onClick={() => {
                   showToast(`Đang in lại phiếu hóa đơn ${selectedOrder.id} ra máy in thu ngân...`);
                   setSelectedOrder(null);
                 }}
-                className="px-4 py-2 bg-stone-100 border border-stone-200 hover:bg-stone-200 text-stone-900 text-xs font-mono uppercase rounded-lg font-bold cursor-pointer transition-colors"
+                className="px-3.5 py-2 bg-white border border-stone-300 hover:bg-stone-50 text-stone-800 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
               >
-                In Lại Hóa Đơn
+                <Printer className="w-4 h-4 text-stone-600" />
+                <span>In Phiếu 80mm</span>
               </button>
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="px-4 py-2 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-mono uppercase rounded-lg font-bold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
               >
                 Đóng
               </button>

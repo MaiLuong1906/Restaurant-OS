@@ -264,7 +264,7 @@ export default function AdminBillsPage() {
             <select
               value={methodFilter}
               onChange={(e) => setMethodFilter(e.target.value)}
-              className="px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-bold text-stone-800 focus:outline-none focus:border-ops-brand cursor-pointer"
+              className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-semibold text-stone-800 focus:outline-none focus:border-ops-brand cursor-pointer shadow-2xs"
             >
               <option value="ALL">Mọi phương thức</option>
               <option value="VIETQR DYNAMIC">VietQR Dynamic</option>
@@ -341,7 +341,7 @@ export default function AdminBillsPage() {
                             CQT ĐÃ CẤP MÃ
                           </span>
                         ) : (
-                          <span className="font-mono text-[11px] text-stone-400 font-medium">
+                          <span className="font-mono text-[11px] text-stone-600 bg-stone-100 px-2 py-0.5 rounded border border-stone-200 font-medium">
                             Chưa cấp mã
                           </span>
                         )}
@@ -382,7 +382,7 @@ export default function AdminBillsPage() {
                           >
                             <Printer className="w-4 h-4" />
                           </button>
-                          {bill.status === 'PAID' && (
+                          {bill.status === 'PAID' ? (
                             <button
                               onClick={() => handleOpenVoidModal(bill.id)}
                               className="p-1.5 hover:bg-rose-50 text-rose-600 hover:text-rose-800 rounded-md transition-colors"
@@ -390,6 +390,10 @@ export default function AdminBillsPage() {
                             >
                               <Ban className="w-4 h-4" />
                             </button>
+                          ) : (
+                            <span className="p-1.5 text-stone-300 cursor-not-allowed inline-flex" title="Không khả dụng">
+                              <Ban className="w-4 h-4 opacity-25" />
+                            </span>
                           )}
                         </div>
                       </td>
@@ -434,8 +438,8 @@ export default function AdminBillsPage() {
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-lg space-y-3 font-mono text-xs text-stone-900">
               <div className="text-center pb-2 border-b border-dashed border-stone-300">
                 <h4 className="font-ops font-bold text-sm uppercase text-stone-900">BOMBAY PALACE CONNAUGHT</h4>
-                <p className="text-[11px] text-stone-600 font-medium">Fine Dining London & Asian Luxury Cuisine</p>
-                <p className="text-[10px] text-stone-500">MST: 0108928374 • Hotline: 1900 6868</p>
+                <p className="text-xs text-stone-700 font-medium">Fine Dining London & Asian Luxury Cuisine</p>
+                <p className="text-xs text-stone-600 font-medium">MST: 0108928374 • Hotline: 1900 6868</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-[11px] py-1 border-b border-dashed border-stone-300">
@@ -515,14 +519,14 @@ export default function AdminBillsPage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-stone-200">
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-stone-200">
               <button
                 onClick={() => {
                   showToast(`Đang gửi phiếu hóa đơn ${selectedBill.id} qua Zalo / SMS cho khách hàng...`);
                 }}
-                className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-900 text-xs font-mono uppercase rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 bg-white hover:bg-stone-50 border border-stone-200 text-stone-800 text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
               >
-                <Send className="w-3.5 h-3.5" />
+                <Send className="w-3.5 h-3.5 text-stone-600" />
                 <span>Gửi Zalo / Email</span>
               </button>
               <button
@@ -530,14 +534,14 @@ export default function AdminBillsPage() {
                   showToast(`Đang in lại hóa đơn ${selectedBill.id} ra máy in thu ngân...`);
                   setSelectedBill(null);
                 }}
-                className="px-4 py-2 bg-stone-900 hover:bg-black text-white text-xs font-mono uppercase rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-stone-900 hover:bg-black text-white text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>In Phiếu 80mm</span>
               </button>
               <button
                 onClick={() => setSelectedBill(null)}
-                className="px-4 py-2 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-mono uppercase rounded-lg font-bold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 text-xs font-bold rounded-lg cursor-pointer transition-colors"
               >
                 Đóng
               </button>
@@ -559,7 +563,7 @@ export default function AdminBillsPage() {
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-stone-200 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-stone-200">
               <div className="flex items-center gap-2">
-                <Lock className="w-5 h-5 text-ops-brand" />
+                <Lock className="w-5 h-5 text-rose-600" />
                 <h3 className="font-ops text-sm font-bold text-stone-900">
                   Xác Thực Hủy Hóa Đơn {voidBillId}
                 </h3>
@@ -573,8 +577,8 @@ export default function AdminBillsPage() {
               </button>
             </div>
 
-            <p className="text-xs text-stone-600 font-medium">
-              Thao tác này sẽ hủy giao dịch, hoàn nguyên nguyên vật liệu về kho BOM và tạo biên bản ghi vết kiểm toán hệ thống:
+            <p className="text-xs text-stone-600 font-medium leading-relaxed">
+              Thao tác này sẽ hủy giao dịch, <strong className="text-stone-900 font-bold">hoàn nguyên nguyên vật liệu về kho BOM</strong> và tạo biên bản ghi vết kiểm toán hệ thống:
             </p>
 
             <form onSubmit={handleConfirmVoid} className="space-y-4">
@@ -585,7 +589,7 @@ export default function AdminBillsPage() {
                 <select
                   value={voidReason}
                   onChange={(e) => setVoidReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-medium text-stone-900 focus:outline-none focus:border-ops-brand cursor-pointer"
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-medium text-stone-900 focus:outline-none focus:border-rose-500 cursor-pointer"
                 >
                   <option value="Khách đổi món trước chế biến">Khách đổi món trước chế biến</option>
                   <option value="Thu ngân gộp nhầm bàn">Thu ngân gộp nhầm bàn</option>
@@ -622,25 +626,26 @@ export default function AdminBillsPage() {
                           pinInputRefs.current[i - 1]?.focus();
                         }
                       }}
-                      className="w-11 h-12 text-center text-lg font-mono font-bold bg-stone-50 border border-stone-300 rounded-lg focus:outline-none focus:border-ops-brand text-stone-900"
+                      className="w-11 h-12 text-center text-lg font-mono font-bold bg-stone-50 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-stone-900 transition-all shadow-2xs"
                     />
                   ))}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setVoidModalOpen(false)}
-                  className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-mono uppercase rounded-lg font-bold cursor-pointer"
+                  className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-lg cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase rounded-lg font-bold cursor-pointer transition-colors"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
                 >
-                  Xác Nhận Hủy
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>Xác Nhận Hủy</span>
                 </button>
               </div>
             </form>

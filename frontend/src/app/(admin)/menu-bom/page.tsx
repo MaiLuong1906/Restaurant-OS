@@ -318,7 +318,7 @@ export default function AdminMenuBomPage() {
                         <img
                           src={dish.image}
                           alt={dish.name}
-                          className="w-12 h-12 rounded-lg object-cover border border-stone-200 shrink-0"
+                          className="w-12 h-12 rounded-lg object-cover aspect-square border border-stone-200 shrink-0"
                         />
                         <div>
                           <strong className="text-stone-900 text-sm font-bold block">{dish.name}</strong>
@@ -334,11 +334,12 @@ export default function AdminMenuBomPage() {
                       {/* Availability Toggle */}
                       <button
                         onClick={(e) => handleToggleSoldOut(dish.id, e)}
-                        className={`px-2.5 py-1 rounded font-mono text-xs uppercase font-bold shrink-0 border cursor-pointer transition-colors ${
+                        className={`px-2.5 py-1 rounded text-xs font-bold shrink-0 border cursor-pointer transition-colors ${
                           dish.isAvailable
                             ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
                             : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
                         }`}
+                        title="Nhấp để bật/tắt trạng thái mở bán"
                       >
                         {dish.isAvailable ? 'Đang Bán' : 'Tạm Hết Món'}
                       </button>
@@ -425,9 +426,9 @@ export default function AdminMenuBomPage() {
                             step="0.01"
                             value={ing.grossQty}
                             onChange={(e) => handleUpdateQty(ing.id, Number(e.target.value) || 0)}
-                            className="w-16 px-1.5 py-0.5 bg-white border border-stone-300 rounded text-right font-mono text-xs font-bold text-stone-900 focus:outline-none focus:border-ops-brand"
+                            className="w-20 px-2 py-1 bg-white border border-stone-300 rounded text-right font-mono text-xs font-bold text-stone-900 focus:outline-none focus:border-ops-brand shadow-2xs"
                           />
-                          <span className="text-xs text-stone-600 font-medium ml-1">{ing.unit}</span>
+                          <span className="text-xs text-stone-600 font-medium ml-1.5">{ing.unit}</span>
                         </td>
                         <td className="py-3 px-2 text-right text-stone-700 font-semibold">
                           {ing.yieldLossPct}%
@@ -441,9 +442,10 @@ export default function AdminMenuBomPage() {
                         <td className="py-3 px-2 text-center">
                           <button
                             onClick={() => handleRemoveIngredient(ing.id)}
-                            className="p-1 text-stone-400 hover:text-rose-700 rounded transition-colors cursor-pointer"
+                            className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                            title="Xóa nguyên liệu khỏi BOM"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
@@ -540,19 +542,19 @@ export default function AdminMenuBomPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-ops-border">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-ops-border">
                 <button
                   type="button"
                   onClick={() => setNewDishModalOpen(false)}
-                  className="px-3 py-1.5 bg-white border border-ops-border text-ops-muted text-xs font-mono uppercase rounded cursor-pointer"
+                  className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-lg cursor-pointer transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-mono uppercase rounded font-bold cursor-pointer"
+                  className="px-4 py-2 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-xs"
                 >
-                  Tạo Món & Thêm BOM
+                  Tạo Món
                 </button>
               </div>
             </form>

@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Search,
   X,
+  Plus,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 import { INITIAL_STOCK, StockItem } from '@/services/mock';
@@ -184,10 +185,10 @@ export default function AdminInventoryPage() {
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono uppercase font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     activeCategory === cat.id
-                      ? 'bg-ops-brand text-white shadow-xs'
-                      : 'bg-stone-50 text-stone-700 hover:text-stone-900 border border-stone-200'
+                      ? 'bg-stone-900 text-white shadow-xs'
+                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200 border border-stone-200'
                   }`}
                 >
                   {cat.label}
@@ -214,11 +215,11 @@ export default function AdminInventoryPage() {
               <thead>
                 <tr className="bg-stone-100 border-y border-stone-200 text-stone-700 font-mono text-xs uppercase">
                   <th className="py-3 px-3 font-bold">Mặt Hàng &amp; Quy Cách</th>
-                  <th className="py-3 px-3 font-bold">Vị Trí Lưu Kho</th>
-                  <th className="py-3 px-3 text-right font-bold">Tồn Thực Tế</th>
-                  <th className="py-3 px-3 text-right font-bold">Mức An Toàn</th>
-                  <th className="py-3 px-3 text-right font-bold">Đơn Giá Nhập</th>
-                  <th className="py-3 px-3 text-right font-bold">Tổng Giá Trị</th>
+                  <th className="py-3 px-3 font-bold border-r border-stone-200">Vị Trí Lưu Kho</th>
+                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Tồn Thực Tế</th>
+                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Mức An Toàn</th>
+                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Đơn Giá Nhập</th>
+                  <th className="py-3 px-3 text-right font-bold border-r border-stone-200">Tổng Giá Trị</th>
                   <th className="py-3 px-3 text-center font-bold">Trạng Thái</th>
                   <th className="py-3 px-3 text-center font-bold">Thao Tác</th>
                 </tr>
@@ -242,23 +243,27 @@ export default function AdminInventoryPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-3 font-sans text-ops-muted">{item.location}</td>
-                    <td className="py-3 px-3 text-right font-bold text-ops-ink text-sm">
+                    <td className="py-3 px-3 font-sans text-ops-muted border-r border-stone-200/60">{item.location}</td>
+                    <td className="py-3 px-3 text-right font-bold text-ops-ink text-sm border-r border-stone-200/60">
                       {item.actualStock} {item.unit}
                     </td>
-                    <td className="py-3 px-3 text-right text-ops-muted">
+                    <td className="py-3 px-3 text-right text-stone-600 font-medium border-r border-stone-200/60">
                       {item.safetyStock} {item.unit}
                     </td>
-                    <td className="py-3 px-3 text-right text-ops-muted">{formatVND(item.costPrice)}</td>
-                    <td className="py-3 px-3 text-right font-bold text-ops-ink">{formatVND(item.totalValue)}</td>
+                    <td className="py-3 px-3 text-right text-stone-700 font-semibold border-r border-stone-200/60">
+                      {formatVND(item.costPrice)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-stone-900 border-r border-stone-200/60">
+                      {formatVND(item.totalValue)}
+                    </td>
                     <td className="py-3 px-3 text-center font-sans">
                       <span
-                        className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold border ${
+                        className={`px-2.5 py-1 rounded text-xs font-bold border inline-block ${
                           item.status === 'SAFE'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            ? 'bg-emerald-100/90 text-emerald-900 border-emerald-300'
                             : item.status === 'LOW'
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-rose-50 text-rose-800 border-rose-200'
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                            : 'bg-rose-100 text-rose-900 border-rose-300 font-extrabold animate-pulse'
                         }`}
                       >
                         {item.status === 'SAFE' ? 'AN TOÀN' : item.status === 'LOW' ? 'SẮP HẾT' : 'BÁO ĐỘNG'}
@@ -270,9 +275,10 @@ export default function AdminInventoryPage() {
                           setPoForm((prev) => ({ ...prev, sku: item.sku }));
                           setPoModalOpen(true);
                         }}
-                        className="px-2.5 py-1 bg-ops-bg border border-ops-border hover:bg-stone-200 text-ops-ink text-[10px] font-mono uppercase rounded font-semibold cursor-pointer"
+                        title={`Tạo đơn nhập hàng cho ${item.name}`}
+                        className="p-1.5 bg-stone-100 hover:bg-stone-900 hover:text-white border border-stone-200 text-stone-700 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center shadow-2xs"
                       >
-                        Nhập Thêm
+                        <Plus className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>

@@ -166,8 +166,9 @@ export default function AdminTablesPage() {
     phone: '',
     guestsCount: '4',
     tableId: 'A01',
+    date: '2026-11-14',
     time: '19:30',
-    notes: 'Kỷ niệm ngày cưới',
+    notes: '',
   });
 
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
@@ -269,6 +270,7 @@ export default function AdminTablesPage() {
       phone: '',
       guestsCount: '4',
       tableId: 'A01',
+      date: '2026-11-14',
       time: '19:30',
       notes: '',
     });
@@ -338,7 +340,7 @@ export default function AdminTablesPage() {
               className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-white text-stone-800 border border-stone-200 hover:bg-stone-50 text-xs font-mono uppercase tracking-wider rounded-lg shadow-2xs cursor-pointer font-bold transition-colors"
             >
               <Split className="h-4 w-4 text-ops-brand" />
-              <span>Tách / Gộp Bàn</span>
+              <span>Chuyển / Gộp Bàn</span>
             </button>
             <button
               onClick={() => setBookingModalOpen(true)}
@@ -482,13 +484,13 @@ export default function AdminTablesPage() {
               <div
                 key={t.id}
                 onClick={() => setSelectedTableId(t.id)}
-                className={`bg-white rounded-xl border border-stone-200 p-4 flex flex-col justify-between h-[165px] shadow-2xs hover:shadow-md transition-all cursor-pointer group ${getStatusBorder(
+                className={`bg-white rounded-xl border border-stone-200 p-4 flex flex-col justify-between shadow-2xs hover:shadow-md hover:border-ops-brand transition-all cursor-pointer group ${getStatusBorder(
                   t.status
                 )}`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between pb-2 border-b border-stone-100">
                   <div className="flex items-center gap-2">
-                    <h2 className="font-ops text-stone-900 text-base font-bold">{t.name}</h2>
+                    <h2 className="font-ops text-stone-900 text-base font-bold group-hover:text-ops-brand transition-colors">{t.name}</h2>
                     <span className="font-mono text-xs uppercase px-2 py-0.5 rounded bg-stone-100 text-stone-700 font-bold border border-stone-200">
                       {t.capacity}
                     </span>
@@ -505,7 +507,7 @@ export default function AdminTablesPage() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between my-auto">
+                <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2.5 h-2.5 rounded-full ${getStatusDot(t.status)}`} />
                     <span className="text-xs font-bold text-stone-900">{t.status}</span>
@@ -515,9 +517,12 @@ export default function AdminTablesPage() {
                   </span>
                 </div>
 
-                <div className="w-full py-1.5 px-3 bg-stone-50 group-hover:bg-stone-200 border border-stone-200 text-stone-800 font-mono text-xs uppercase tracking-wider rounded-lg transition-colors font-bold flex items-center justify-center gap-1">
-                  <Receipt className="w-3.5 h-3.5" />
-                  <span>Xem Chi Tiết Món</span>
+                <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500 font-medium">
+                  <span className="flex items-center gap-1 group-hover:text-ops-brand transition-colors">
+                    <Receipt className="w-3.5 h-3.5 text-stone-400 group-hover:text-ops-brand" />
+                    <span>{t.orders.length > 0 ? `${t.orders.length} món đang gọi` : 'Chưa gọi món'}</span>
+                  </span>
+                  <span className="text-stone-400 group-hover:text-ops-brand font-bold">Chi tiết &rarr;</span>
                 </div>
               </div>
             );
@@ -686,14 +691,14 @@ export default function AdminTablesPage() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Điều Phối / Gộp Bàn Ăn"
-          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+          aria-label="Chuyển / Gộp Bàn Ăn"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
         >
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
               <div className="flex items-center gap-2">
                 <Split className="w-5 h-5 text-ops-brand" />
-                <h3 className="font-sans text-base font-bold text-ops-ink">Điều Phối / Gộp Bàn Ăn</h3>
+                <h3 className="font-sans text-base font-bold text-ops-ink">Chuyển / Gộp Bàn Ăn</h3>
               </div>
               <button
                 onClick={() => setMergeModalOpen(false)}
@@ -703,19 +708,19 @@ export default function AdminTablesPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-xs text-ops-muted">
+            <p className="text-xs text-ops-muted leading-relaxed">
               Chuyển toàn bộ các món đã gọi từ bàn nguồn sang bàn đích và cập nhật trạng thái trên POS:
             </p>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                  Bàn Nguồn (Cần Chuyển)
+                <label className="text-xs font-semibold text-stone-700 block mb-1">
+                  Bàn nguồn (cần chuyển)
                 </label>
                 <select
                   value={mergeSource}
                   onChange={(e) => setMergeSource(e.target.value)}
-                  className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono font-bold"
+                  className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono font-bold cursor-pointer"
                 >
                   {Object.keys(tables).map((id) => (
                     <option key={id} value={id}>
@@ -726,13 +731,13 @@ export default function AdminTablesPage() {
               </div>
 
               <div>
-                <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                  Bàn Đích (Nhận Món)
+                <label className="text-xs font-semibold text-stone-700 block mb-1">
+                  Bàn đích (nhận món)
                 </label>
                 <select
                   value={mergeTarget}
                   onChange={(e) => setMergeTarget(e.target.value)}
-                  className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono font-bold"
+                  className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono font-bold cursor-pointer"
                 >
                   {Object.keys(tables).map((id) => (
                     <option key={id} value={id}>
@@ -747,16 +752,16 @@ export default function AdminTablesPage() {
               <button
                 type="button"
                 onClick={() => setMergeModalOpen(false)}
-                className="px-3 py-1.5 bg-white border border-ops-border text-ops-muted text-xs font-mono uppercase rounded cursor-pointer"
+                className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-lg cursor-pointer transition-colors"
               >
                 Hủy
               </button>
               <button
                 type="button"
                 onClick={handleConfirmMerge}
-                className="px-4 py-1.5 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-mono uppercase rounded font-bold cursor-pointer"
+                className="px-4 py-2 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
               >
-                Xác Nhận Gộp
+                Xác Nhận Chuyển / Gộp
               </button>
             </div>
           </div>
@@ -769,7 +774,7 @@ export default function AdminTablesPage() {
           role="dialog"
           aria-modal="true"
           aria-label="Tiếp Nhận Đặt Chỗ Mới"
-          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
         >
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-ops-border space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-ops-border">
@@ -786,10 +791,10 @@ export default function AdminTablesPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateBooking} className="space-y-3 text-xs">
+            <form onSubmit={handleCreateBooking} className="space-y-3.5 text-xs">
               <div>
-                <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                  Tên Khách Hàng *
+                <label className="text-xs font-semibold text-stone-800 block mb-1">
+                  Tên khách hàng <span className="text-rose-600 font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -797,92 +802,107 @@ export default function AdminTablesPage() {
                   placeholder="Ví dụ: Anh Hoàng Tuấn"
                   value={newBooking.guestName}
                   onChange={(e) => setNewBooking({ ...newBooking, guestName: e.target.value })}
-                  className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-medium"
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-ops-brand font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                    Số Điện Thoại
+                  <label className="text-xs font-semibold text-stone-800 block mb-1">
+                    Số điện thoại <span className="text-rose-600 font-bold">*</span>
                   </label>
                   <input
                     type="tel"
+                    required
                     placeholder="0912 345 678"
                     value={newBooking.phone}
                     onChange={(e) => setNewBooking({ ...newBooking, phone: e.target.value })}
-                    className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono"
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-ops-brand font-mono font-medium"
                   />
                 </div>
                 <div>
-                  <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                    Số Lượng Khách
+                  <label className="text-xs font-semibold text-stone-800 block mb-1">
+                    Số lượng khách <span className="text-rose-600 font-bold">*</span>
                   </label>
                   <input
                     type="number"
+                    required
                     min="1"
                     max="20"
                     value={newBooking.guestsCount}
                     onChange={(e) => setNewBooking({ ...newBooking, guestsCount: e.target.value })}
-                    className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono"
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:border-ops-brand font-mono font-medium"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2.5">
                 <div>
-                  <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                    Gán Bàn Phục Vụ
+                  <label className="text-xs font-semibold text-stone-800 block mb-1">
+                    Gán bàn <span className="text-rose-600 font-bold">*</span>
                   </label>
                   <select
                     value={newBooking.tableId}
                     onChange={(e) => setNewBooking({ ...newBooking, tableId: e.target.value })}
-                    className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono font-bold"
+                    className="w-full px-2.5 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:border-ops-brand font-mono font-bold cursor-pointer"
                   >
                     {Object.keys(tables).map((id) => (
                       <option key={id} value={id}>
-                        {tables[id].name} ({tables[id].capacity})
+                        {tables[id].name}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                    Thời Gian Đến
+                  <label className="text-xs font-semibold text-stone-800 block mb-1">
+                    Ngày đến <span className="text-rose-600 font-bold">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newBooking.date}
+                    onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
+                    className="w-full px-2 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:border-ops-brand font-mono text-[11px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-stone-800 block mb-1">
+                    Giờ đến (24h) <span className="text-rose-600 font-bold">*</span>
                   </label>
                   <input
                     type="time"
+                    required
                     value={newBooking.time}
                     onChange={(e) => setNewBooking({ ...newBooking, time: e.target.value })}
-                    className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand font-mono"
+                    className="w-full px-2 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:border-ops-brand font-mono text-[11px]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-mono text-[10px] uppercase font-bold text-ops-muted block mb-1">
-                  Ghi Chú Đặc Biệt (Dị ứng, Trang trí)
+                <label className="text-xs font-semibold text-stone-800 block mb-1">
+                  Ghi chú đặc biệt (dị ứng, vị trí ngồi)
                 </label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Kỷ niệm ngày cưới, xếp bàn cạnh cửa sổ"
+                  placeholder="Ví dụ: Kỷ niệm ngày cưới, xếp bàn cạnh cửa sổ..."
                   value={newBooking.notes}
                   onChange={(e) => setNewBooking({ ...newBooking, notes: e.target.value })}
-                  className="w-full px-3 py-2 bg-ops-bg border border-ops-border rounded-lg text-ops-ink focus:outline-none focus:border-ops-brand"
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-ops-brand"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-ops-border">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-ops-border">
                 <button
                   type="button"
                   onClick={() => setBookingModalOpen(false)}
-                  className="px-3 py-1.5 bg-white border border-ops-border text-ops-muted text-xs font-mono uppercase rounded cursor-pointer"
+                  className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-lg cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-mono uppercase rounded font-bold cursor-pointer"
+                  className="px-4 py-2 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
                 >
                   Lưu Đặt Bàn
                 </button>

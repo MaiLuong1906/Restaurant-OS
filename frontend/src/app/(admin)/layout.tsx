@@ -164,8 +164,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </Link>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-ops-brand bg-ops-brand-light px-2 py-0.5 rounded border border-ops-brand/20">
-                OS v7.2
+              <span className="font-mono text-[10px] text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">
+                v7.2
               </span>
               <button
                 type="button"
@@ -186,12 +186,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <span className="font-mono text-xs uppercase tracking-wider text-stone-700 font-bold">
                     {group.groupTitle}
                   </span>
-                  {group.badge ? (
+                  {group.badge && (
                     <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-bold">
                       {group.badge}
                     </span>
-                  ) : (
-                    <span className="w-1.5 h-1.5 bg-stone-300 rounded-full" />
                   )}
                 </div>
                 <div className="space-y-0.5">
@@ -221,9 +219,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Sidebar Bottom LAN Status Strip */}
-        <div className="p-3.5 border-t border-ops-border bg-stone-50">
+        <div className="p-3.5 pb-6 border-t border-ops-border bg-stone-50">
           <div className="flex items-center justify-between text-stone-700 font-mono text-xs">
-            <span className="flex items-center gap-1.5 font-medium">
+            <span className="flex items-center gap-1.5 font-medium pl-6 lg:pl-0">
               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
               STOMP #POS-CONNAUGHT
             </span>
