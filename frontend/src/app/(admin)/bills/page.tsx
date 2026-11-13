@@ -17,180 +17,9 @@ import {
   Send,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
-
-interface BillItem {
-  name: string;
-  qty: number;
-  price: number;
-}
-
-interface Bill {
-  id: string;
-  eInvoiceCode?: string;
-  time: string;
-  table: string;
-  zone: string;
-  customer: string;
-  phone?: string;
-  cashier: string;
-  items: BillItem[];
-  subtotal: number;
-  discount: number;
-  vat: number;
-  total: number;
-  paymentMethod: 'VIETQR DYNAMIC' | 'THẺ TÍN DỤNG' | 'TIỀN MẶT' | 'CHUYỂN KHOẢN';
-  status: 'PAID' | 'PENDING' | 'VOIDED' | 'REFUNDED';
-  cqtVerified: boolean;
-  voidReason?: string;
-}
-
-const INITIAL_BILLS: Bill[] = [
-  {
-    id: '#ORD-9024',
-    eInvoiceCode: 'HD-2024-009024',
-    time: '19:42:15',
-    table: 'Bàn VIP-02',
-    zone: 'Tầng 2 - Phòng Riêng',
-    customer: 'Ông Trần Hoàng Long',
-    phone: '0903 *** 888',
-    cashier: 'Nguyễn Văn Nam',
-    items: [
-      { name: 'Royal Lamb Biryani', qty: 2, price: 650000 },
-      { name: 'Château Margaux 2015', qty: 1, price: 1850000 },
-      { name: 'Garlic Butter Naan', qty: 3, price: 100000 },
-    ],
-    subtotal: 3450000,
-    discount: 0,
-    vat: 276000,
-    total: 3726000,
-    paymentMethod: 'VIETQR DYNAMIC',
-    status: 'PAID',
-    cqtVerified: true,
-  },
-  {
-    id: '#ORD-9023',
-    eInvoiceCode: 'HD-2024-009023',
-    time: '19:28:40',
-    table: 'Bàn T1-04',
-    zone: 'Tầng 1 - Sảnh Chính',
-    customer: 'Khách Vãng Lai',
-    cashier: 'Mai Thị Hoa',
-    items: [
-      { name: 'Butter Chicken Masala', qty: 2, price: 280000 },
-      { name: 'Saffron Pilau Rice', qty: 2, price: 120000 },
-      { name: 'Mango Lassi', qty: 2, price: 85000 },
-    ],
-    subtotal: 970000,
-    discount: 50000,
-    vat: 73600,
-    total: 993600,
-    paymentMethod: 'TIỀN MẶT',
-    status: 'PAID',
-    cqtVerified: true,
-  },
-  {
-    id: '#ORD-9022',
-    eInvoiceCode: 'HD-2024-009022',
-    time: '19:15:02',
-    table: 'Bàn T1-02',
-    zone: 'Tầng 1 - Sảnh Chính',
-    customer: 'Bà Lê Kim Ngân (Thành Viên Gold)',
-    phone: '0912 *** 345',
-    cashier: 'Mai Thị Hoa',
-    items: [
-      { name: 'Tandoori King Prawns', qty: 2, price: 480000 },
-      { name: 'Palak Paneer', qty: 1, price: 210000 },
-      { name: 'Cheese Garlic Naan', qty: 4, price: 90000 },
-    ],
-    subtotal: 1530000,
-    discount: 153000,
-    vat: 110160,
-    total: 1487160,
-    paymentMethod: 'THẺ TÍN DỤNG',
-    status: 'PAID',
-    cqtVerified: true,
-  },
-  {
-    id: '#ORD-9021',
-    time: '18:55:10',
-    table: 'Bàn OUT-01',
-    zone: 'Sân Vườn Terrace',
-    customer: 'Khách Đặt Trước',
-    cashier: 'Phạm Đức Duy',
-    items: [
-      { name: 'Bò Lúc Lắc Wagyu A4 & Nấm Truffle', qty: 1, price: 480000 },
-    ],
-    subtotal: 480000,
-    discount: 0,
-    vat: 38400,
-    total: 518400,
-    paymentMethod: 'TIỀN MẶT',
-    status: 'VOIDED',
-    cqtVerified: false,
-  },
-  {
-    id: '#ORD-9020',
-    eInvoiceCode: 'HD-2024-009020',
-    time: '18:40:22',
-    table: 'Bàn VIP-01',
-    zone: 'Tầng 2 - Phòng Riêng',
-    customer: 'Công ty Cổ Phần Alpha Tech',
-    phone: '028 3822 ****',
-    cashier: 'Nguyễn Văn Nam',
-    items: [
-      { name: 'Thịt Cừu Nướng Rogan Josh', qty: 3, price: 420000 },
-      { name: 'Bánh Samosa Thập Cẩm', qty: 4, price: 150000 },
-      { name: 'Chai Rượu Vang Đỏ Shiraz', qty: 2, price: 1200000 },
-    ],
-    subtotal: 4260000,
-    discount: 426000,
-    vat: 306720,
-    total: 4140720,
-    paymentMethod: 'CHUYỂN KHOẢN',
-    status: 'PAID',
-    cqtVerified: true,
-  },
-  {
-    id: '#ORD-9019',
-    time: '18:22:15',
-    table: 'Bàn T1-06',
-    zone: 'Tầng 1 - Sảnh Chính',
-    customer: 'Khách Vãng Lai',
-    cashier: 'Mai Thị Hoa',
-    items: [
-      { name: 'Lobster Thermidor Thượng Hạng', qty: 1, price: 1650000 },
-      { name: 'Súp Hải Sản saffron', qty: 2, price: 165000 },
-    ],
-    subtotal: 1980000,
-    discount: 0,
-    vat: 158400,
-    total: 2138400,
-    paymentMethod: 'VIETQR DYNAMIC',
-    status: 'PENDING',
-    cqtVerified: false,
-  },
-  {
-    id: '#ORD-9018',
-    eInvoiceCode: 'HD-2024-009018',
-    time: '17:50:00',
-    table: 'Bàn T1-01',
-    zone: 'Tầng 1 - Sảnh Chính',
-    customer: 'Anh Vũ Đình Tuấn',
-    cashier: 'Phạm Đức Duy',
-    items: [
-      { name: 'Cà Ri Gà Korma Hạt Điều', qty: 1, price: 290000 },
-      { name: 'Cơm Nị Nghệ Tây', qty: 1, price: 110000 },
-      { name: 'Trà Sữa Masala Nóng', qty: 2, price: 65000 },
-    ],
-    subtotal: 530000,
-    discount: 0,
-    vat: 42400,
-    total: 572400,
-    paymentMethod: 'VIETQR DYNAMIC',
-    status: 'PAID',
-    cqtVerified: true,
-  },
-];
+import { AdminToast, useAdminToast, KpiCard } from '@/components/admin';
+import { INITIAL_BILLS } from '@/services/mock';
+import { Bill } from './bills-helpers';
 
 export default function AdminBillsPage() {
   const MANAGER_PIN = '1234'; // PIN demo — thay bằng xác thực API trong production
@@ -198,7 +27,7 @@ export default function AdminBillsPage() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
   const [methodFilter, setMethodFilter] = React.useState<string>('ALL');
-  const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const { toastMsg, showToast } = useAdminToast(3200);
 
   // Modals
   const [selectedBill, setSelectedBill] = React.useState<Bill | null>(null);
@@ -207,13 +36,6 @@ export default function AdminBillsPage() {
   const [voidReason, setVoidReason] = React.useState('Khách đổi món trước chế biến');
   const [voidPin, setVoidPin] = React.useState(['', '', '', '']);
   const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
-  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  React.useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
 
   // Modal a11y: Escape key listener
   React.useEffect(() => {
@@ -233,12 +55,6 @@ export default function AdminBillsPage() {
       setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
     }
   }, [voidModalOpen]);
-
-  const showToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMsg(msg);
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3200);
-  };
 
   const handleOpenVoidModal = (billId: string) => {
     setVoidBillId(billId);
@@ -292,12 +108,8 @@ export default function AdminBillsPage() {
 
   return (
     <div className="w-full">
-      {/* Toast Alert */}
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-4 py-2.5 rounded-lg shadow-xl border border-stone-700 text-xs font-semibold animate-in fade-in slide-in-from-bottom-2">
-          {toastMsg}
-        </div>
-      )}
+      {/* Toast Alert Dùng Chung */}
+      <AdminToast message={toastMsg} />
 
       {/* Top Header Strip */}
       <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-stone-200">
@@ -334,95 +146,59 @@ export default function AdminBillsPage() {
         </div>
       </div>
 
-      {/* 4 Summary KPI Cards */}
+      {/* 4 Summary KPI Cards (Dùng KpiCard Component) */}
       <div className="px-4 sm:px-6 lg:px-8 pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1 */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-ops-brand" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                DOANH THU THỰC THU
-              </span>
-              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-xs font-bold rounded">
-                +14.2% CA TRƯỚC
-              </span>
+        <KpiCard
+          title="DOANH THU THỰC THU"
+          value={formatVND(totalPaidRevenue)}
+          badge={{ text: '+14.2% CA TRƯỚC', variant: 'success' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>Đã thu tiền thành công</span>
+              <span className="font-mono font-bold text-emerald-700">{totalPaidCount} hóa đơn</span>
             </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
-              {formatVND(totalPaidRevenue)}
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>Đã thu tiền thành công</span>
-            <span className="font-mono font-bold text-emerald-700">{totalPaidCount} hóa đơn</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-ops-brand"
+        />
 
-        {/* KPI 2 */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-600" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                HÓA ĐƠN HOÀN TẤT
-              </span>
-              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-xs font-bold rounded">
-                97.2% TỶ LỆ
-              </span>
+        <KpiCard
+          title="HÓA ĐƠN HOÀN TẤT"
+          value={`${totalPaidCount} / ${bills.length}`}
+          badge={{ text: '97.2% TỶ LỆ', variant: 'success' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>Chờ thanh toán: 1 bàn</span>
+              <span className="font-mono font-bold text-stone-700">ĐANG PHỤC VỤ</span>
             </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
-              {totalPaidCount} / {bills.length}
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>Chờ thanh toán: 1 bàn</span>
-            <span className="font-mono font-bold text-stone-700">ĐANG PHỤC VỤ</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-emerald-600"
+        />
 
-        {/* KPI 3 */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                GIẢM GIÁ & VOUCHER
-              </span>
-              <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 font-mono text-xs font-bold rounded">
-                3 HÓA ĐƠN
-              </span>
+        <KpiCard
+          title="GIẢM GIÁ & VOUCHER"
+          value={formatVND(totalDiscount)}
+          badge={{ text: '3 HÓA ĐƠN', variant: 'warning' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>Chính sách thẻ VIP/Gold</span>
+              <span className="font-mono font-bold text-amber-700">ĐÃ ÁP DỤNG</span>
             </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
-              {formatVND(totalDiscount)}
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>Chính sách thẻ VIP/Gold</span>
-            <span className="font-mono font-bold text-amber-700">ĐÃ ÁP DỤNG</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-amber-500"
+        />
 
-        {/* KPI 4 */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-2xs flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-rose-600" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                HỦY & TRẢ MÓN (VOID)
-              </span>
-              <span className="px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-200 font-mono text-xs font-bold rounded">
-                1 HÓA ĐƠN
-              </span>
+        <KpiCard
+          title="HỦY & TRẢ MÓN (VOID)"
+          value={formatVND(totalVoidedAmount)}
+          badge={{ text: '1 HÓA ĐƠN', variant: 'danger' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>Đã hoàn nguyên kho BOM</span>
+              <span className="font-mono font-bold text-rose-700">KIỂM SOÁT TỐT</span>
             </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
-              {formatVND(totalVoidedAmount)}
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>Đã hoàn nguyên kho BOM</span>
-            <span className="font-mono font-bold text-rose-700">KIỂM SOÁT TỐT</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-rose-600"
+        />
       </div>
 
       {/* Filter Toolbar Area */}

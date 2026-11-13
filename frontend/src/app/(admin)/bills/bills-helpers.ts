@@ -4,13 +4,24 @@ export interface BillItem {
   price: number;
 }
 
-export type PaymentMethod = 'VIETQR' | 'CASH' | 'CARD' | 'TRANSFER';
-export type BillStatus = 'PAID' | 'VOIDED' | 'PENDING_CQT';
+export type PaymentMethod =
+  | 'VIETQR'
+  | 'CASH'
+  | 'CARD'
+  | 'TRANSFER'
+  | 'VIETQR DYNAMIC'
+  | 'THẺ TÍN DỤNG'
+  | 'TIỀN MẶT'
+  | 'CHUYỂN KHOẢN';
+
+export type BillStatus = 'PAID' | 'VOIDED' | 'PENDING' | 'PENDING_CQT' | 'REFUNDED';
 
 export interface Bill {
   id: string;
   table: string;
+  zone?: string;
   customer: string;
+  phone?: string;
   time: string;
   items: BillItem[];
   subtotal: number;
@@ -100,3 +111,4 @@ export function filterBills(bills: Bill[], filters: BillFilterCriteria): Bill[] 
     return matchesSearch && matchesStatus && matchesMethod;
   });
 }
+

@@ -11,6 +11,7 @@ import {
   Search,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
+import { AdminToast, useAdminToast, KpiCard } from '@/components/admin';
 
 interface DashboardAction {
   id: string;
@@ -43,26 +44,19 @@ interface RecentOrder {
 export default function AdminDashboardPage() {
   const MANAGER_PIN = '1234'; // PIN demo
   const [period, setPeriod] = React.useState<'live' | 'week' | 'month'>('live');
-  const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const { toastMsg, showToast } = useAdminToast();
 
   // Modal State for Pin Approval
   const [pinModalOpen, setPinModalOpen] = React.useState(false);
   const [pinDigits, setPinDigits] = React.useState(['', '', '', '']);
   const [actionToApprove, setActionToApprove] = React.useState<string | null>(null);
   const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
-  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Selected Order for Detail Modal (Strictly Typed)
   const [selectedOrder, setSelectedOrder] = React.useState<RecentOrder | null>(null);
 
   // Filter Search
   const [searchQuery, setSearchQuery] = React.useState('');
-
-  React.useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
 
   // Modal a11y: Escape key listener
   React.useEffect(() => {
@@ -82,12 +76,6 @@ export default function AdminDashboardPage() {
       setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
     }
   }, [pinModalOpen]);
-
-  const showToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMsg(msg);
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
-  };
 
   // Urgent Actions State
   const [actions, setActions] = React.useState<DashboardAction[]>([
@@ -269,12 +257,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="w-full">
-      {/* Toast Alert */}
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-ops-ink text-white px-4 py-2.5 rounded-lg shadow-lg border border-ops-border text-xs font-medium animate-in fade-in slide-in-from-bottom-2">
-          {toastMsg}
-        </div>
-      )}
+      {/* Toast Alert Dùng Chung */}
+      <AdminToast message={toastMsg} />
 
       {/* Top Command Status Strip */}
       <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-stone-200">
@@ -332,95 +316,71 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 4 Core Metric KPI Blocks */}
+      {/* 4 Core Metric KPI Blocks (Dùng KpiCard Component) */}
       <div className="px-4 sm:px-6 lg:px-8 pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Doanh thu */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 flex flex-col justify-between shadow-2xs relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-ops-brand" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                DOANH THU TÍCH LŨY
-              </span>
-              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-xs font-bold rounded whitespace-nowrap">
-                {METRICS.revGrowth}
-              </span>
+        <KpiCard
+          title="DOANH THU TÍCH LŨY"
+          value={formatVND(METRICS.rev)}
+          badge={{ text: METRICS.revGrowth, variant: 'success' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>{METRICS.target}</span>
+              <span className="font-mono font-bold text-emerald-700">{METRICS.targetPct}</span>
             </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
-              {formatVND(METRICS.rev)}
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>{METRICS.target}</span>
-            <span className="font-mono font-bold text-emerald-700">{METRICS.targetPct}</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-ops-brand"
+        />
 
         {/* KPI 2: Tải phòng ăn */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 flex flex-col justify-between shadow-2xs relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                TẢI PHÒNG ĂN
-              </span>
-              <span className="px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-200 font-mono text-xs font-bold rounded whitespace-nowrap">
-                4 BÀN &gt; 90 PHÚT
-              </span>
+        <KpiCard
+          title="TẢI PHÒNG ĂN"
+          value={METRICS.occ}
+          badge={{ text: '4 BÀN > 90 PHÚT', variant: 'danger' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>{METRICS.occDesc}</span>
+              <span className="font-mono font-bold text-amber-700">{METRICS.occPct}</span>
             </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
-              {METRICS.occ}
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>{METRICS.occDesc}</span>
-            <span className="font-mono font-bold text-amber-700">{METRICS.occPct}</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-amber-500"
+        />
 
         {/* KPI 3: Tốc độ bếp KDS */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 flex flex-col justify-between shadow-2xs relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-600" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                TỐC ĐỘ BẾP KDS
-              </span>
-              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-xs font-bold rounded whitespace-nowrap">
-                94% ĐÚNG SLA
-              </span>
-            </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
+        <KpiCard
+          title="TỐC ĐỘ BẾP KDS"
+          value={
+            <>
               {METRICS.kdsTime} <span className="text-sm text-stone-500 font-normal">/ 15:00 MAX</span>
+            </>
+          }
+          badge={{ text: '94% ĐÚNG SLA', variant: 'success' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>Vé đang ra: 14 vé</span>
+              <span className="font-mono font-bold text-emerald-700">TIẾN ĐỘ TỐT</span>
             </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>Vé đang ra: 14 vé</span>
-            <span className="font-mono font-bold text-emerald-700">TIẾN ĐỘ TỐT</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-emerald-600"
+        />
 
         {/* KPI 4: Food Cost */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 flex flex-col justify-between shadow-2xs relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-ops-brand" />
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700 whitespace-nowrap">
-                TỶ LỆ FOOD COST
-              </span>
-              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-xs font-bold rounded whitespace-nowrap">
-                MỤC TIÊU &lt; 33.0%
-              </span>
-            </div>
-            <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
+        <KpiCard
+          title="TỶ LỆ FOOD COST"
+          value={
+            <>
               {METRICS.cogs} <span className="text-sm text-emerald-700 font-bold ml-1">{METRICS.cogsDiff}</span>
+            </>
+          }
+          badge={{ text: 'MỤC TIÊU < 33.0%', variant: 'success' }}
+          subtext={
+            <div className="flex items-center justify-between">
+              <span>Định lượng BOM</span>
+              <span className="font-mono font-bold text-emerald-700">CHUẨN ĐỊNH MỨC</span>
             </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-            <span>Định lượng BOM</span>
-            <span className="font-mono font-bold text-emerald-700">CHUẨN ĐỊNH MỨC</span>
-          </div>
-        </div>
+          }
+          className="relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-ops-brand"
+        />
       </div>
 
       {/* Main Operational Area: Hourly Chart (Left 8 cols) & Action Feed (Right 4 cols) */}

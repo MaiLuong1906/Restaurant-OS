@@ -9,76 +9,8 @@ import {
   Search,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
-
-interface StaffPayroll {
-  id: string;
-  name: string;
-  role: string;
-  dept: 'BOH' | 'FOH' | 'Cashier';
-  baseSalary: number;
-  hours: number;
-  otHours: number;
-  bonus: number;
-  status: string;
-}
-
-const INITIAL_STAFF_PAYROLL: StaffPayroll[] = [
-  {
-    id: 'EMP-001',
-    name: 'Nguyễn Văn Tuấn',
-    role: 'Bếp Trưởng',
-    dept: 'BOH',
-    baseSalary: 15000000,
-    hours: 192,
-    otHours: 16,
-    bonus: 1500000,
-    status: 'SẴN SÀNG',
-  },
-  {
-    id: 'EMP-002',
-    name: 'Lê Văn An',
-    role: 'Phụ Bếp',
-    dept: 'BOH',
-    baseSalary: 9500000,
-    hours: 184,
-    otHours: 8,
-    bonus: 0,
-    status: 'SẴN SÀNG',
-  },
-  {
-    id: 'EMP-005',
-    name: 'Mai Thị Hoa',
-    role: 'Phục Vụ Lead',
-    dept: 'FOH',
-    baseSalary: 8500000,
-    hours: 176,
-    otHours: 12,
-    bonus: 300000,
-    status: 'SẴN SÀNG',
-  },
-  {
-    id: 'EMP-008',
-    name: 'Lê Thùy Linh',
-    role: 'Thu Ngân Trưởng',
-    dept: 'Cashier',
-    baseSalary: 9000000,
-    hours: 190,
-    otHours: 0,
-    bonus: 0,
-    status: 'SẴN SÀNG',
-  },
-  {
-    id: 'EMP-009',
-    name: 'Nguyễn Văn Nam',
-    role: 'Phục Vụ Runner',
-    dept: 'FOH',
-    baseSalary: 7500000,
-    hours: 180,
-    otHours: 6,
-    bonus: 200000,
-    status: 'SẴN SÀNG',
-  },
-];
+import { INITIAL_STAFF_PAYROLL, StaffPayroll } from '@/services/mock';
+import { AdminToast, useAdminToast } from '@/components/admin';
 
 interface StaffPayrollDetail extends StaffPayroll {
   tipShare: number;
@@ -87,12 +19,11 @@ interface StaffPayrollDetail extends StaffPayroll {
 
 export default function AdminPayrollPage() {
   const MANAGER_PIN = '1234'; // PIN demo
-  const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const { toastMsg, showToast } = useAdminToast(3000);
   const [showPinModal, setShowPinModal] = React.useState(false);
   const [pinDigits, setPinDigits] = React.useState(['', '', '', '']);
   const [isLocked, setIsLocked] = React.useState(false);
   const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
-  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Tip Pool Setting
   const [tipPoolTotal, setTipPoolTotal] = React.useState(18450000);
@@ -101,12 +32,6 @@ export default function AdminPayrollPage() {
 
   // Selected Staff for Detailed Modal (Strictly Typed)
   const [selectedStaff, setSelectedStaff] = React.useState<StaffPayrollDetail | null>(null);
-
-  React.useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
 
   // Modal a11y: Escape key listener
   React.useEffect(() => {
@@ -126,12 +51,6 @@ export default function AdminPayrollPage() {
       setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
     }
   }, [showPinModal]);
-
-  const showToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMsg(msg);
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
-  };
 
   const handlePinInput = (index: number, val: string) => {
     if (!/^\d*$/.test(val)) return;
@@ -176,11 +95,7 @@ export default function AdminPayrollPage() {
   return (
     <div className="w-full">
       {/* Toast Alert */}
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-ops-ink text-white px-4 py-2.5 rounded-lg shadow-lg border border-ops-border text-xs font-medium animate-in fade-in slide-in-from-bottom-2">
-          {toastMsg}
-        </div>
-      )}
+      <AdminToast message={toastMsg} />
 
       {/* Top Header */}
       <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 max-w-[1600px] mx-auto w-full">

@@ -8,94 +8,8 @@ import {
   X,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
-
-interface StockItem {
-  sku: string;
-  name: string;
-  specs: string;
-  location: string;
-  category: 'cold' | 'chill' | 'dry' | 'wine';
-  unit: string;
-  actualStock: number;
-  safetyStock: number;
-  costPrice: number;
-  totalValue: number;
-  status: 'SAFE' | 'LOW' | 'CRITICAL';
-  image: string;
-}
-
-const INITIAL_STOCK: StockItem[] = [
-  {
-    sku: 'RAW-WAGYU-A4',
-    name: 'Thịt bò Wagyu Nhật A4',
-    specs: 'Striploin (Cấp đông chuẩn)',
-    location: 'Kho đông #B2 (-18°C)',
-    category: 'cold',
-    unit: 'kg',
-    actualStock: 8.2,
-    safetyStock: 10.0,
-    costPrice: 650000,
-    totalValue: 5330000,
-    status: 'LOW',
-    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    sku: 'RAW-SALMON-01',
-    name: 'Cá hồi tươi Na Uy fillet',
-    specs: 'Superior Sashimi Grade',
-    location: 'Kho mát #M1 (0-4°C)',
-    category: 'chill',
-    unit: 'kg',
-    actualStock: 4.8,
-    safetyStock: 6.0,
-    costPrice: 450000,
-    totalValue: 2160000,
-    status: 'LOW',
-    image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    sku: 'RAW-SAUCE-BOMBAY',
-    name: 'Sốt Garam Masala Bombay',
-    specs: 'Bếp trung tâm hầm chậm 18h',
-    location: 'Kho khô #K3',
-    category: 'dry',
-    unit: 'lít',
-    actualStock: 12.5,
-    safetyStock: 4.0,
-    costPrice: 180000,
-    totalValue: 2250000,
-    status: 'SAFE',
-    image: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    sku: 'WINE-MARGAUX-15',
-    name: 'Château Margaux 2015',
-    specs: 'Premier Grand Cru Classé',
-    location: 'Hầm Grand Cru (14°C)',
-    category: 'wine',
-    unit: 'chai',
-    actualStock: 3,
-    safetyStock: 5,
-    costPrice: 8500000,
-    totalValue: 25500000,
-    status: 'CRITICAL',
-    image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    sku: 'RAW-LAMB-NZ',
-    name: 'Thịt đùi cừu New Zealand',
-    specs: 'Đùi rút xương cao cấp',
-    location: 'Kho đông #B1 (-18°C)',
-    category: 'cold',
-    unit: 'kg',
-    actualStock: 14.0,
-    safetyStock: 8.0,
-    costPrice: 320000,
-    totalValue: 4480000,
-    status: 'SAFE',
-    image: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=100&auto=format&fit=crop&q=80',
-  },
-];
+import { INITIAL_STOCK, StockItem } from '@/services/mock';
+import { AdminToast, useAdminToast, KpiCard } from '@/components/admin';
 
 export default function AdminInventoryPage() {
   const [stockItems, setStockItems] = React.useState<StockItem[]>(INITIAL_STOCK);
@@ -103,7 +17,7 @@ export default function AdminInventoryPage() {
   const [auditModalOpen, setAuditModalOpen] = React.useState(false);
   const [activeCategory, setActiveCategory] = React.useState<'all' | 'cold' | 'chill' | 'dry' | 'wine'>('all');
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [toastMsg, setToastMsg] = React.useState<string | null>(null);
+  const { toastMsg, showToast } = useAdminToast(3000);
 
   // Inbound PO Form State
   const [poForm, setPoForm] = React.useState({
@@ -122,14 +36,6 @@ export default function AdminInventoryPage() {
     reason: 'Đã tìm thấy 1 chai trong tủ trữ VIP Maharaja',
   });
 
-  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  React.useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
   // Modal a11y: Escape key listener
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -141,12 +47,6 @@ export default function AdminInventoryPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  const showToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMsg(msg);
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
-  };
 
   const handleInboundPoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,11 +108,7 @@ export default function AdminInventoryPage() {
   return (
     <div className="w-full">
       {/* Toast Alert */}
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-ops-ink text-white px-4 py-2.5 rounded-lg shadow-lg border border-ops-border text-xs font-medium animate-in fade-in slide-in-from-bottom-2">
-          {toastMsg}
-        </div>
-      )}
+      <AdminToast message={toastMsg} />
 
       <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 max-w-[1720px] mx-auto w-full">
         {/* Top Header */}
@@ -246,29 +142,29 @@ export default function AdminInventoryPage() {
 
         {/* 4 KPI Blocks */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-2xs space-y-1">
-            <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">Tổng Giá Trị Kho Tồn</span>
-            <div className="font-mono text-2xl font-extrabold text-stone-900">{formatVND(totalInventoryValue)}</div>
-            <span className="text-xs text-stone-600 font-medium">Định giá theo phương pháp FIFO</span>
-          </div>
-
-          <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-2xs space-y-1">
-            <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">Cảnh Báo Chạm Ngưỡng An Toàn</span>
-            <div className="font-mono text-2xl font-extrabold text-rose-700">{lowStockCount} Mặt hàng</div>
-            <span className="text-xs text-rose-800 font-bold">Cần bổ sung đơn PO khẩn</span>
-          </div>
-
-          <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-2xs space-y-1">
-            <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">Vòng Quay Tồn Kho (ITR)</span>
-            <div className="font-mono text-2xl font-extrabold text-stone-900">4.2 Lượt / Tháng</div>
-            <span className="text-xs text-emerald-700 font-bold">Tốc độ luân chuyển tốt</span>
-          </div>
-
-          <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-2xs space-y-1">
-            <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">Sai Số Kiểm Kê Định Kỳ</span>
-            <div className="font-mono text-2xl font-extrabold text-emerald-700">0.08%</div>
-            <span className="text-xs text-stone-600 font-medium">Dưới ngưỡng trần cho phép (0.5%)</span>
-          </div>
+          <KpiCard
+            title="Tổng Giá Trị Kho Tồn"
+            value={formatVND(totalInventoryValue)}
+            subtext="Định giá theo phương pháp FIFO"
+          />
+          <KpiCard
+            title="Cảnh Báo Chạm Ngưỡng An Toàn"
+            value={<span className="text-rose-700">{lowStockCount} Mặt hàng</span>}
+            badge={{ text: 'PO khẩn', variant: 'danger' }}
+            subtext={<span className="text-rose-800 font-bold">Cần bổ sung đơn PO khẩn</span>}
+          />
+          <KpiCard
+            title="Vòng Quay Tồn Kho (ITR)"
+            value="4.2 Lượt / Tháng"
+            badge={{ text: 'Tốt', variant: 'success' }}
+            subtext={<span className="text-emerald-700 font-bold">Tốc độ luân chuyển tốt</span>}
+          />
+          <KpiCard
+            title="Sai Số Kiểm Kê Định Kỳ"
+            value={<span className="text-emerald-700">0.08%</span>}
+            badge={{ text: 'Chuẩn', variant: 'neutral' }}
+            subtext="Dưới ngưỡng trần cho phép (0.5%)"
+          />
         </div>
 
         {/* Filters & Table Container */}
