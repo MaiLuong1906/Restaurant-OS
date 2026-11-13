@@ -661,3 +661,66 @@ export const MONTHLY_TREND = [
   { month: 'T11', pct: 28, height: 72, isCurrent: true },
 ];
 
+
+// ============================================================================
+// 8. DASHBOARD METRICS MOCK DATA (KPI theo kỳ: live / week / month)
+// ============================================================================
+export interface DashboardMetrics {
+  rev: number;
+  revGrowth: string;
+  target: string;
+  targetPct: string;
+  occ: string;
+  occDesc: string;
+  occPct: string;
+  cogs: string;
+  cogsDiff: string;
+  kdsTime: string;
+}
+
+export const DASHBOARD_METRICS: Record<'live' | 'week' | 'month', DashboardMetrics> = {
+  live: {
+    rev: 42850000,
+    revGrowth: '+14.2% T7 TRƯỚC',
+    target: 'Target ngày: 48M',
+    targetPct: '89.2% ĐẠT CHỈ TIÊU',
+    occ: '28/34 bàn',
+    occDesc: '6 bàn trống khả dụng',
+    occPct: '82% CÔNG SUẤT',
+    cogs: '31.4%',
+    cogsDiff: '-1.6% TIẾT KIỆM',
+    kdsTime: '08:42',
+  },
+  week: {
+    rev: 298400000,
+    revGrowth: '+8.7% W-o-W',
+    target: 'Target tuần: 320M',
+    targetPct: '93.2% ĐẠT CHỈ TIÊU',
+    occ: '86% TB',
+    occDesc: '184 lượt bàn / tuần',
+    occPct: '86% CÔNG SUẤT',
+    cogs: '30.2%',
+    cogsDiff: '-2.8% TIẾT KIỆM',
+    kdsTime: '09:15',
+  },
+  month: {
+    rev: 1285000000,
+    revGrowth: '+12.4% vs T10',
+    target: 'Target tháng: 1.35B',
+    targetPct: '95.1% ĐẠT CHỈ TIÊU',
+    occ: '88% TB',
+    occDesc: '760 lượt bàn / tháng',
+    occPct: '88% CÔNG SUẤT',
+    cogs: '29.5%',
+    cogsDiff: '-2.5% TIẾT KIỆM',
+    kdsTime: '08:50',
+  },
+};
+
+// ============================================================================
+// 9. BILLS SHIFT COMPARISON (Dữ liệu ca trước để tính % tăng trưởng)
+// ============================================================================
+/** Doanh thu ca tối #01 (ca trước) — dùng để tính % tăng trưởng KPI */
+export const PREV_SHIFT_REVENUE = 11430000; // Ca Tối #01
+/** Số hóa đơn ca trước */
+export const PREV_SHIFT_BILL_COUNT = 6;

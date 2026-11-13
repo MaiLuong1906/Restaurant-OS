@@ -602,9 +602,9 @@ export default function AdminTablesPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {selectedTable.orders.map((ord, idx) => (
+                    {selectedTable.orders.map((ord) => (
                       <div
-                        key={`${selectedTable.id}-${ord.name}-${idx}`}
+                        key={`${selectedTable.id}-${ord.name}`}
                         className="p-3 rounded-lg bg-ops-bg border border-ops-border flex items-start justify-between"
                       >
                         <div>

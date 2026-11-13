@@ -38,6 +38,8 @@ export function AdminModal({
   className = '',
   ariaLabel,
 }: AdminModalProps) {
+  const closeButtonRef = React.useRef<HTMLButtonElement>(null);
+
   React.useEffect(() => {
     if (!isOpen) return;
 
@@ -49,6 +51,14 @@ export function AdminModal({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      // Delay nhỏ để DOM render xong
+      const timer = setTimeout(() => closeButtonRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -78,6 +88,7 @@ export function AdminModal({
           </div>
           <button
             type="button"
+            ref={closeButtonRef}
             onClick={onClose}
             aria-label="Đóng modal"
             className="w-7 h-7 rounded hover:bg-stone-100 text-stone-500 hover:text-stone-900 flex items-center justify-center cursor-pointer transition-colors"

@@ -4,7 +4,6 @@ import * as React from 'react';
 import {
   FileText,
   Search,
-  Filter,
   Printer,
   Download,
   Eye,
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 import { AdminToast, useAdminToast, KpiCard } from '@/components/admin';
-import { INITIAL_BILLS } from '@/services/mock';
+import { INITIAL_BILLS, PREV_SHIFT_REVENUE } from '@/services/mock';
 import { Bill } from './bills-helpers';
 
 export default function AdminBillsPage() {
@@ -51,9 +50,9 @@ export default function AdminBillsPage() {
 
   // Focus first PIN input when void modal opens
   React.useEffect(() => {
-    if (voidModalOpen) {
-      setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
-    }
+    if (!voidModalOpen) return;
+    const timer = setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
+    return () => clearTimeout(timer);
   }, [voidModalOpen]);
 
   const handleOpenVoidModal = (billId: string) => {
@@ -106,6 +105,27 @@ export default function AdminBillsPage() {
     .reduce((sum, b) => sum + b.total, 0);
   const totalDiscount = bills.reduce((sum, b) => sum + b.discount, 0);
 
+  // Tính % tăng trưởng doanh thu so với ca trước (rounded 1 decimal)
+  const revenueGrowthPct =
+    PREV_SHIFT_REVENUE > 0
+      ? Math.round(((totalPaidRevenue - PREV_SHIFT_REVENUE) / PREV_SHIFT_REVENUE) * 1000) / 10
+      : 0;
+  const revenueGrowthText =
+    revenueGrowthPct >= 0 ? `+${revenueGrowthPct}% CA TRƯỚC` : `${revenueGrowthPct}% CA TRƯỚC`;
+
+  // Tỷ lệ hoàn tất hóa đơn (%)
+  const paidRatioPct =
+    bills.length > 0 ? Math.round((totalPaidCount / bills.length) * 1000) / 10 : 0;
+  const paidRatioText = `${paidRatioPct}% TỶ LỆ`;
+
+  // Số hóa đơn có giảm giá
+  const discountBillCount = bills.filter((b) => b.discount > 0).length;
+  const discountBadgeText = `${discountBillCount} HÓA ĐƠN`;
+
+  // Số hóa đơn VOIDED (cho KPI thứ 4)
+  const voidedCount = bills.filter((b) => b.status === 'VOIDED').length;
+  const voidedBadgeText = `${voidedCount} HÓA ĐƠN`;
+
   return (
     <div className="w-full">
       {/* Toast Alert Dùng Chung */}
@@ -151,7 +171,7 @@ export default function AdminBillsPage() {
         <KpiCard
           title="DOANH THU THỰC THU"
           value={formatVND(totalPaidRevenue)}
-          badge={{ text: '+14.2% CA TRƯỚC', variant: 'success' }}
+          badge={{ text: revenueGrowthText, variant: 'success' }}
           subtext={
             <div className="flex items-center justify-between">
               <span>Đã thu tiền thành công</span>
@@ -164,7 +184,7 @@ export default function AdminBillsPage() {
         <KpiCard
           title="HÓA ĐƠN HOÀN TẤT"
           value={`${totalPaidCount} / ${bills.length}`}
-          badge={{ text: '97.2% TỶ LỆ', variant: 'success' }}
+          badge={{ text: paidRatioText, variant: 'success' }}
           subtext={
             <div className="flex items-center justify-between">
               <span>Chờ thanh toán: 1 bàn</span>
@@ -177,7 +197,7 @@ export default function AdminBillsPage() {
         <KpiCard
           title="GIẢM GIÁ & VOUCHER"
           value={formatVND(totalDiscount)}
-          badge={{ text: '3 HÓA ĐƠN', variant: 'warning' }}
+          badge={{ text: discountBadgeText, variant: 'warning' }}
           subtext={
             <div className="flex items-center justify-between">
               <span>Chính sách thẻ VIP/Gold</span>
@@ -190,7 +210,7 @@ export default function AdminBillsPage() {
         <KpiCard
           title="HỦY & TRẢ MÓN (VOID)"
           value={formatVND(totalVoidedAmount)}
-          badge={{ text: '1 HÓA ĐƠN', variant: 'danger' }}
+          badge={{ text: voidedBadgeText, variant: 'danger' }}
           subtext={
             <div className="flex items-center justify-between">
               <span>Đã hoàn nguyên kho BOM</span>

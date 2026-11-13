@@ -3,11 +3,9 @@
 import * as React from 'react';
 import {
   Wifi,
-  Printer,
   Mic,
   QrCode,
   Zap,
-  Cpu,
   Radio,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
@@ -30,14 +28,14 @@ export default function AdminAiHubPage() {
 
   // VietQR Dynamic Amount
   const [qrAmount, setQrAmount] = React.useState('4620000');
-  const [qrBank, setQrBank] = React.useState('VPBank · 109876543');
+  const [qrBank] = React.useState('VPBank · 109876543');
 
   // Whisper Audio State
   const [isRecording, setIsRecording] = React.useState(false);
-  const [audioTranscript, setAudioTranscript] = React.useState(
+  const [audioTranscript] = React.useState(
     'Cho tôi hai phần Royal Lamb Biryani, một giỏ Garlic Naan và một chai Château Margaux 2015 mang ra bàn VIP 02'
   );
-  const [recognizedItems, setRecognizedItems] = React.useState([
+  const [recognizedItems] = React.useState([
     { id: '1', name: 'Royal Lamb Biryani', qty: 2, price: 720000 },
     { id: '2', name: 'Garlic Naan Basket', qty: 1, price: 100000 },
     { id: '3', name: 'Château Margaux 2015', qty: 1, price: 8500000 },
@@ -98,9 +96,10 @@ export default function AdminAiHubPage() {
   const asyncTimersRef = React.useRef<NodeJS.Timeout[]>([]);
 
   React.useEffect(() => {
+    const asyncTimers = asyncTimersRef.current;
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      asyncTimersRef.current.forEach((t) => clearTimeout(t));
+      asyncTimers.forEach((t) => clearTimeout(t));
     };
   }, []);
 
@@ -278,7 +277,7 @@ export default function AdminAiHubPage() {
                   Giọng nói ghi âm gần nhất:
                 </span>
                 <p className="text-xs text-ops-ink italic bg-white p-2.5 rounded border border-ops-border leading-relaxed">
-                  "{audioTranscript}"
+                  &ldquo;{audioTranscript}&rdquo;
                 </p>
               </div>
 

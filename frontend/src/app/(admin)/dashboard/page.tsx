@@ -11,6 +11,7 @@ import {
   Search,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
+import { DASHBOARD_METRICS } from '@/services/mock';
 import { AdminToast, useAdminToast, KpiCard } from '@/components/admin';
 
 interface DashboardAction {
@@ -72,9 +73,9 @@ export default function AdminDashboardPage() {
 
   // Focus first PIN input when PIN modal opens
   React.useEffect(() => {
-    if (pinModalOpen) {
-      setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
-    }
+    if (!pinModalOpen) return;
+    const timer = setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
+    return () => clearTimeout(timer);
   }, [pinModalOpen]);
 
   // Urgent Actions State
@@ -115,44 +116,7 @@ export default function AdminDashboardPage() {
   ]);
 
   // Dynamic Metrics based on period
-  const METRICS = {
-    live: {
-      rev: 42850000,
-      revGrowth: '+14.2% T7 TRƯỚC',
-      target: 'Target ngày: 48M',
-      targetPct: '89.2% ĐẠT CHỈ TIÊU',
-      occ: '28/34 bàn',
-      occDesc: '6 bàn trống khả dụng',
-      occPct: '82% CÔNG SUẤT',
-      cogs: '31.4%',
-      cogsDiff: '-1.6% TIẾT KIỆM',
-      kdsTime: '08:42',
-    },
-    week: {
-      rev: 298400000,
-      revGrowth: '+8.7% W-o-W',
-      target: 'Target tuần: 320M',
-      targetPct: '93.2% ĐẠT CHỈ TIÊU',
-      occ: '86% TB',
-      occDesc: '184 lượt bàn / tuần',
-      occPct: '86% CÔNG SUẤT',
-      cogs: '30.2%',
-      cogsDiff: '-2.8% TIẾT KIỆM',
-      kdsTime: '09:15',
-    },
-    month: {
-      rev: 1285000000,
-      revGrowth: '+12.4% vs T10',
-      target: 'Target tháng: 1.35B',
-      targetPct: '95.1% ĐẠT CHỈ TIÊU',
-      occ: '88% TB',
-      occDesc: '760 lượt bàn / tháng',
-      occPct: '88% CÔNG SUẤT',
-      cogs: '29.5%',
-      cogsDiff: '-2.5% TIẾT KIỆM',
-      kdsTime: '08:50',
-    },
-  }[period];
+  const METRICS = DASHBOARD_METRICS[period];
 
   const HOURLY_DATA = [
     { hour: '10H', amount: '1.2M', height: 14, isPeak: false },
@@ -169,7 +133,7 @@ export default function AdminDashboardPage() {
     { hour: '21H', amount: '2.1M', height: 22, isPeak: false },
   ];
 
-  const [recentOrders, setRecentOrders] = React.useState([
+  const [recentOrders] = React.useState([
     {
       id: '#ORD-9024',
       time: '19:42:15',

@@ -7,7 +7,6 @@ import {
   Coins,
   HelpCircle,
   AlertOctagon,
-  Filter,
   X,
 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';

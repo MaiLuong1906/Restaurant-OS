@@ -26,7 +26,7 @@ export default function AdminPayrollPage() {
   const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
   // Tip Pool Setting
-  const [tipPoolTotal, setTipPoolTotal] = React.useState(18450000);
+  const [tipPoolTotal] = React.useState(18450000);
   const [deptFilter, setDeptFilter] = React.useState<'ALL' | 'BOH' | 'FOH' | 'Cashier'>('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
 
@@ -47,9 +47,9 @@ export default function AdminPayrollPage() {
 
   // Auto-focus PIN input when modal opens
   React.useEffect(() => {
-    if (showPinModal) {
-      setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
-    }
+    if (!showPinModal) return;
+    const timer = setTimeout(() => pinInputRefs.current[0]?.focus(), 50);
+    return () => clearTimeout(timer);
   }, [showPinModal]);
 
   const handlePinInput = (index: number, val: string) => {
