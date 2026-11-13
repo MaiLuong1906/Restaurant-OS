@@ -1,4 +1,4 @@
-import { Dish } from '@/types';
+import type { Dish } from '../types';
 
 export interface CustomerDish extends Dish {
   badge?: string;

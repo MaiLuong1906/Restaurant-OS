@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { Dish, CartItem } from '@/types';
+import type { Dish, CartItem } from '../types';
 import {
   INITIAL_PLACED_BATCHES,
-  PlacedBatch,
-  PlacedBatchItem,
-} from '@/lib/customer-menu-data';
+  type PlacedBatch,
+  type PlacedBatchItem,
+} from '../lib/customer-menu-data';
 
 interface CartState {
   tableId: string | null;
