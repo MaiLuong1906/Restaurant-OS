@@ -10,10 +10,18 @@ Quy trình chuẩn từng bước để tạo script SQL versioning trong `backe
 
 ---
 
-## Bước 1: Quy Ước Đặt Tên File Migration
-- Kiểm tra danh sách các file migration hiện có trong thư mục `backend/src/main/resources/db/migration/`.
-- Xác định số phiên bản tiếp theo: `V<Số_Thứ_Tự>__<Tên_Mô_Tả_Snake_Case>.sql` (dùng 2 dấu gạch dưới `__`).
-- Ví dụ: `V1__init_restaurant_schema.sql`, `V2__create_orders_and_bom.sql`.
+## Bước 1: Sinh File Migration Chống Trùng (Conflict-Free Generation)
+- **Cơ chế bắt buộc:** Sử dụng lệnh CLI chuẩn của Monorepo để sinh file:
+  ```bash
+  pnpm db:migration:create <tên_mô_tả>
+  # Ví dụ: pnpm db:migration:create add_kitchen_printer_station
+  ```
+- **Quy ước tên file:** `V<YYYYMMDDHHmmss>__<tên_mô_tả_snake_case>.sql` (sử dụng **Timestamp 14 chữ số** và **2 dấu gạch dưới** `__`).
+- Lệnh trên sẽ tự động:
+  1. Lấy Timestamp thời gian thực chính xác đến từng giây.
+  2. Chuẩn hóa tên mô tả thành `snake_case`.
+  3. Tạo file template rỗng chuẩn vị trí `backend/src/main/resources/db/migration/` kèm header cảnh báo các ràng buộc kỹ thuật.
+*(Lưu ý: Không tự ý đặt tên file thủ công bằng số nguyên `V3, V4...` để tránh xung đột khi merge nhiều nhánh cùng lúc).*
 
 ---
 

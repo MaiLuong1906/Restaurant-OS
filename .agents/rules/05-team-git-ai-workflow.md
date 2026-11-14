@@ -36,12 +36,12 @@ Khi được giao nhiệm vụ xây dựng một tính năng (Feature) hoặc Us
 - AI chỉ được phép sinh code cho **từng sub-task một**. Sau mỗi sub-task, phải tự chạy kiểm tra biên dịch (`type-check` hoặc build) xem có lỗi syntax không.
 - Tuyệt đối cấm sinh một cục code khổng lồ hàng trăm dòng làm thay đổi 5-6 file cùng lúc khiến lập trình viên mất kiểm soát.
 
-### 🏁 Giai đoạn 4: Nghiệm Thu Theo Definition of Done (DoD) & Tạo PR
-- Trước khi tuyên bố "hoàn thành", AI phải tự kiểm tra chéo theo bảng **DoD** trong [CONTRIBUTING.md](file:///d:/my-project/restaurant-os/CONTRIBUTING.md):
-  - *TypeScript có lỗi không?*
-  - *Ngân sách GPU animate có bị vi phạm không?*
-  - *Có vô tình tạo file rác không?*
-- Sau đó, kích hoạt skill `audit-pr-readiness` để sinh nội dung mô tả PR 4 phần cho người dùng.
+### 🏁 Giai đoạn 4: Nghiệm Thu Theo Definition of Done (DoD) & Pre-flight CI/CD
+- Trước khi tuyên bố "hoàn thành" hay đề xuất commit/push, AI **bắt buộc phải tự chạy kiểm tra mô phỏng CI cục bộ**:
+  - Frontend: `pnpm cicd:frontend` (Typecheck 0 lỗi + Vitest pass 100%).
+  - Backend/AI: Compile & test sạch sẽ, không có syntax/type error.
+  - Git Hygiene: Không sót file mã nguồn trong `src/`, không có file `.env` hay file rác.
+- Sau khi toàn bộ các cổng CI cục bộ đều xanh, kích hoạt skill `audit-pr-readiness` để sinh nội dung mô tả PR 4 phần cho người dùng.
 
 ---
 
@@ -64,7 +64,8 @@ Khi được giao nhiệm vụ xây dựng một tính năng (Feature) hoặc Us
 Khi được lập trình viên yêu cầu hỗ trợ tạo nhánh hoặc commit mã nguồn:
 
 ### 4.1. Quy ước tạo nhánh (Bắt buộc từ nhánh `dev`):
-- Nhánh gốc duy nhất để tách nhánh: **`dev`** (không dùng `main`, không dùng tên cũ `develop`).
+- **Vị trí nhánh làm việc cốt lõi:** **Phần lớn thời gian (95% vòng đời dự án)**, toàn bộ lập trình viên và AI đều làm việc trên và xuất phát từ nhánh **`dev`**. Nhánh `main` chỉ dành cho Production Releases.
+- Nhánh gốc duy nhất để tách nhánh: **`dev`** (không tách từ `main`, không dùng tên cũ `develop`).
 - Định dạng bắt buộc: `<tiền-tố>/<tên-thành-viên>/<loại>-<tên-tính-năng>`
   - Nhánh Frontend: `fe/<tên-thành-viên>/feature-<tên>` hoặc `fe/<tên-thành-viên>/fix-<tên>`
   - Nhánh Backend: `be/<tên-thành-viên>/feature-<tên>` hoặc `be/<tên-thành-viên>/fix-<tên>`
@@ -83,5 +84,5 @@ Khi được lập trình viên yêu cầu hỗ trợ tạo nhánh hoặc commit
 ---
 
 ## 5. Hàng Rào Chống Ảo Giác Dữ Liệu (Zero-Hallucination)
-- **CẤM** tự bịa đặt cột trong Database, thuộc tính JSONB hoặc REST endpoint không có trong thiết kế [Restaurant_OS_Tai_Lieu_Du_An_v1.1.docx](file:///d:/my-project/restaurant-os/doc/Restaurant_OS_Tai_Lieu_Du_An_v1.1.docx).
+- **CẤM** tự bịa đặt cột trong Database, thuộc tính JSONB hoặc REST endpoint không có trong thiết kế [Restaurant_OS_Master_UseCases.md](file:///d:/my-project/restaurant-os/doc/Restaurant_OS_Master_UseCases.md).
 - Nếu phát hiện thiếu thông tin, AI phải hỏi lại người dùng để làm rõ thay vì tự giả định.

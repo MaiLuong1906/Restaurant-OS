@@ -18,11 +18,34 @@ AI tự động kiểm tra nhanh:
 
 ---
 
-## Bước 2: Chạy Thử Quality Gates (Nếu môi trường đã cài đặt)
-- Frontend Typecheck: `pnpm typecheck:frontend` (0 lỗi TypeScript).
-- Frontend Unit Test: `pnpm test:frontend` (Vitest chạy xanh 100%).
-- Backend Unit Test: `pnpm test:backend` (hoặc `cd backend && ./mvnw test`).
-- Kiểm tra toàn diện nhanh: `pnpm test:all`.
+## Bước 2: Chạy Thử CI/CD Quality Gates Cục Bộ (AI Pre-flight CI/CD Verification)
+AI **BẮT BUỘC** phải tự chạy các lệnh kiểm tra tương ứng với phân hệ thay đổi trước khi báo cáo hoàn thành hoặc tạo PR:
+
+### 2.1. Kiểm Tra Phân Hệ Frontend:
+```bash
+pnpm cicd:frontend
+# Hoặc chạy lẻ:
+pnpm --filter frontend typecheck   # Bắt buộc: 0 lỗi TypeScript
+pnpm --filter frontend test        # Bắt buộc: Vitest xanh 100%
+```
+
+### 2.2. Kiểm Tra Phân Hệ Backend (Nếu có sửa backend/):
+```bash
+cd backend && ./mvnw test-compile   # Hoặc ./mvnw test nếu có Docker/DB
+```
+
+### 2.3. Kiểm Tra Phân Hệ AI (Nếu có sửa ai-service/):
+```bash
+cd ai-service && python -m py_compile main.py
+```
+
+### 2.4. Kiểm Tra Git Status & Untracked Files:
+- Chạy `git status -s` để phát hiện:
+  - Có file mã nguồn mới nào trong `src/` bị sót do `.gitignore` chặn nhầm không.
+  - Có file rác hoặc `.env` nào đang nằm trong stage không.
+
+> [!CAUTION]
+> Nếu bất kỳ lệnh nào trả về lỗi (exit code $\neq 0$), AI **tuyệt đối không được yêu cầu người dùng commit hoặc mở PR**. Phải giải quyết triệt để lỗi trước!
 
 ---
 

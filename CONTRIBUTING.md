@@ -74,6 +74,15 @@ pnpm dev:ai
 # Hoặc: cd ai-service && uvicorn main:app --reload --port 8000
 ```
 
+### Cách 3: Quản Lý Database Migrations (Flyway)
+Khi thêm bảng, cột mới hoặc sửa đổi Schema PostgreSQL, để **tránh xung đột số thứ tự version giữa các thành viên khi merge nhánh**, bắt buộc sử dụng lệnh tự động sinh file kèm Timestamp:
+```bash
+# Tự động sinh file migration Flyway mới kèm Timestamp chống trùng
+pnpm db:migration:create <tên_mô_tả>
+# Ví dụ: pnpm db:migration:create add_kitchen_printer_table
+```
+File SQL mới sẽ tự động được tạo tại `backend/src/main/resources/db/migration/` với định dạng `V<YYYYMMDDHHmmss>__<tên_mô_tả>.sql` sẵn sàng để viết câu lệnh DDL.
+
 ---
 
 ## 2. Quy Trình Phát Triển Tính Năng Chuẩn Agile / Scrum (Feature Lifecycle)
@@ -110,6 +119,12 @@ Một tính năng chỉ được xem là **"Done" (Hoàn thành)** và đủ đi
 ---
 
 ## 3. Chiến Lược Phân Nhánh Git (Git Branching Strategy)
+
+> [!IMPORTANT]
+> **QUY TẮC BẤT BIẾN VỀ VỊ TRÍ NHÁNH LÀM VIỆC:**
+> - **Phần lớn thời gian (95% vòng đời dự án)**, toàn bộ đội ngũ lập trình viên và trợ lý AI sẽ **làm việc trực tiếp trên và bắt nguồn từ nhánh `dev`**.
+> - Nhánh **`main`** chỉ đại diện cho mã nguồn sản xuất (Production-ready) và chỉ được cập nhật khi phát hành phiên bản chính thức (Release Tag).
+> - **Tuyệt đối không commit trực tiếp vào `main`.** Mọi nhánh tính năng (`feature`), sửa lỗi (`fix`), tối ưu (`perf`) **bắt buộc phải tách ra từ `dev`** và mở Pull Request merge ngược lại vào **`dev`**.
 
 Dự án áp dụng mô hình phân nhánh với nhánh tích hợp chính là **`dev`** (đã rút gọn từ `develop`):
 

@@ -49,13 +49,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Cài đặt pnpm 12
-        uses: pnpm/action-setup@v4
-        with:
-          version: 12.14.0
+      - name: Cài đặt pnpm 12 toàn cục
+        run: npm install -g pnpm@12.14.0
 
       - name: Cài đặt Dependencies Monorepo
-        run: pnpm install --frozen-lockfile || pnpm install
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm approve-builds --all
 
       - name: TypeScript Typecheck
         run: pnpm --filter frontend typecheck
