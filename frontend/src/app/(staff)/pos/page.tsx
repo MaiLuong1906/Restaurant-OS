@@ -153,7 +153,7 @@ export default function PosCashierPage() {
   );
 
   return (
-    <div className="min-h-screen bg-cream font-sans text-ink">
+    <div className="min-h-screen bg-ops-bg font-sans text-ink">
       {/* NỘI DUNG THEO TAB */}
       {activeTab === 'home' ? (
         <CashierHomeView
@@ -161,6 +161,7 @@ export default function PosCashierPage() {
           reservations={reservations}
           shift={shift}
           currentAttendance={currentAttendance}
+          selectedTableId={selectedTableId}
           isCashDrawerOpen={isCashDrawerOpen}
           onEnterPos={(tableId) => {
             if (tableId) selectTable(tableId);
