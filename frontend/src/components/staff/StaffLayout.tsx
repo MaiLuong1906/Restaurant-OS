@@ -7,7 +7,7 @@ import { Home, Calendar, DollarSign, User } from 'lucide-react';
 
 export interface StaffLayoutProps {
   children: React.ReactNode;
-  homeHref?: '/staff' | '/pos';
+  homeHref?: '/staff' | '/pos' | '/chef';
 }
 
 export function StaffLayout({ children, homeHref = '/staff' }: StaffLayoutProps) {

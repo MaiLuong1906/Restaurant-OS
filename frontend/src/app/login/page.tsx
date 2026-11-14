@@ -17,6 +17,19 @@ import {
   Loader2,
 } from 'lucide-react';
 
+function homeHrefForRole(role?: string): string {
+  switch (role) {
+    case 'CHEF':
+    case 'MANAGER':
+      return '/chef';
+    case 'CASHIER':
+      return '/pos';
+    case 'STAFF':
+    default:
+      return '/chef';
+  }
+}
+
 export default function StaffLoginPage() {
   const router = useRouter();
   const staffUser = useAuthStore((s) => s.staffUser);
@@ -40,10 +53,11 @@ export default function StaffLoginPage() {
   React.useEffect(() => {
     if (authState !== 'SUCCESS') return;
     const timer = setTimeout(() => {
-      router.push('/staff');
+      const destination = homeHrefForRole(loggedInUser?.role || staffUser?.role);
+      router.push(destination);
     }, 1500);
     return () => clearTimeout(timer);
-  }, [authState, router]);
+  }, [authState, router, loggedInUser, staffUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -330,7 +344,10 @@ export default function StaffLoginPage() {
 
               <button
                 type="button"
-                onClick={() => router.push('/staff')}
+                onClick={() => {
+                  const destination = homeHrefForRole(loggedInUser?.role || staffUser?.role);
+                  router.push(destination);
+                }}
                 className="w-full py-3 bg-[#8C1D2C] hover:bg-[#6F1623] text-white font-bold rounded-lg min-h-[48px] flex items-center justify-center transition-colors"
               >
                 Vào trang chủ
