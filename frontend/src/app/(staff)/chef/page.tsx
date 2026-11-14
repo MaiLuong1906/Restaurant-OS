@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { StaffHomeShell } from '@/components/staff/StaffHomeShell';
+import { QuickActions } from '@/components/staff/QuickActions';
 
 export default function ChefHomePage() {
   const staffUser = useAuthStore((s) => s.staffUser);
@@ -190,48 +191,37 @@ export default function ChefHomePage() {
         </Link>
       </section>
 
-      {/* 4. Thao tác nhanh (4 nút min-h-[76px]) */}
-      <section className="bg-white border border-sand-200 rounded-2xl p-5 md:p-6 shadow-warm">
-        <h2 className="text-lg font-bold text-ink">Thao tác nhanh</h2>
-        <p className="text-sm text-muted mb-3">4 chức năng thường dùng</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Link
-            href="/staff/attendance"
-            className="min-h-[76px] p-3 rounded-xl border border-sand-200 bg-white hover:bg-neutral-50 active:scale-98 flex flex-col items-center justify-center gap-1 text-center shadow-xs transition-transform"
-          >
-            <Clock className="h-5 w-5 text-ops-brand" />
-            <span className="text-sm font-bold text-ink">Chấm công</span>
-            <span className="text-[11px] text-muted">Vào / ra ca</span>
-          </Link>
-
-          <Link
-            href="/staff/schedule"
-            className="min-h-[76px] p-3 rounded-xl border border-sand-200 bg-white hover:bg-neutral-50 active:scale-98 flex flex-col items-center justify-center gap-1 text-center shadow-xs transition-transform"
-          >
-            <Calendar className="h-5 w-5 text-ops-brand" />
-            <span className="text-sm font-bold text-ink">Lịch ca</span>
-            <span className="text-[11px] text-muted">Ca tuần này</span>
-          </Link>
-
-          <Link
-            href="/staff/leave"
-            className="min-h-[76px] p-3 rounded-xl border border-sand-200 bg-white hover:bg-neutral-50 active:scale-98 flex flex-col items-center justify-center gap-1 text-center shadow-xs transition-transform"
-          >
-            <FileText className="h-5 w-5 text-ops-brand" />
-            <span className="text-sm font-bold text-ink">Xin nghỉ</span>
-            <span className="text-[11px] text-muted">Đơn &amp; quỹ phép</span>
-          </Link>
-
-          <Link
-            href="/staff/payslip"
-            className="min-h-[76px] p-3 rounded-xl border border-sand-200 bg-white hover:bg-neutral-50 active:scale-98 flex flex-col items-center justify-center gap-1 text-center shadow-xs transition-transform"
-          >
-            <DollarSign className="h-5 w-5 text-ops-brand" />
-            <span className="text-sm font-bold text-ink">Lương &amp; Tip</span>
-            <span className="text-[11px] text-muted">Phiếu tháng này</span>
-          </Link>
-        </div>
-      </section>
+      {/* 4. Thao tác nhanh */}
+      <QuickActions
+        title="Thao tác nhanh"
+        subtitle="4 chức năng thường dùng"
+        actions={[
+          {
+            icon: Clock,
+            label: 'Chấm công',
+            sub: 'Vào / ra ca',
+            href: '/staff/attendance',
+          },
+          {
+            icon: Calendar,
+            label: 'Lịch ca',
+            sub: 'Ca tuần này',
+            href: '/staff/schedule',
+          },
+          {
+            icon: FileText,
+            label: 'Xin nghỉ',
+            sub: 'Đơn & quỹ phép',
+            href: '/staff/leave',
+          },
+          {
+            icon: DollarSign,
+            label: 'Lương & Tip',
+            sub: 'Phiếu tháng này',
+            href: '/staff/payslip',
+          },
+        ]}
+      />
 
       {/* 5 & 6. Lương & Quỹ phép grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -28,6 +28,7 @@ import {
   formatVietnameseFullDate,
 } from '@/lib/utils';
 import { StaffHomeShell } from '@/components/staff/StaffHomeShell';
+import { QuickActions } from '@/components/staff/QuickActions';
 
 interface CashierHomeViewProps {
   tables: CashierTable[];
@@ -175,88 +176,55 @@ export function CashierHomeView({
 
   const extraSections = (
     <>
-      {/* DẢI CHỨC NĂNG USE CASE THU NGÂN (5 Use Cases) */}
-      <section className="rounded-2xl border border-sand-200 bg-white p-6 shadow-warm">
-        <h2 className="text-lg font-bold text-ink">Nghiệp vụ Thu ngân</h2>
-        <p className="mt-1 text-sm text-muted">
-          Chọn chức năng để thực hiện tác vụ thu ngân nhanh chóng
-        </p>
-
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <button
-            type="button"
-            onClick={onOpenCheckInList}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-sand-50/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <UserCheck className="h-5 w-5 text-sage-700" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">
-                Check-in Bàn đặt ({confirmedReservations.length})
-              </p>
-              <p className="text-xs text-muted">Nhận bàn & Khấu trừ cọc</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
+      {/* THAO TÁC NHANH THU NGÂN (5 Use Cases) */}
+      <QuickActions
+        title="Thao tác nhanh"
+        subtitle="5 chức năng thường dùng"
+        actions={[
+          {
+            icon: UserCheck,
+            label: `Check-in Bàn đặt (${confirmedReservations.length})`,
+            sub: 'Nhận bàn & Khấu trừ cọc',
+            onClick: onOpenCheckInList,
+          },
+          {
+            icon: GitMerge,
+            label: 'Tách / Gộp Hóa đơn',
+            sub: 'Chia đều / Theo món / Gộp',
+            onClick: () => {
               if (selectedTableId) {
                 onOpenSplitMerge(selectedTableId);
               } else {
                 onEnterPos();
               }
-            }}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-sand-50/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <GitMerge className="h-5 w-5 text-honey-500" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Tách / Gộp Hóa đơn</p>
-              <p className="text-xs text-muted">Chia đều / Theo món / Gộp</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
+            },
+          },
+          {
+            icon: CreditCard,
+            label: 'Thanh toán & In',
+            sub: 'Khóa bàn • Giảm giá • ESC/POS',
+            onClick: () => {
               if (selectedTableId) {
                 onEnterPos(selectedTableId);
               } else {
                 onEnterPos();
               }
-            }}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-sand-50/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <CreditCard className="h-5 w-5 text-primary-500" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Thanh toán & In</p>
-              <p className="text-xs text-muted">Khóa bàn • Giảm giá • ESC/POS</p>
-            </div>
-          </button>
-
-          <Link
-            href="/staff/attendance"
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-sand-50/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <Clock className="h-5 w-5 text-sage-700" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Chấm công Ca</p>
-              <p className="text-xs text-muted">Vào ca • Nghỉ ca • Tan ca</p>
-            </div>
-          </Link>
-
-          <button
-            type="button"
-            onClick={onOpenShiftSettlement}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-sand-50/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <Wallet className="h-5 w-5 text-brown-700" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Đối soát & Kết ca</p>
-              <p className="text-xs text-muted">Kiểm tiền mặt & Chốt ca</p>
-            </div>
-          </button>
-        </div>
-      </section>
+            },
+          },
+          {
+            icon: Clock,
+            label: 'Chấm công Ca',
+            sub: 'Vào ca • Nghỉ ca • Tan ca',
+            href: '/staff/attendance',
+          },
+          {
+            icon: Wallet,
+            label: 'Đối soát & Kết ca',
+            sub: 'Kiểm tiền mặt & Chốt ca',
+            onClick: onOpenShiftSettlement,
+          },
+        ]}
+      />
 
       {/* THẺ 3: CẢNH BÁO CẦN CHÚ Ý */}
       <section className="rounded-2xl border border-sand-200 bg-white p-6 shadow-warm">
