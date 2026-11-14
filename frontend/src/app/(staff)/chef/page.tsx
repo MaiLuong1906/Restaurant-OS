@@ -191,37 +191,39 @@ export default function ChefHomePage() {
         </Link>
       </section>
 
-      {/* 4. Thao tác nhanh */}
-      <QuickActions
-        title="Thao tác nhanh"
-        subtitle="4 chức năng thường dùng"
-        actions={[
-          {
-            icon: Clock,
-            label: 'Chấm công',
-            sub: 'Vào / ra ca',
-            href: '/staff/attendance',
-          },
-          {
-            icon: Calendar,
-            label: 'Lịch ca',
-            sub: 'Ca tuần này',
-            href: '/staff/schedule',
-          },
-          {
-            icon: FileText,
-            label: 'Xin nghỉ',
-            sub: 'Đơn & quỹ phép',
-            href: '/staff/leave',
-          },
-          {
-            icon: DollarSign,
-            label: 'Lương & Tip',
-            sub: 'Phiếu tháng này',
-            href: '/staff/payslip',
-          },
-        ]}
-      />
+      {/* 4. Thao tác nhanh (Chỉ hiện trên laptop/tablet, mobile đã có FAB) */}
+      <div className="hidden md:block">
+        <QuickActions
+          title="Thao tác nhanh"
+          subtitle="4 chức năng thường dùng"
+          actions={[
+            {
+              icon: Clock,
+              label: 'Chấm công',
+              sub: 'Vào / ra ca',
+              href: '/staff/attendance',
+            },
+            {
+              icon: Calendar,
+              label: 'Lịch ca',
+              sub: 'Ca tuần này',
+              href: '/staff/schedule',
+            },
+            {
+              icon: FileText,
+              label: 'Xin nghỉ',
+              sub: 'Đơn & quỹ phép',
+              href: '/staff/leave',
+            },
+            {
+              icon: DollarSign,
+              label: 'Lương & Tip',
+              sub: 'Phiếu tháng này',
+              href: '/staff/payslip',
+            },
+          ]}
+        />
+      </div>
 
       {/* 5 & 6. Lương & Quỹ phép grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

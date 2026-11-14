@@ -26,6 +26,7 @@ import { SplitMergeModal } from '@/components/pos/SplitMergeModal';
 import { SettlementSheet } from '@/components/pos/SettlementSheet';
 import { ShiftSettlementView } from '@/components/pos/ShiftSettlementModal';
 import { formatVND } from '@/lib/utils';
+import { useQuickActionIntentStore } from '@/stores/useQuickActionIntentStore';
 
 type CashierNavTab = 'home' | 'pos' | 'reservation' | 'shift';
 
@@ -122,6 +123,36 @@ export default function PosCashierPage() {
     syncRealtimeClockSeed();
     initializeWebSocket();
   }, [syncRealtimeClockSeed, initializeWebSocket]);
+
+  // Tiêu thụ Quick Action intent từ FAB hoặc trang khác
+  const posIntent = useQuickActionIntentStore((s) => s.posIntent);
+  const clearPosIntent = useQuickActionIntentStore((s) => s.clearPosIntent);
+
+  React.useEffect(() => {
+    if (!posIntent) return;
+
+    switch (posIntent) {
+      case 'checkin':
+        setReservationSubTab('checkin');
+        setActiveTab('reservation');
+        break;
+      case 'splitmerge':
+        if (selectedTableId) {
+          selectTable(selectedTableId);
+          setActiveTab('pos');
+          setSplitMergeOpen(true);
+        } else {
+          setActiveTab('pos');
+        }
+        break;
+      case 'settlement':
+        setShiftSubTab('settlement');
+        setActiveTab('shift');
+        break;
+    }
+
+    clearPosIntent();
+  }, [posIntent, clearPosIntent, selectedTableId, selectTable]);
 
   React.useEffect(() => {
     if (!lastActionToast) return;

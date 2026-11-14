@@ -4,13 +4,20 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Calendar, DollarSign, User } from 'lucide-react';
+import { QuickActionItem } from '@/components/staff/QuickActions';
+import { QuickActionsFab } from '@/components/staff/QuickActionsFab';
 
 export interface StaffLayoutProps {
   children: React.ReactNode;
   homeHref?: '/staff' | '/pos' | '/chef';
+  quickActions?: QuickActionItem[];
 }
 
-export function StaffLayout({ children, homeHref = '/staff' }: StaffLayoutProps) {
+export function StaffLayout({
+  children,
+  homeHref = '/staff',
+  quickActions,
+}: StaffLayoutProps) {
   const pathname = usePathname();
 
   const navItems = [
@@ -52,6 +59,11 @@ export function StaffLayout({ children, homeHref = '/staff' }: StaffLayoutProps)
       <main className="flex-1 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-6">
         {children}
       </main>
+
+      {/* FAB Thao tác nhanh cho Mobile */}
+      {quickActions && quickActions.length > 0 ? (
+        <QuickActionsFab actions={quickActions} />
+      ) : null}
 
       {/* Bottom Nav cố định đáy cho mobile (cao 64-68px) */}
       <nav

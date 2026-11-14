@@ -176,55 +176,57 @@ export function CashierHomeView({
 
   const extraSections = (
     <>
-      {/* THAO TÁC NHANH THU NGÂN (5 Use Cases) */}
-      <QuickActions
-        title="Thao tác nhanh"
-        subtitle="5 chức năng thường dùng"
-        actions={[
-          {
-            icon: UserCheck,
-            label: `Check-in Bàn đặt (${confirmedReservations.length})`,
-            sub: 'Nhận bàn & Khấu trừ cọc',
-            onClick: onOpenCheckInList,
-          },
-          {
-            icon: GitMerge,
-            label: 'Tách / Gộp Hóa đơn',
-            sub: 'Chia đều / Theo món / Gộp',
-            onClick: () => {
-              if (selectedTableId) {
-                onOpenSplitMerge(selectedTableId);
-              } else {
-                onEnterPos();
-              }
+      {/* THAO TÁC NHANH THU NGÂN (Chỉ hiện trên laptop/tablet, mobile đã có FAB) */}
+      <div className="hidden md:block">
+        <QuickActions
+          title="Thao tác nhanh"
+          subtitle="5 chức năng thường dùng"
+          actions={[
+            {
+              icon: UserCheck,
+              label: `Check-in Bàn đặt (${confirmedReservations.length})`,
+              sub: 'Nhận bàn & Khấu trừ cọc',
+              onClick: onOpenCheckInList,
             },
-          },
-          {
-            icon: CreditCard,
-            label: 'Thanh toán & In',
-            sub: 'Khóa bàn • Giảm giá • ESC/POS',
-            onClick: () => {
-              if (selectedTableId) {
-                onEnterPos(selectedTableId);
-              } else {
-                onEnterPos();
-              }
+            {
+              icon: GitMerge,
+              label: 'Tách / Gộp Hóa đơn',
+              sub: 'Chia đều / Theo món / Gộp',
+              onClick: () => {
+                if (selectedTableId) {
+                  onOpenSplitMerge(selectedTableId);
+                } else {
+                  onEnterPos();
+                }
+              },
             },
-          },
-          {
-            icon: Clock,
-            label: 'Chấm công Ca',
-            sub: 'Vào ca • Nghỉ ca • Tan ca',
-            href: '/staff/attendance',
-          },
-          {
-            icon: Wallet,
-            label: 'Đối soát & Kết ca',
-            sub: 'Kiểm tiền mặt & Chốt ca',
-            onClick: onOpenShiftSettlement,
-          },
-        ]}
-      />
+            {
+              icon: CreditCard,
+              label: 'Thanh toán & In',
+              sub: 'Khóa bàn • Giảm giá • ESC/POS',
+              onClick: () => {
+                if (selectedTableId) {
+                  onEnterPos(selectedTableId);
+                } else {
+                  onEnterPos();
+                }
+              },
+            },
+            {
+              icon: Clock,
+              label: 'Chấm công Ca',
+              sub: 'Vào ca • Nghỉ ca • Tan ca',
+              href: '/staff/attendance',
+            },
+            {
+              icon: Wallet,
+              label: 'Đối soát & Kết ca',
+              sub: 'Kiểm tiền mặt & Chốt ca',
+              onClick: onOpenShiftSettlement,
+            },
+          ]}
+        />
+      </div>
 
       {/* THẺ 3: CẢNH BÁO CẦN CHÚ Ý */}
       <section className="rounded-2xl border border-sand-200 bg-white p-6 shadow-warm">

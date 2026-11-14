@@ -1,5 +1,18 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  Clock,
+  Calendar,
+  FileText,
+  DollarSign,
+  UserCheck,
+  GitMerge,
+  Wallet,
+} from 'lucide-react';
+import { useQuickActionIntentStore } from '@/stores/useQuickActionIntentStore';
 
 export interface QuickActionItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -13,12 +26,84 @@ export interface QuickActionsProps {
   title: string;
   subtitle: string;
   actions: QuickActionItem[];
+  onItemClick?: () => void;
+}
+
+export const CHEF_QUICK_ACTIONS: QuickActionItem[] = [
+  {
+    icon: Clock,
+    label: 'Chấm công',
+    sub: 'Vào / ra ca',
+    href: '/staff/attendance',
+  },
+  {
+    icon: Calendar,
+    label: 'Lịch ca',
+    sub: 'Ca tuần này',
+    href: '/staff/schedule',
+  },
+  {
+    icon: FileText,
+    label: 'Xin nghỉ',
+    sub: 'Đơn & quỹ phép',
+    href: '/staff/leave',
+  },
+  {
+    icon: DollarSign,
+    label: 'Lương & Tip',
+    sub: 'Phiếu tháng này',
+    href: '/staff/payslip',
+  },
+];
+
+export function usePosQuickActions(): QuickActionItem[] {
+  const router = useRouter();
+  const setPosIntent = useQuickActionIntentStore((s) => s.setPosIntent);
+
+  return React.useMemo<QuickActionItem[]>(
+    () => [
+      {
+        icon: UserCheck,
+        label: 'Check-in khách',
+        sub: 'Nhận bàn & Khấu trừ cọc',
+        onClick: () => {
+          setPosIntent('checkin');
+          router.push('/pos');
+        },
+      },
+      {
+        icon: GitMerge,
+        label: 'Gộp / tách bàn',
+        sub: 'Chia đều / Theo món / Gộp',
+        onClick: () => {
+          setPosIntent('splitmerge');
+          router.push('/pos');
+        },
+      },
+      {
+        icon: Clock,
+        label: 'Chấm công',
+        sub: 'Vào ca • Nghỉ ca • Tan ca',
+        href: '/staff/attendance',
+      },
+      {
+        icon: Wallet,
+        label: 'Đối soát ca',
+        sub: 'Kiểm tiền mặt & Chốt ca',
+        onClick: () => {
+          setPosIntent('settlement');
+          router.push('/pos');
+        },
+      },
+    ],
+    [router, setPosIntent]
+  );
 }
 
 const itemClassName =
   'min-h-[76px] p-3 px-2 rounded-lg border border-sand-200 bg-white hover:bg-neutral-50 active:scale-98 flex flex-col items-center justify-center gap-1.5 text-center shadow-xs transition-transform cursor-pointer';
 
-export function QuickActions({ title, subtitle, actions }: QuickActionsProps) {
+export function QuickActions({ title, subtitle, actions, onItemClick }: QuickActionsProps) {
   return (
     <section className="bg-white border border-sand-200 rounded-2xl p-5 md:p-6 shadow-warm">
       <h2 className="text-lg font-bold text-ink">{title}</h2>
@@ -40,6 +125,7 @@ export function QuickActions({ title, subtitle, actions }: QuickActionsProps) {
                 key={action.href || idx}
                 href={action.href}
                 className={itemClassName}
+                onClick={onItemClick}
               >
                 {content}
               </Link>
@@ -50,7 +136,10 @@ export function QuickActions({ title, subtitle, actions }: QuickActionsProps) {
             <button
               key={action.label || idx}
               type="button"
-              onClick={action.onClick}
+              onClick={() => {
+                action.onClick?.();
+                onItemClick?.();
+              }}
               className={itemClassName}
             >
               {content}
