@@ -140,11 +140,11 @@ export default function PersonalPage() {
       ? 'Quản lý · Nhà hàng'
       : 'Nhân viên vận hành';
   const staffId = staffUser?.id === 'staff-1' ? 'NV-001' : staffUser?.id || 'NV-001';
-  const rawPhone = staffUser?.phoneNumber || '0901234567';
+  const rawPhone = staffUser?.phoneNumber?.trim() || '';
   const maskedPhone =
     rawPhone.length >= 7
       ? `${rawPhone.slice(0, 4)} ••• ${rawPhone.slice(-3)}`
-      : '0901 ••• 567';
+      : 'Chưa cập nhật';
   const initial = staffName.charAt(0).toUpperCase() || 'H';
 
   // Lương tháng 11

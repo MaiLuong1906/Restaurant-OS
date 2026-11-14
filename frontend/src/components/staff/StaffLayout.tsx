@@ -67,7 +67,7 @@ export function StaffLayout({
 
       {/* Bottom Nav cố định đáy cho mobile (cao 64-68px) */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E9E4DC] grid grid-cols-4 px-2 py-2 shadow-lg z-40"
+        className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E9E4DC] grid grid-cols-4 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-lg z-40"
         aria-label="Điều hướng Staff Portal (bản điện thoại)"
       >
         {navItems.map((item) => {
