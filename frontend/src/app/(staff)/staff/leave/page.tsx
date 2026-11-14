@@ -6,14 +6,9 @@ import { staffService } from '@/services/mock/mockStaffService';
 import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus } from '@/types';
 import { parseDateKey } from '@/lib/dateKey';
 import {
-  Calendar,
   AlertCircle,
   CheckCircle2,
-  ChevronRight,
-  Clock,
   ArrowLeft,
-  X,
-  FileText,
 } from 'lucide-react';
 
 export default function LeavePage() {
@@ -24,8 +19,8 @@ export default function LeavePage() {
   const [balance, setBalance] = React.useState<LeaveBalance | null>(null);
   const [requests, setRequests] = React.useState<LeaveRequest[]>([]);
   const [filter, setFilter] = React.useState<LeaveStatus | 'ALL'>('ALL');
-  const [loading, setLoading] = React.useState<boolean>(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [, setLoading] = React.useState<boolean>(true);
+  const [, setError] = React.useState<string | null>(null);
 
   // B10 Form states (3 bước)
   const [selectedType, setSelectedType] = React.useState<LeaveType | null>(null);

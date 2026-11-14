@@ -78,7 +78,6 @@ export default function PosCashierPage() {
     reservations,
     shift,
     currentAttendance,
-    attendanceLogs,
     selectedTableId,
     isCashDrawerOpen,
     lastActionToast,
@@ -106,14 +105,10 @@ export default function PosCashierPage() {
     recordInternalPayout,
     settleShiftAndBalance,
     reopenShiftDemo,
-    clockInAttendance,
-    toggleBreakAttendance,
-    clockOutAttendance,
   } = usePosStore();
 
   const [activeTab, setActiveTab] = React.useState<CashierNavTab>('home');
   const [reservationSubTab, setReservationSubTab] = React.useState<'create' | 'checkin'>('create');
-  const [shiftSubTab, setShiftSubTab] = React.useState<'settlement' | 'attendance'>('settlement');
   const [areaFilter, setAreaFilter] = React.useState<'ALL' | CashierTableArea>('ALL');
   const [statusFilter, setStatusFilter] = React.useState<'ALL' | CashierTableStatus>('ALL');
   const [splitMergeOpen, setSplitMergeOpen] = React.useState(false);
@@ -146,7 +141,6 @@ export default function PosCashierPage() {
         }
         break;
       case 'settlement':
-        setShiftSubTab('settlement');
         setActiveTab('shift');
         break;
     }
@@ -212,11 +206,9 @@ export default function PosCashierPage() {
             setSplitMergeOpen(true);
           }}
           onOpenShiftSettlement={() => {
-            setShiftSubTab('settlement');
             setActiveTab('shift');
           }}
           onOpenAttendance={() => {
-            setShiftSubTab('attendance');
             setActiveTab('shift');
           }}
           onTriggerCashDrawer={() =>

@@ -6,7 +6,6 @@ import { staffService } from '@/services/mock/mockStaffService';
 import {
   WeekSchedule,
   ScheduleSummary,
-  DaySchedule,
   OpenShift,
   Shift,
   SwapPeerCandidate,
@@ -18,15 +17,9 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Calendar,
   CheckCircle2,
   AlertCircle,
-  Users,
   Search,
-  ArrowRightLeft,
-  X,
-  Send,
 } from 'lucide-react';
 
 export default function SchedulePage() {
@@ -40,8 +33,8 @@ export default function SchedulePage() {
   const [selectedDateKey, setSelectedDateKey] = React.useState<string>('');
   const [schedule, setSchedule] = React.useState<WeekSchedule | null>(null);
   const [summary, setSummary] = React.useState<ScheduleSummary | null>(null);
-  const [loading, setLoading] = React.useState<boolean>(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [, setLoading] = React.useState<boolean>(true);
+  const [, setError] = React.useState<string | null>(null);
 
   // B7 states
   const [b7SelectedDateKey, setB7SelectedDateKey] = React.useState<string>('');

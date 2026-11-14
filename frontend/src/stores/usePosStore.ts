@@ -1087,7 +1087,7 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
   // UC4: Process Counter Settlement & Payment
   processCounterSettlement: ({ tableId, method, cashReceived, printEscPos, openCashDrawer }) => {
     const idempotencyKey = generateIdempotencyKey();
-    const { tables, shift } = get();
+    const { tables } = get();
     const table = tables.find((t) => t.id === tableId);
     if (!table) return;
 

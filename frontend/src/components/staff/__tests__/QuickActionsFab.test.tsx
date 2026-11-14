@@ -21,7 +21,7 @@ describe('QuickActionCounts & Speed-Dial ordering logic', () => {
   beforeEach(() => {
     // Mock localStorage in node environment if needed
     const store: Record<string, string> = {};
-    (global as any).window = {
+    (globalThis as unknown as { window: unknown }).window = {
       localStorage: {
         getItem: (k: string) => store[k] || null,
         setItem: (k: string, v: string) => {

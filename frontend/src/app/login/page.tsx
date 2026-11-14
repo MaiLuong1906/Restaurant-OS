@@ -13,12 +13,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
-  ArrowRight,
   Loader2,
 } from 'lucide-react';
 import { homeHrefForRole } from './login-helpers';
-
-export { homeHrefForRole };
 
 export default function StaffLoginPage() {
   const router = useRouter();
@@ -87,7 +84,7 @@ export default function StaffLoginPage() {
       setLoggedInUser(res.user);
       setFailedAttempts(0);
       setAuthState('SUCCESS');
-    } catch (err) {
+    } catch {
       const nextFailed = failedAttempts + 1;
       setFailedAttempts(nextFailed);
 

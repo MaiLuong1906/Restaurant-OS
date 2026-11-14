@@ -58,7 +58,7 @@ export function CashierHomeView({
   onOpenCheckInList,
   onOpenSplitMerge,
   onOpenShiftSettlement,
-  onOpenAttendance,
+  onOpenAttendance: _onOpenAttendance,
   onTriggerCashDrawer,
 }: CashierHomeViewProps) {
   const [now, setNow] = React.useState<Date>(SSR_FALLBACK_DATE);

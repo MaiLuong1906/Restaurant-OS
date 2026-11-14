@@ -3,17 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { staffService } from '@/services/mock/mockStaffService';
-import { Payslip, TipMonthSummary, TipRecord } from '@/types';
+import { Payslip, TipMonthSummary } from '@/types';
 import { formatVnd } from '@/lib/formatMoney';
 import {
   ChevronRight,
-  AlertCircle,
   Coins,
-  Receipt,
   ArrowLeft,
-  Calendar,
-  CheckCircle2,
-  Clock,
   Info,
 } from 'lucide-react';
 
@@ -25,8 +20,8 @@ export default function PayslipPage() {
   const [tipMonths, setTipMonths] = React.useState<TipMonthSummary[]>([]);
   const [selectedPayslip, setSelectedPayslip] = React.useState<Payslip | null>(null);
   const [currentTipMonth, setCurrentTipMonth] = React.useState<TipMonthSummary | null>(null);
-  const [loading, setLoading] = React.useState<boolean>(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [, setLoading] = React.useState<boolean>(true);
+  const [, setError] = React.useState<string | null>(null);
 
   const loadData = React.useCallback(async () => {
     try {

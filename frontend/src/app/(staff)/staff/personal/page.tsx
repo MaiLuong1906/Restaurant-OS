@@ -9,17 +9,13 @@ import {
   TodayAttendance,
   LeaveBalance,
   Payslip,
-  TipRecord,
   RecentAttendanceEntry,
 } from '@/types';
-import { formatVnd } from '@/lib/formatMoney';
 import {
   ArrowLeft,
   Copy,
   Check,
   CheckCircle2,
-  Clock,
-  Calendar,
   FileText,
   DollarSign,
   ChevronRight,
@@ -28,8 +24,6 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  Home,
-  User,
 } from 'lucide-react';
 
 export default function PersonalPage() {
@@ -38,10 +32,10 @@ export default function PersonalPage() {
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
   const [todayAttendance, setTodayAttendance] = React.useState<TodayAttendance | null>(null);
-  const [leaveBalance, setLeaveBalance] = React.useState<LeaveBalance | null>(null);
-  const [payslips, setPayslips] = React.useState<Payslip[]>([]);
+  const [, setLeaveBalance] = React.useState<LeaveBalance | null>(null);
+  const [, setPayslips] = React.useState<Payslip[]>([]);
   const [recentAttendance, setRecentAttendance] = React.useState<RecentAttendanceEntry[]>([]);
-  const [loading, setLoading] = React.useState<boolean>(true);
+  const [, setLoading] = React.useState<boolean>(true);
 
   // Copy staff ID feedback
   const [copiedId, setCopiedId] = React.useState<boolean>(false);
@@ -146,10 +140,6 @@ export default function PersonalPage() {
       ? `${rawPhone.slice(0, 4)} ••• ${rawPhone.slice(-3)}`
       : 'Chưa cập nhật';
   const initial = staffName.charAt(0).toUpperCase() || 'H';
-
-  // Lương tháng 11
-  const t11Payslip = payslips.find((p) => p.month === '2026-11') || payslips[0];
-  const t11Net = t11Payslip?.netSalary || 4250000;
 
   // Copy handler
   const handleCopyId = async () => {

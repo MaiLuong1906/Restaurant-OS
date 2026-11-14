@@ -2,13 +2,11 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { staffService } from '@/services/mock/mockStaffService';
 import { TodayAttendance, CheckInResponse, AttendanceMethod } from '@/types';
 import {
   ArrowLeft,
   ArrowRight,
-  Camera,
   CheckCircle2,
   Clock,
   AlertTriangle,
@@ -18,8 +16,6 @@ import {
 } from 'lucide-react';
 
 export default function AttendancePage() {
-  const router = useRouter();
-
   // FSM steps: 'B3' (Chấm công) | 'B4' (Xác minh) | 'B5' (Kết quả)
   const [step, setStep] = React.useState<'B3' | 'B4' | 'B5'>('B3');
   const [attendance, setAttendance] = React.useState<TodayAttendance | null>(null);
@@ -101,7 +97,7 @@ export default function AttendancePage() {
       const res = await staffService.verifyFaceScan(key);
       setResult(res);
       setStep('B5');
-    } catch (err) {
+    } catch {
       setScanError('Không nhận diện được khuôn mặt. Vui lòng quét lại hoặc dùng mã PIN.');
     } finally {
       setIsScanning(false);
