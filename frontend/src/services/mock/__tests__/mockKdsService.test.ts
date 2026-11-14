@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MockKdsService } from '../mockKdsService';
-import { MOCK_TICKETS } from '../data/kdsMockData';
 
 describe('MockKdsService', () => {
   let service: MockKdsService;

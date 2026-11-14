@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { UtensilsCrossed, Monitor, CreditCard, LayoutDashboard, Sparkles, ChefHat, QrCode } from 'lucide-react';
+import { UtensilsCrossed, CreditCard, LayoutDashboard, Sparkles, ChefHat, QrCode } from 'lucide-react';
 
 export default function HomePage() {
   const modules = [
