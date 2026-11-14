@@ -400,7 +400,7 @@ interface PosStoreState {
   shift: ShiftSettlementRecord;
   currentAttendance: CashierAttendanceEntry;
   attendanceLogs: CashierAttendanceEntry[];
-  selectedTableId: string;
+  selectedTableId: string | null;
   hasHydratedClock: boolean;
   isCashDrawerOpen: boolean;
   isConnected: boolean;
@@ -424,7 +424,7 @@ interface PosStoreState {
   } | null;
 
   // Navigation & Selection
-  selectTable: (tableId: string) => void;
+  selectTable: (tableId: string | null) => void;
   clearToast: () => void;
   setToast: (message: string) => void;
   syncRealtimeClockSeed: () => void;
@@ -489,7 +489,7 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
   shift: initialShiftSeed,
   currentAttendance: initialAttendanceSeed.current,
   attendanceLogs: initialAttendanceSeed.logs,
-  selectedTableId: 't4',
+  selectedTableId: null,
   hasHydratedClock: false,
   isCashDrawerOpen: false,
   isConnected: false,

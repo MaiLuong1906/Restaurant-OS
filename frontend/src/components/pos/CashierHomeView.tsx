@@ -29,13 +29,17 @@ import {
 } from '@/lib/utils';
 import { StaffHomeShell } from '@/components/staff/StaffHomeShell';
 import { QuickActions } from '@/components/staff/QuickActions';
+import {
+  SalaryLeaveGridSection,
+  AnnouncementsSection,
+} from '@/components/staff/StaffHomeSections';
 
 interface CashierHomeViewProps {
   tables: CashierTable[];
   reservations: TableReservation[];
   shift: ShiftSettlementRecord;
   currentAttendance: CashierAttendanceEntry;
-  selectedTableId?: string;
+  selectedTableId?: string | null;
   isCashDrawerOpen?: boolean;
   onEnterPos: (tableId?: string) => void;
   onOpenNewReservation: () => void;
@@ -313,6 +317,21 @@ export function CashierHomeView({
           ))}
         </div>
       </section>
+
+      {/* Lương & Quỹ phép grid */}
+      <SalaryLeaveGridSection
+        t11TipTotal={320000}
+        leaveBalance={{
+          staffId: 'cashier-1',
+          totalDays: 12,
+          usedDays: 6,
+          remainingDays: 6,
+          pendingRequestsCount: 2,
+        }}
+      />
+
+      {/* Thông báo */}
+      <AnnouncementsSection />
     </>
   );
 

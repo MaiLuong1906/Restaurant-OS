@@ -123,8 +123,9 @@ export default function PosFloorPage() {
     return () => clearTimeout(timer);
   }, [lastActionToast, clearToast]);
 
-  const selectedTable =
-    tables.find((t) => t.id === selectedTableId) ?? tables[0];
+  const selectedTable = selectedTableId
+    ? tables.find((t) => t.id === selectedTableId) ?? null
+    : null;
 
   const filteredTables = tables.filter((t) => {
     if (areaFilter !== 'ALL' && t.area !== areaFilter) return false;
@@ -570,7 +571,19 @@ export default function PosFloorPage() {
                 </div>
               ) : null}
             </div>
-          ) : null}
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-sand-300 bg-white p-12 text-center shadow-warm">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sand-100 text-sand-500">
+                <CreditCard className="h-7 w-7 text-brown-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-ink">Chưa chọn bàn nào</h3>
+                <p className="mt-1 text-xs text-muted max-w-xs">
+                  Vui lòng bấm vào một bàn trên sơ đồ bên trái để xem chi tiết hóa đơn và tác nghiệp thanh toán.
+                </p>
+              </div>
+            </div>
+          )}
         </aside>
       </main>
 
