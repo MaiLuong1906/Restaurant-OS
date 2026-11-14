@@ -3,10 +3,15 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { usePosStore } from '@/stores/usePosStore';
+import { useQuickActionIntentStore } from '@/stores/useQuickActionIntentStore';
 import { CashierHomeView } from '@/components/pos/CashierHomeView';
 
 export default function PosCashierPage() {
   const router = useRouter();
+  const setPendingReservationSubTab = useQuickActionIntentStore(
+    (s) => s.setPendingReservationSubTab
+  );
+  const setPendingSplitMerge = useQuickActionIntentStore((s) => s.setPendingSplitMerge);
   const {
     tables,
     reservations,
@@ -42,10 +47,12 @@ export default function PosCashierPage() {
           router.push('/pos/reservation');
         }}
         onOpenCheckInList={() => {
+          setPendingReservationSubTab('checkin');
           router.push('/pos/reservation');
         }}
         onOpenSplitMerge={(tableId) => {
           selectTable(tableId);
+          setPendingSplitMerge(true);
           router.push('/pos/floor');
         }}
         onOpenShiftSettlement={() => {

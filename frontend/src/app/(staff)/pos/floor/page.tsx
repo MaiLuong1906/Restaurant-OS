@@ -20,6 +20,7 @@ import {
   computeTableSubtotal,
   usePosStore,
 } from '@/stores/usePosStore';
+import { useQuickActionIntentStore } from '@/stores/useQuickActionIntentStore';
 import { CashierTableArea, CashierTableStatus } from '@/types';
 import { SplitMergeModal } from '@/components/pos/SplitMergeModal';
 import { SettlementSheet } from '@/components/pos/SettlementSheet';
@@ -100,6 +101,16 @@ export default function PosFloorPage() {
   const [statusFilter, setStatusFilter] = React.useState<'ALL' | CashierTableStatus>('ALL');
   const [splitMergeOpen, setSplitMergeOpen] = React.useState(false);
   const [settlementOpen, setSettlementOpen] = React.useState(false);
+
+  const pendingSplitMerge = useQuickActionIntentStore((s) => s.pendingSplitMerge);
+  const clearPendingSplitMerge = useQuickActionIntentStore((s) => s.clearPendingSplitMerge);
+
+  React.useEffect(() => {
+    if (pendingSplitMerge) {
+      setSplitMergeOpen(true);
+      clearPendingSplitMerge();
+    }
+  }, [pendingSplitMerge, clearPendingSplitMerge]);
 
   React.useEffect(() => {
     syncRealtimeClockSeed();

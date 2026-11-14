@@ -5,10 +5,17 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { usePosStore } from '@/stores/usePosStore';
+import { useQuickActionIntentStore } from '@/stores/useQuickActionIntentStore';
 import { ReservationView } from '@/components/pos/ReservationModal';
 
 export default function PosReservationPage() {
   const router = useRouter();
+  const pendingReservationSubTab = useQuickActionIntentStore(
+    (s) => s.pendingReservationSubTab
+  );
+  const clearPendingReservationSubTab = useQuickActionIntentStore(
+    (s) => s.clearPendingReservationSubTab
+  );
   const {
     tables,
     reservations,
@@ -19,7 +26,14 @@ export default function PosReservationPage() {
     initializeWebSocket,
   } = usePosStore();
 
-  const [reservationSubTab] = React.useState<'create' | 'checkin'>('create');
+  const [reservationSubTab, setReservationSubTab] = React.useState<'create' | 'checkin'>('create');
+
+  React.useEffect(() => {
+    if (pendingReservationSubTab === 'checkin') {
+      setReservationSubTab('checkin');
+      clearPendingReservationSubTab();
+    }
+  }, [pendingReservationSubTab, clearPendingReservationSubTab]);
 
   React.useEffect(() => {
     syncRealtimeClockSeed();
