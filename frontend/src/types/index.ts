@@ -88,7 +88,7 @@ export interface Batch {
 // DTOs & Models cho Staff Portal & KDS Authentication
 // --------------------------------------------------------------------
 
-export type StaffRole = 'MANAGER' | 'CHEF' | 'STAFF' | 'CASHIER';
+export type StaffRole = 'MANAGER' | 'CHEF' | 'STAFF' | 'CASHIER' | 'WAITER';
 
 export interface StaffUser {
   id: string;
@@ -144,7 +144,7 @@ export interface AttendanceRecord {
   note?: string;
 }
 
-export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type LeaveType = 'ANNUAL' | 'SICK' | 'UNPAID';
 
 export interface LeaveRequest {
@@ -158,13 +158,46 @@ export interface LeaveRequest {
   status: LeaveStatus;
   approvedBy?: string;
   createdAt: string;
+  calendarDays?: number;
+  affectedShifts?: number;
+  idempotencyKey?: string;
 }
+
+export interface CreateLeaveRequest {
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  idempotencyKey: string;
+}
+
+export interface WithdrawLeaveRequest {
+  id: string;
+}
+
+export interface LeaveBalance {
+  staffId: string;
+  totalDays: number;
+  usedDays: number;
+  remainingDays: number;
+  pendingRequestsCount: number;
+}
+
+export type PayslipStatus = 'PROVISIONAL' | 'FINAL';
+export type PayslipPaymentStatus = 'EXPECTED' | 'PAID';
+export type TipPaymentStatus = 'UNPAID' | 'PAID';
 
 export interface Payslip {
   id: string;
   staffId: string;
   staffName: string;
   month: string; // YYYY-MM
+  monthLabel?: string;
+  status?: PayslipStatus;
+  paymentStatus?: PayslipPaymentStatus;
+  periodLabel?: string;
+  paymentDateLabel?: string;
+  paymentNote?: string;
   baseSalary: number; // VND integer
   workedHours: number;
   hourlyRate: number; // VND integer
@@ -172,8 +205,17 @@ export interface Payslip {
   bonus: number; // VND integer
   tipAmount: number; // VND integer
   deductions: number; // VND integer
+  bhxhAmount?: number;
+  advanceAmount?: number;
   netSalary: number; // VND integer (thực lĩnh)
   paidAt?: string;
+}
+
+export interface TipDailyEntry {
+  date: string;
+  dateLabel: string;
+  shiftLabel: string;
+  amount: number;
 }
 
 export interface TipRecord {
@@ -184,6 +226,15 @@ export interface TipRecord {
   poolAmount: number; // VND integer
   allocatedAmount: number; // VND integer
   note?: string;
+}
+
+export interface TipMonthSummary {
+  monthKey: string;
+  monthLabel: string;
+  totalAmount: number;
+  paymentStatus: TipPaymentStatus;
+  paymentNote?: string;
+  dailyEntries?: TipDailyEntry[];
 }
 
 export type OrderStatus = 'PLACED' | 'CONFIRMED' | 'PREPARING' | 'SERVED' | 'COMPLETED' | 'CANCELLED';
@@ -246,7 +297,7 @@ export interface CashierInvoiceItem {
   name: string;
   qty: number;
   unitPrice: number; // VND integer
-  status: 'WAITING' | 'COOKING' | 'SERVED';
+  status: 'WAITING' | 'READY' | 'SERVED';
   note?: string;
 }
 
@@ -340,6 +391,12 @@ export interface ShiftSettlementRecord {
   settledAt?: string;
   drawerOpenLogs: CashDrawerLog[];
   payoutLogs: CashPayoutEntry[];
+  bankTransferSales: number; // VND integer — Chuyển khoản VietQR
+  cardSales: number; // VND integer — Quẹt thẻ POS
+  eWalletSales: number; // VND integer — Ví điện tử (Momo / ZaloPay)
+  totalOrdersSettled: number; // Số hóa đơn đã đóng trong ca
+  totalRevenue: number; // VND integer — Tổng doanh thu ca
+  notes: string[]; // Ghi chú kết ca từ quản lý
 }
 
 export type CashierAttendanceStatus =
@@ -435,3 +492,153 @@ export interface CreateWasteLogRequest {
   recordedByRole?: string;
   idempotencyKey: string;
 }
+
+export type AttendanceCheckInStatus = 'NOT_CHECKED_IN' | 'CHECKED_IN';
+export type AttendanceResultKind = 'SUCCESS' | 'ALREADY_CHECKED_IN' | 'NETWORK_ERROR';
+
+export interface TodayAttendance {
+  shiftName: string;
+  shiftHours: string;
+  zone: string;
+  date: string;
+  status: AttendanceCheckInStatus;
+  checkedInAt: string | null;
+  punctuality?: string;
+  method?: AttendanceMethod;
+}
+
+export interface CheckInRequest {
+  method: AttendanceMethod;
+  idempotencyKey: string;
+}
+
+export interface CheckInResponse {
+  kind: AttendanceResultKind;
+  checkedInAt?: string;
+  method?: AttendanceMethod;
+  message?: string;
+}
+
+// B6-B8 Types
+export interface OpenShift {
+  id: string;
+  dateKey: string; // YYYY-MM-DD
+  startTime: string;
+  endTime: string;
+  role: StaffRole;
+  title: string;
+  zone: string;
+  slotsTotal: number;
+  slotsTaken: number;
+  postedById: string;
+  postedAt: string;
+  note?: string;
+}
+
+export type ShiftRegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface ShiftRegistration {
+  id: string;
+  staffId: string;
+  openShiftId: string;
+  dateKey: string;
+  status: ShiftRegistrationStatus;
+  createdAt: string;
+  idempotencyKey: string;
+  note?: string;
+}
+
+export interface RegisterShiftRequest {
+  openShiftId: string;
+  dateKey: string;
+  note?: string;
+  idempotencyKey: string;
+}
+
+export interface CancelRegistrationRequest {
+  registrationId: string;
+}
+
+export type ShiftSwapStatus =
+  | 'PENDING_PEER'
+  | 'PENDING_MANAGER'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PEER_DECLINED';
+
+export interface ShiftSwapRequest {
+  id: string;
+  requesterId: string;
+  requesterShiftId: string;
+  peerId: string;
+  peerShiftId?: string;
+  dateKey: string;
+  reason?: string;
+  status: ShiftSwapStatus;
+  createdAt: string;
+  peerConfirmedAt?: string;
+  idempotencyKey: string;
+  rejectionReason?: string;
+  processedBy?: string;
+}
+
+export interface CreateShiftSwapRequest {
+  requesterShiftId: string;
+  peerId: string;
+  peerShiftId?: string;
+  reason?: string;
+  idempotencyKey: string;
+}
+
+export interface ScheduleSummary {
+  shiftsThisWeek: number;
+  hoursThisWeek: number;
+  pendingRegistrations: number;
+  pendingSwaps: number;
+  openShiftsThisWeek: number;
+}
+
+export interface DaySchedule {
+  dateKey: string; // YYYY-MM-DD
+  weekdayLabel: string; // T2, T3, ... CN
+  fullDateLabel: string; // Thứ 2, 05/11
+  dayNumber: number;
+  myShifts: Shift[];
+  openShifts: OpenShift[];
+  registrations: ShiftRegistration[];
+  swaps: ShiftSwapRequest[];
+}
+
+export interface WeekSchedule {
+  weekStartKey: string; // Monday YYYY-MM-DD
+  weekEndKey: string; // Sunday YYYY-MM-DD
+  weekLabel: string; // Tuần 05/11 – 11/11/2026
+  days: DaySchedule[];
+}
+
+export interface SwapPeerCandidate {
+  staffId: string;
+  staffName: string;
+  role: StaffRole;
+  shiftTitle: string;
+  shiftTime: string;
+  shiftDate: string;
+  zone: string;
+}
+
+export interface RecentAttendanceEntry {
+  id: string;
+  dateLabel: string;
+  time: string;
+  methodLabel: string; // 'Quét mặt' | 'Mã PIN'
+  statusLabel: string; // 'Đúng giờ' | 'Đi muộn'
+  isLate: boolean;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+

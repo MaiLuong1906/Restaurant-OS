@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle,
   CalendarPlus,
@@ -26,12 +27,15 @@ import {
   formatVND,
   formatVietnameseFullDate,
 } from '@/lib/utils';
+import { StaffHomeShell } from '@/components/staff/StaffHomeShell';
+import { QuickActions } from '@/components/staff/QuickActions';
 
 interface CashierHomeViewProps {
   tables: CashierTable[];
   reservations: TableReservation[];
   shift: ShiftSettlementRecord;
   currentAttendance: CashierAttendanceEntry;
+  selectedTableId?: string;
   isCashDrawerOpen?: boolean;
   onEnterPos: (tableId?: string) => void;
   onOpenNewReservation: () => void;
@@ -47,6 +51,7 @@ export function CashierHomeView({
   reservations,
   shift,
   currentAttendance,
+  selectedTableId,
   isCashDrawerOpen = false,
   onEnterPos,
   onOpenNewReservation,
@@ -82,269 +87,148 @@ export function CashierHomeView({
     shift.depositCashCollected -
     shift.cashRefundsOrPayouts;
 
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 pb-24 md:px-8 md:pb-8">
-      {/* Header chào mừng chuẩn B2-home.png + Thời gian thực */}
-      <section className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-ink">
-            Xin chào, Thu ngân
-          </h1>
-          <p className="ops-nums mt-1 text-sm font-medium text-muted" suppressHydrationWarning>
-            {formatVietnameseFullDate(now)} • {formatTimeHHMMSS(now)}
-          </p>
-          <div className="mt-2.5 inline-flex items-center gap-2 rounded-lg border border-sand-200 bg-white px-3.5 py-1.5 text-xs font-bold text-ink shadow-warm-sm">
-            <span>Nhân viên vận hành</span>
-            <span className="text-sand-400">•</span>
-            <span className="text-primary-500">{shift.cashierName}</span>
-          </div>
-        </div>
+  const headerAction = (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={onTriggerCashDrawer}
+        className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-warm-sm transition-colors ${
+          isCashDrawerOpen
+            ? 'border-primary-400 bg-primary-50 text-primary-600 hover:bg-primary-100'
+            : 'border-sand-300 bg-white text-ink hover:bg-sand-100'
+        }`}
+      >
+        {isCashDrawerOpen ? (
+          <Lock className="h-4 w-4 text-primary-600" />
+        ) : (
+          <LockOpen className="h-4 w-4 text-primary-500" />
+        )}
+        <span>{isCashDrawerOpen ? 'Đóng két tiền' : 'Mở két tiền'}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onOpenNewReservation}
+        className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-semibold text-white shadow-warm transition-colors hover:bg-primary-600"
+      >
+        <CalendarPlus className="h-4 w-4" />
+        <span>+ Đặt bàn mới</span>
+      </button>
+    </div>
+  );
 
-        {/* Nút thao tác nhanh mở/đóng két & tạo đặt bàn */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onTriggerCashDrawer}
-            className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-warm-sm transition-colors ${isCashDrawerOpen
-                ? 'border-primary-400 bg-primary-50 text-primary-600 hover:bg-primary-100'
-                : 'border-sand-300 bg-white text-ink hover:bg-cream-dark'
-              }`}
-          >
-            {isCashDrawerOpen ? (
-              <Lock className="h-4 w-4 text-primary-600" />
-            ) : (
-              <LockOpen className="h-4 w-4 text-primary-500" />
-            )}
-            <span>{isCashDrawerOpen ? 'Đóng két tiền' : 'Mở két tiền'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onOpenNewReservation}
-            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-semibold text-white shadow-warm transition-colors hover:bg-primary-600"
-          >
-            <CalendarPlus className="h-4 w-4" />
-            <span>+ Đặt bàn mới</span>
-          </button>
-        </div>
-      </section>
+  const shiftExtraRows = (
+    <div className="flex items-center justify-between border-t border-dashed border-sand-200 pt-2.5">
+      <span className="text-muted">Tiền mặt dự kiến trong két</span>
+      <span className="ops-nums font-bold text-primary-500">
+        {formatVND(expectedCash)}
+      </span>
+    </div>
+  );
 
-      {/* Lưới 2 cột trên màn hình rộng, 1 cột chuẩn B2-home trên mobile */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {/* THẺ 1: CA HÔM NAY (Giống hệt B2-home.png) */}
-        <div className="flex flex-col justify-between rounded-2xl border border-sand-200 bg-white p-6 shadow-warm">
+  const roleCard = (
+    <div className="flex flex-col justify-between rounded-2xl border border-sand-200 bg-white p-6 shadow-warm">
+      <div>
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h2 className="text-xl font-bold text-ink">Ca hôm nay</h2>
-                <p className="mt-0.5 text-sm text-muted">{shift.shiftName}</p>
-              </div>
-              <span
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold ${shift.status === 'OPEN'
-                    ? 'bg-sage-100 text-sage-700'
-                    : 'bg-sand-200 text-brown-700'
-                  }`}
-              >
-                {shift.status === 'OPEN' ? 'Đang mở ca' : 'Đã chốt ca'}
-              </span>
-            </div>
-
-            <div className="my-4 border-t border-sand-200/80" />
-
-            <div className="flex flex-col gap-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Giờ ca</span>
-                <span className="ops-nums font-bold text-ink">
-                  {shift.startTime} – {shift.endTime}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Khu vực</span>
-                <span className="font-bold text-ink">{shift.area}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Ca tiếp theo</span>
-                <span className="ops-nums font-medium text-muted">{shift.nextShift}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-dashed border-sand-200 pt-2.5">
-                <span className="text-muted">Tiền mặt dự kiến trong két</span>
-                <span className="ops-nums font-bold text-primary-500">
-                  {formatVND(expectedCash)}
-                </span>
-              </div>
-            </div>
+            <h2 className="text-xl font-bold text-ink">Thu ngân — POS</h2>
+            <p className="mt-0.5 text-sm text-muted">Hàng đợi lúc này</p>
           </div>
-
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-sand-100 pt-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-primary-500">
-              <Check className="h-4 w-4 stroke-[2.5] text-sage-700" />
-              <span>
-                {currentAttendance.status === 'WORKING'
-                  ? `Đã vào ca lúc ${currentAttendance.checkInTime}`
-                  : currentAttendance.status === 'ON_BREAK'
-                    ? `Đang nghỉ giữa ca (từ ${currentAttendance.breakStartedAt ?? '--:--'})`
-                    : currentAttendance.status === 'CHECKED_OUT'
-                      ? `Đã tan ca lúc ${currentAttendance.checkOutTime ?? '--:--'}`
-                      : 'Chưa chấm công vào ca'}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenAttendance}
-                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-cream"
-              >
-                <Clock className="h-3.5 w-3.5 text-sage-700" />
-                <span>Chấm công</span>
-              </button>
-              <button
-                type="button"
-                onClick={onOpenShiftSettlement}
-                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-cream px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-cream-dark"
-              >
-                <Wallet className="h-3.5 w-3.5 text-primary-500" />
-                <span>Đối soát & Kết ca</span>
-              </button>
-            </div>
-          </div>
+          <span className="ops-nums rounded-lg bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-500">
+            {confirmedReservations.length} bàn đặt trước
+          </span>
         </div>
 
-        {/* THẺ 2: THU NGÂN — POS (Hàng đợi lúc này — Giống hệt thẻ Bếp KDS ở B2-home.png) */}
-        <div className="flex flex-col justify-between rounded-2xl border border-sand-200 bg-white p-6 shadow-warm">
-          <div>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h2 className="text-xl font-bold text-ink">Thu ngân — POS</h2>
-                <p className="mt-0.5 text-sm text-muted">Hàng đợi lúc này</p>
-              </div>
-              <span className="ops-nums rounded-lg bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-500">
-                {confirmedReservations.length} bàn đặt trước
-              </span>
-            </div>
+        <div className="my-4 border-t border-dashed border-sand-200" />
 
-            <div className="my-4 border-t border-dashed border-sand-200" />
-
-            <div className="grid grid-cols-3 gap-2 py-2 text-center">
-              <div className="flex flex-col items-center">
-                <span className="ops-nums text-3xl font-extrabold text-ink">
-                  {activeTables.length}
-                </span>
-                <span className="mt-1 text-xs font-medium text-muted">Bàn đang mở</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="ops-nums text-3xl font-extrabold text-danger-500">
-                  {overdueTables.length}
-                </span>
-                <span className="mt-1 text-xs font-bold text-ink">Quá SLA</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="ops-nums text-3xl font-extrabold text-ink">
-                  {totalUnpaidItems}
-                </span>
-                <span className="mt-1 text-xs font-medium text-muted">Món trên bill</span>
-              </div>
-            </div>
+        <div className="grid grid-cols-3 gap-2 py-2 text-center">
+          <div className="flex flex-col items-center">
+            <span className="ops-nums text-3xl font-extrabold text-ink">
+              {activeTables.length}
+            </span>
+            <span className="mt-1 text-xs font-medium text-muted">Bàn đang mở</span>
           </div>
-
-          <div className="mt-5 flex flex-col gap-2.5">
-            <button
-              type="button"
-              onClick={() => onEnterPos()}
-              className="flex min-h-13 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 py-3.5 text-base font-bold text-white shadow-warm transition-all hover:bg-primary-600 active:scale-[0.99]"
-            >
-              <span>Vào quầy thu ngân</span>
-            </button>
+          <div className="flex flex-col items-center">
+            <span className="ops-nums text-3xl font-extrabold text-danger-500">
+              {overdueTables.length}
+            </span>
+            <span className="mt-1 text-xs font-bold text-ink">Quá SLA</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="ops-nums text-3xl font-extrabold text-ink">
+              {totalUnpaidItems}
+            </span>
+            <span className="mt-1 text-xs font-medium text-muted">Món trên bill</span>
           </div>
         </div>
       </div>
 
-      {/* DẢI CHỨC NĂNG USE CASE THU NGÂN (5 Use Cases từ image.png) */}
-      <section className="rounded-2xl border border-sand-200 bg-white p-5 shadow-warm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold text-ink">
-            Nghiệp vụ Thu ngân (Cashier Use Cases)
-          </h2>
-          <span className="text-xs font-medium text-muted">
-            Bấm để thao tác trực tiếp
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <button
-            type="button"
-            onClick={onOpenNewReservation}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <CalendarPlus className="h-5 w-5 text-primary-500" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Tạo đặt bàn & Cọc</p>
-              <p className="text-xs text-muted">Check trống + Thu cọc</p>
-            </div>
-          </button>
+      <div className="mt-5 flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={() => onEnterPos()}
+          className="flex min-h-13 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 py-3.5 text-base font-bold text-white shadow-warm transition-all hover:bg-primary-600 active:scale-[0.99]"
+        >
+          <span>Vào quầy thu ngân</span>
+        </button>
+      </div>
+    </div>
+  );
 
-          <button
-            type="button"
-            onClick={onOpenCheckInList}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <UserCheck className="h-5 w-5 text-sage-700" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">
-                Check-in Bàn đặt ({confirmedReservations.length})
-              </p>
-              <p className="text-xs text-muted">Nhận bàn & Khấu trừ cọc</p>
-            </div>
-          </button>
+  const extraSections = (
+    <>
+      {/* THAO TÁC NHANH THU NGÂN (Chỉ hiện trên laptop/tablet, mobile đã có FAB) */}
+      <div className="hidden md:block">
+        <QuickActions
+          title="Thao tác nhanh"
+          subtitle="5 chức năng thường dùng"
+          actions={[
+            {
+              icon: UserCheck,
+              label: `Check-in Bàn đặt (${confirmedReservations.length})`,
+              sub: 'Nhận bàn & Khấu trừ cọc',
+              onClick: onOpenCheckInList,
+            },
+            {
+              icon: GitMerge,
+              label: 'Tách / Gộp Hóa đơn',
+              sub: 'Chia đều / Theo món / Gộp',
+              onClick: () => {
+                if (selectedTableId) {
+                  onOpenSplitMerge(selectedTableId);
+                } else {
+                  onEnterPos();
+                }
+              },
+            },
+            {
+              icon: CreditCard,
+              label: 'Thanh toán & In',
+              sub: 'Khóa bàn • Giảm giá • ESC/POS',
+              onClick: () => {
+                if (selectedTableId) {
+                  onEnterPos(selectedTableId);
+                } else {
+                  onEnterPos();
+                }
+              },
+            },
+            {
+              icon: Clock,
+              label: 'Chấm công Ca',
+              sub: 'Vào ca • Nghỉ ca • Tan ca',
+              href: '/staff/attendance',
+            },
+            {
+              icon: Wallet,
+              label: 'Đối soát & Kết ca',
+              sub: 'Kiểm tiền mặt & Chốt ca',
+              onClick: onOpenShiftSettlement,
+            },
+          ]}
+        />
+      </div>
 
-          <button
-            type="button"
-            onClick={() => onOpenSplitMerge('t4')}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <GitMerge className="h-5 w-5 text-honey-500" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Tách / Gộp Hóa đơn</p>
-              <p className="text-xs text-muted">Chia đều / Theo món / Gộp</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onEnterPos('t4')}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <CreditCard className="h-5 w-5 text-primary-500" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Thanh toán & In</p>
-              <p className="text-xs text-muted">Khóa bàn • Giảm giá • ESC/POS</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenAttendance}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <Clock className="h-5 w-5 text-sage-700" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Chấm công Ca</p>
-              <p className="text-xs text-muted">Vào ca • Nghỉ ca • Tan ca</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenShiftSettlement}
-            className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-cream/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
-          >
-            <Wallet className="h-5 w-5 text-brown-700" />
-            <div className="mt-2">
-              <p className="text-xs font-bold text-ink">Đối soát & Kết ca</p>
-              <p className="text-xs text-muted">Kiểm tiền mặt & Chốt ca</p>
-            </div>
-          </button>
-        </div>
-      </section>
-
-      {/* THẺ 3: CẢNH BÁO CẦN CHÚ Ý (Giống hệt B2-home.png) */}
+      {/* THẺ 3: CẢNH BÁO CẦN CHÚ Ý */}
       <section className="rounded-2xl border border-sand-200 bg-white p-6 shadow-warm">
         <div className="flex items-center gap-2.5">
           <AlertTriangle className="h-5 w-5 shrink-0 text-danger-500" />
@@ -372,7 +256,7 @@ export function CashierHomeView({
                   key={table.id}
                   type="button"
                   onClick={() => onEnterPos(table.id)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-4 py-4 text-left transition-colors hover:bg-cream/50"
+                  className="flex w-full cursor-pointer items-center justify-between gap-4 py-4 text-left transition-colors hover:bg-sand-50/50"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-base font-bold text-ink">
@@ -393,10 +277,11 @@ export function CashierHomeView({
                   </div>
 
                   <span
-                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${isOverdue
+                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${
+                      isOverdue
                         ? 'border-danger-200 bg-kds-overdue-bg text-danger-600'
-                        : 'border-sand-200 bg-cream text-brown-700'
-                      }`}
+                        : 'border-sand-200 bg-sand-100 text-brown-700'
+                    }`}
                   >
                     {isOverdue ? 'Quá SLA' : 'Chờ thu'}
                   </span>
@@ -409,7 +294,7 @@ export function CashierHomeView({
               key={res.id}
               type="button"
               onClick={onOpenCheckInList}
-              className="flex w-full cursor-pointer items-center justify-between gap-4 py-4 text-left transition-colors hover:bg-cream/50"
+              className="flex w-full cursor-pointer items-center justify-between gap-4 py-4 text-left transition-colors hover:bg-sand-50/50"
             >
               <div className="min-w-0 flex-1">
                 <p className="text-base font-bold text-ink">
@@ -428,6 +313,80 @@ export function CashierHomeView({
           ))}
         </div>
       </section>
-    </div>
+    </>
+  );
+
+  return (
+    <StaffHomeShell
+      userName={shift.cashierName ? shift.cashierName.replace(/^Thu ngân\s*/i, '') : ''}
+      roleChip={
+        <div className="inline-flex items-center gap-2 rounded-lg border border-sand-200 bg-white px-3.5 py-1.5 text-xs font-bold text-ink shadow-warm-sm">
+          <span>Nhân viên vận hành</span>
+          <span className="text-sand-400">•</span>
+          <span className="text-primary-500">{shift.cashierName}</span>
+        </div>
+      }
+      subtitle={
+        <p className="ops-nums" suppressHydrationWarning>
+          {formatVietnameseFullDate(now)} • {formatTimeHHMMSS(now)}
+        </p>
+      }
+      headerAction={headerAction}
+      shift={{
+        title: 'Ca hôm nay',
+        subtitle: shift.shiftName,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        area: shift.area,
+        nextShift: shift.nextShift,
+        statusBadge: (
+          <span
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+              shift.status === 'OPEN'
+                ? 'bg-sage-100 text-sage-700'
+                : 'bg-sand-200 text-brown-700'
+            }`}
+          >
+            {shift.status === 'OPEN' ? 'Đang mở ca' : 'Đã chốt ca'}
+          </span>
+        ),
+        checkInStatus: (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-bold text-primary-500">
+              <Check className="h-4 w-4 stroke-[2.5] text-sage-700" />
+              <span>
+                {currentAttendance.status === 'WORKING'
+                  ? `Đã vào ca lúc ${currentAttendance.checkInTime}`
+                  : currentAttendance.status === 'ON_BREAK'
+                  ? `Đang nghỉ giữa ca (từ ${currentAttendance.breakStartedAt ?? '--:--'})`
+                  : currentAttendance.status === 'CHECKED_OUT'
+                  ? `Đã tan ca lúc ${currentAttendance.checkOutTime ?? '--:--'}`
+                  : 'Chưa chấm công vào ca'}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/staff/attendance"
+                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-sand-100"
+              >
+                <Clock className="h-3.5 w-3.5 text-sage-700" />
+                <span>Chấm công</span>
+              </Link>
+              <button
+                type="button"
+                onClick={onOpenShiftSettlement}
+                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-sand-100 px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-sand-200"
+              >
+                <Wallet className="h-3.5 w-3.5 text-primary-500" />
+                <span>Đối soát & Kết ca</span>
+              </button>
+            </div>
+          </div>
+        ),
+      }}
+      roleCard={roleCard}
+      shiftExtraRows={shiftExtraRows}
+      extraSections={extraSections}
+    />
   );
 }

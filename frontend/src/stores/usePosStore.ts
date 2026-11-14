@@ -125,7 +125,7 @@ const INITIAL_TABLES: CashierTable[] = [
     discountAmount: 0,
     items: [
       { id: 'i_601', name: 'Bún Chả Hàng Mành', qty: 2, unitPrice: 95000, status: 'SERVED' },
-      { id: 'i_602', name: 'Bò Lúc Lắc Khoai Tây', qty: 1, unitPrice: 175000, status: 'COOKING' },
+      { id: 'i_602', name: 'Bò Lúc Lắc Khoai Tây', qty: 1, unitPrice: 175000, status: 'READY' },
       { id: 'i_603', name: 'Chè Khúc Bạch Nhãn Lồng', qty: 4, unitPrice: 45000, status: 'WAITING' },
     ],
   },
@@ -276,6 +276,12 @@ function createInitialShift(now: Date = new Date()): ShiftSettlementRecord {
         idempotencyKey: 'init-payout-001',
       },
     ],
+    bankTransferSales: 7400000,
+    cardSales: 3800000,
+    eWalletSales: 1400000,
+    totalOrdersSettled: 42,
+    totalRevenue: 21050000,
+    notes: [],
   };
 }
 
