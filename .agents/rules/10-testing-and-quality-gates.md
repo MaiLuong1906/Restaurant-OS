@@ -46,6 +46,8 @@ Kiểm thử tự động bảo đảm cho việc định tuyến đơn hàng th
 2. **Hiển thị Component:**
    - Kiểm tra món ăn khi hết hàng phải hiển thị badge "Hết món" và vô hiệu hóa nút thêm vào giỏ.
    - Kiểm tra tiền tệ luôn được format đúng định dạng số nguyên Việt Nam Đồng (`35.000 đ`).
+3. **Logic Tính toán Nghiệp Vụ & Pure Helpers:**
+   - Mọi hàm tính toán tiền nong (VAT 8%, chiết khấu thẻ VIP/voucher, tổng tiền thực thu), logic tổng hợp KPI (reduce) và bộ lọc đa điều kiện (multi-criteria filtering) **bắt buộc phải tách ra file helper thuần túy và có unit test bao phủ bằng Vitest**.
 
 ---
 
@@ -59,7 +61,7 @@ Pipeline CI bắt buộc phải chạy thành công 3 luồng E2E sau trước k
 
 ## 5. Cổng Kiểm Soát Chất Lượng Trước Khi Merge (Quality Gates)
 Một Pull Request sẽ bị chặn merge nếu không vượt qua các điều kiện sau:
-- `pnpm --filter frontend type-check` (0 lỗi TypeScript)
-- `pnpm --filter frontend lint` (0 lỗi Linting)
-- `cd backend && ./mvnw test` (Toàn bộ Unit & Slice test đều xanh)
-- Độ bao phủ kiểm thử (Coverage) đạt tối thiểu **70%** ở các Service nghiệp vụ lõi (`OrderService`, `InventoryService`).
+- **Kiểm tra TypeScript nghiêm ngặt:** `pnpm --filter frontend type-check` (0 lỗi TypeScript). File `frontend/tsconfig.json` bắt buộc kích hoạt `"noUnusedLocals": true` và `"noUnusedParameters": true` để triệt tiêu hoàn toàn import thừa và biến rác.
+- **Kiểm tra Linting & Đồng Bộ CI:** `pnpm --filter frontend lint` (0 lỗi Linting). Nghiêm cấm đặt tên Job CI có chữ "Lint" nhưng bên trong không chạy bước lint thực tế.
+- **Kiểm tra Backend:** `cd backend && ./mvnw test` (Toàn bộ Unit & Slice test đều xanh).
+- **Độ bao phủ kiểm thử:** Coverage đạt tối thiểu **70%** ở các Service nghiệp vụ lõi (`OrderService`, `InventoryService`).

@@ -54,6 +54,22 @@ Mọi trang (page) **bắt buộc** phải nằm trong một Route Group đóng 
 - **Hooks & Stores:** `camelCase.ts` có tiền tố `use` (ví dụ: `useCartStore.ts`, `useStomp.ts`).
 - **File tiện ích:** `kebab-case.ts` (ví dụ: `format-currency.ts`, `device-haptics.ts`).
 
+### 2.4. Quy chuẩn Code Hygiene & Trách nhiệm Component
+Được đúc kết từ thực tiễn kiểm thử và code review, các ràng buộc sau đây là **bắt buộc đối với toàn bộ mã nguồn Frontend**:
+
+1. **Nguyên tắc DRY Component (Ngưỡng lặp $\ge 3$ lần):**
+   - Tuyệt đối không lặp lại cùng một khối cấu trúc JSX/logic trên nhiều trang. Khi một thành phần giao diện xuất hiện từ 3 màn hình trở lên (Toast thông báo, Thẻ KPI, Modal bọc ngoài, Toolbar tìm kiếm), **bắt buộc phải bóc tách thành shared component** trong `components/admin/` hoặc `components/ui/` (ví dụ: `AdminToast`, `KpiCard`, `AdminModal`).
+2. **Tách biệt Dữ liệu Giả lập (Mock Data Separation):**
+   - Nghiêm cấm nhúng (inline) các mảng mock data khổng lồ (`INITIAL_*`, `METRICS_*`) trực tiếp vào file `page.tsx`.
+   - Toàn bộ dữ liệu mẫu phải chuyển về `src/services/mock/data/` (ví dụ: `adminMockData.ts`, `kdsMockData.ts`) để file trang chỉ thuần túy quản lý luồng dữ liệu và trạng thái UI.
+3. **Chuẩn React Idioms & Memory Leak Prevention:**
+   - **Cấm truy vấn DOM bằng chuỗi ID:** Không dùng `document.getElementById` để điều hướng focus ô PIN hoặc lấy phần tử. Phải sử dụng mảng `useRef` React để bảo đảm tính đóng gói khi nhiều modal cùng mở.
+   - **Bắt buộc dọn dẹp Timer:** Mọi `setTimeout` hoặc `setInterval` dùng cho toast, hiệu ứng trễ hoặc polling đều phải có hàm `clearTimeout` tương ứng trong phần cleanup của `useEffect` hoặc bọc trong custom hook quản lý riêng.
+   - **Không State Chết (No Dead State):** Mọi form control / dropdown (như lý do hủy đơn, bộ lọc nâng cao) khi người dùng thao tác bắt buộc phải được đọc và ghi nhận vào state / mutation payload thật, không để UI "trơ" không tác dụng.
+   - **Chính sách Zero `any`:** Không dùng `any` trong state hay props (`useState<any>`). Luôn định nghĩa interface hoặc type cụ thể cho từng thực thể.
+   - **Khóa danh sách ổn định (Stable React Keys):** Không dùng `key={idx}` cho danh sách có thao tác thêm/xóa/lọc. Bắt buộc dùng id duy nhất hoặc khóa kết hợp `${item.name}-${idx}`.
+   - **Tiêu chuẩn Modal Accessibility (a11y):** Mọi Modal bắt buộc có `role="dialog"`, `aria-modal="true"`, lắng nghe phím `Escape` để đóng và tự động focus vào input đầu tiên hoặc nút đóng.
+
 ---
 
 ## 3. Quản Trị Cấu Trúc Backend Spring Boot (`backend/`)
