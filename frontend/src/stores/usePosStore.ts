@@ -276,6 +276,12 @@ function createInitialShift(now: Date = new Date()): ShiftSettlementRecord {
         idempotencyKey: 'init-payout-001',
       },
     ],
+    bankTransferSales: 7400000,
+    cardSales: 3800000,
+    eWalletSales: 1400000,
+    totalOrdersSettled: 42,
+    totalRevenue: 21050000,
+    notes: [],
   };
 }
 

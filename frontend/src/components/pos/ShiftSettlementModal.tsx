@@ -227,7 +227,7 @@ export function ShiftSettlementView({
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-muted">
-                4. Chi tiền mặt / Hoàn cọc / Chi tiêu nội bộ ({shift.payoutNotes.length} phiếu)
+                4. Chi tiền mặt / Hoàn cọc / Chi tiêu nội bộ ({shift.payoutLogs.length} phiếu)
               </span>
               <span className="ops-nums font-bold text-danger-600">
                 -{formatVND(shift.cashRefundsOrPayouts)}
@@ -235,17 +235,17 @@ export function ShiftSettlementView({
             </div>
 
             {/* Danh sách note chi tiêu két */}
-            {shift.payoutNotes.length > 0 ? (
+            {shift.payoutLogs.length > 0 ? (
               <div className="rounded-xl border border-sand-200 bg-sand-50/50 p-3">
                 <p className="text-xs font-bold text-ink">Lịch sử phiếu chi két:</p>
                 <ul className="mt-1.5 divide-y divide-sand-200 text-xs">
-                  {shift.payoutNotes.map((pn) => (
+                  {shift.payoutLogs.map((pn) => (
                     <li
                       key={pn.id}
                       className="flex items-center justify-between py-1.5 text-muted"
                     >
                       <span>
-                        [{pn.time}] {pn.note}
+                        [{pn.timestamp}] {pn.note}
                       </span>
                       <strong className="ops-nums text-danger-600">
                         -{formatVND(pn.amount)}

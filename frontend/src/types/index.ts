@@ -391,6 +391,12 @@ export interface ShiftSettlementRecord {
   settledAt?: string;
   drawerOpenLogs: CashDrawerLog[];
   payoutLogs: CashPayoutEntry[];
+  bankTransferSales: number; // VND integer — Chuyển khoản VietQR
+  cardSales: number; // VND integer — Quẹt thẻ POS
+  eWalletSales: number; // VND integer — Ví điện tử (Momo / ZaloPay)
+  totalOrdersSettled: number; // Số hóa đơn đã đóng trong ca
+  totalRevenue: number; // VND integer — Tổng doanh thu ca
+  notes: string[]; // Ghi chú kết ca từ quản lý
 }
 
 export type CashierAttendanceStatus =
