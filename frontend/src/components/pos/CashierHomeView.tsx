@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle,
   CalendarPlus,
@@ -232,9 +233,8 @@ export function CashierHomeView({
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenAttendance}
+          <Link
+            href="/staff/attendance"
             className="flex min-h-20 cursor-pointer flex-col items-start justify-between rounded-xl border border-sand-200 bg-sand-50/60 p-3.5 text-left transition-all hover:border-primary-400 hover:bg-white hover:shadow-warm-sm"
           >
             <Clock className="h-5 w-5 text-sage-700" />
@@ -242,7 +242,7 @@ export function CashierHomeView({
               <p className="text-xs font-bold text-ink">Chấm công Ca</p>
               <p className="text-xs text-muted">Vào ca • Nghỉ ca • Tan ca</p>
             </div>
-          </button>
+          </Link>
 
           <button
             type="button"
@@ -395,14 +395,13 @@ export function CashierHomeView({
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenAttendance}
+              <Link
+                href="/staff/attendance"
                 className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-sand-100"
               >
                 <Clock className="h-3.5 w-3.5 text-sage-700" />
                 <span>Chấm công</span>
-              </button>
+              </Link>
               <button
                 type="button"
                 onClick={onOpenShiftSettlement}

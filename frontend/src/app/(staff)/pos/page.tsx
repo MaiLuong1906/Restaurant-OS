@@ -631,17 +631,11 @@ export default function PosCashierPage() {
       {activeTab === 'shift' ? (
         <ShiftSettlementView
           shift={shift}
-          currentAttendance={currentAttendance}
-          attendanceLogs={attendanceLogs}
-          initialTab={shiftSubTab}
           isCashDrawerOpen={isCashDrawerOpen}
           onSettleShift={settleShiftAndBalance}
           onRecordPayout={recordInternalPayout}
           onReopenShiftDemo={reopenShiftDemo}
           onTriggerCashDrawer={(reason) => toggleCashDrawer(reason)}
-          onClockIn={clockInAttendance}
-          onToggleBreak={toggleBreakAttendance}
-          onClockOut={clockOutAttendance}
         />
       ) : null}
 

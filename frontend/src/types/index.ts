@@ -297,7 +297,7 @@ export interface CashierInvoiceItem {
   name: string;
   qty: number;
   unitPrice: number; // VND integer
-  status: 'WAITING' | 'COOKING' | 'SERVED';
+  status: 'WAITING' | 'READY' | 'SERVED';
   note?: string;
 }
 
