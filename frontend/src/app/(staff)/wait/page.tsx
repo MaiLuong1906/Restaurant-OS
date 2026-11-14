@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { StaffHomeShell } from '@/components/staff/StaffHomeShell';
-import { QuickActions, CHEF_QUICK_ACTIONS } from '@/components/staff/QuickActions';
+import { QuickActions, WAITER_QUICK_ACTIONS } from '@/components/staff/QuickActions';
 import {
   AllergyWarningSection,
   SalaryLeaveGridSection,
@@ -120,7 +120,7 @@ export default function WaiterHomePage() {
         <button
           onClick={loadData}
           type="button"
-          className="px-4 py-2 bg-ops-brand text-white rounded-lg text-sm font-bold shadow-xs hover:bg-neutral-800"
+          className="px-4 py-2 bg-ops-brand text-white rounded-lg text-sm font-bold shadow-xs hover:bg-ops-brand-dark"
         >
           Thử lại
         </button>
@@ -141,11 +141,11 @@ export default function WaiterHomePage() {
       <div className="grid grid-cols-3 gap-3 text-center my-4">
         <div className="p-3 bg-neutral-50 rounded-xl border border-sand-200">
           <div className="ops-nums text-2xl font-black text-ink">{servingTablesCount}</div>
-          <div className="text-xs text-muted mt-0.5">Bàn phục vụ</div>
+          <div className="text-xs text-muted mt-0.5">Bàn</div>
         </div>
-        <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200">
-          <div className="ops-nums text-2xl font-black text-emerald-700">{itemsWaitingDeliveryCount}</div>
-          <div className="text-xs text-emerald-800 font-medium mt-0.5">Chờ giao</div>
+        <div className="p-3 bg-sage-100 rounded-xl border border-sage-200">
+          <div className="ops-nums text-2xl font-black text-sage-700">{itemsWaitingDeliveryCount}</div>
+          <div className="text-xs text-sage-700 font-medium mt-0.5">Chờ giao</div>
         </div>
         <div className="p-3 bg-neutral-50 rounded-xl border border-sand-200">
           <div className="ops-nums text-2xl font-black text-muted">{itemsDeliveredCount}</div>
@@ -154,8 +154,8 @@ export default function WaiterHomePage() {
       </div>
 
       <Link
-        href="/wait"
-        className="w-full min-h-[48px] rounded-lg bg-ops-brand hover:bg-neutral-800 text-white font-bold text-sm flex items-center justify-center transition-colors shadow-xs active:scale-98"
+        href="/wait/tables"
+        className="w-full min-h-[48px] rounded-lg bg-ops-brand hover:bg-ops-brand-dark text-white font-bold text-sm flex items-center justify-center transition-colors shadow-xs active:scale-98"
       >
         Vào danh sách bàn
       </Link>
@@ -172,7 +172,7 @@ export default function WaiterHomePage() {
         <QuickActions
           title="Thao tác nhanh"
           subtitle="4 chức năng thường dùng"
-          actions={CHEF_QUICK_ACTIONS}
+          actions={WAITER_QUICK_ACTIONS}
         />
       </div>
 
@@ -206,7 +206,7 @@ export default function WaiterHomePage() {
         nextShift: nextShift ? `Thứ Sáu · ${nextShift.startTime} – ${nextShift.endTime}` : 'Chưa xếp',
         checkInStatus: (
           <div className="flex items-center gap-2 text-sm font-bold text-ops-brand">
-            <Check className="h-4 w-4 text-emerald-600" />
+            <Check className="h-4 w-4 text-sage-700" />
             <span>Đã vào ca lúc 07:58</span>
           </div>
         ),

@@ -11,6 +11,9 @@ import {
   UserCheck,
   GitMerge,
   Wallet,
+  LayoutGrid,
+  ClipboardList,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { useQuickActionIntentStore } from '@/stores/useQuickActionIntentStore';
 
@@ -53,6 +56,33 @@ export const CHEF_QUICK_ACTIONS: QuickActionItem[] = [
     label: 'Lương & Tip',
     sub: 'Phiếu tháng này',
     href: '/staff/payslip',
+  },
+];
+
+export const WAITER_QUICK_ACTIONS: QuickActionItem[] = [
+  {
+    icon: LayoutGrid,
+    label: 'Sơ đồ bàn',
+    sub: 'Trạng thái & chuyển bàn',
+    href: '/wait/tables',
+  },
+  {
+    icon: ClipboardList,
+    label: 'Theo dõi món',
+    sub: 'Tiến độ bếp & trả món',
+    href: '/wait/tracking',
+  },
+  {
+    icon: UtensilsCrossed,
+    label: 'Gọi món',
+    sub: 'Thêm món cho bàn',
+    href: '/wait/order',
+  },
+  {
+    icon: Clock,
+    label: 'Chấm công',
+    sub: 'Vào / ra ca',
+    href: '/staff/attendance',
   },
 ];
 

@@ -99,7 +99,7 @@ export function QuickActionsFab({ actions }: QuickActionsFabProps) {
           >
             <QuickActions
               title="Thao tác nhanh"
-              subtitle="Chọn chức năng để thực hiện tác vụ"
+              subtitle="4 chức năng thường dùng"
               actions={actions}
               onItemClick={handleClose}
             />
