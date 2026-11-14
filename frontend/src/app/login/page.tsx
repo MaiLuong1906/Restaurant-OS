@@ -16,19 +16,9 @@ import {
   ArrowRight,
   Loader2,
 } from 'lucide-react';
+import { homeHrefForRole } from './login-helpers';
 
-function homeHrefForRole(role?: string): string {
-  switch (role) {
-    case 'CHEF':
-    case 'MANAGER':
-      return '/chef';
-    case 'CASHIER':
-      return '/pos';
-    case 'STAFF':
-    default:
-      return '/chef';
-  }
-}
+export { homeHrefForRole };
 
 export default function StaffLoginPage() {
   const router = useRouter();

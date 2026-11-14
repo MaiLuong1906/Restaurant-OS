@@ -9,7 +9,7 @@ import { QuickActionsFab } from '@/components/staff/QuickActionsFab';
 
 export interface StaffLayoutProps {
   children: React.ReactNode;
-  homeHref?: '/staff' | '/pos' | '/chef';
+  homeHref?: '/staff' | '/pos' | '/chef' | '/wait';
   quickActions?: QuickActionItem[];
 }
 

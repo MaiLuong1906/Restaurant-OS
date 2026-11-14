@@ -88,7 +88,7 @@ export interface Batch {
 // DTOs & Models cho Staff Portal & KDS Authentication
 // --------------------------------------------------------------------
 
-export type StaffRole = 'MANAGER' | 'CHEF' | 'STAFF' | 'CASHIER';
+export type StaffRole = 'MANAGER' | 'CHEF' | 'STAFF' | 'CASHIER' | 'WAITER';
 
 export interface StaffUser {
   id: string;
