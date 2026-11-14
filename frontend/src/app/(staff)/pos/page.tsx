@@ -2,22 +2,15 @@
 
 import * as React from 'react';
 import {
-  AlertTriangle,
-  Calendar,
   CheckCircle2,
-  Circle,
   CreditCard,
-  DollarSign,
   GitMerge,
-  Home,
   Lock,
   LockOpen,
   Printer,
   Sparkles,
   Tag,
-  User,
   UserCheck,
-  UtensilsCrossed,
   X,
 } from 'lucide-react';
 import {
@@ -161,77 +154,6 @@ export default function PosCashierPage() {
 
   return (
     <div className="min-h-screen bg-cream font-sans text-ink">
-      {/* Top Header & Taskbar duy nhất trên Máy tính (Desktop >= md) */}
-      <header className="sticky top-0 z-40 border-b border-sand-200 bg-white/95 shadow-warm-sm backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 md:px-8">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-sm font-extrabold text-white shadow-warm-sm">
-              ROS
-            </span>
-            <div>
-              <p className="text-sm font-extrabold text-ink">
-                Restaurant OS • Thu Ngân (Cashier)
-              </p>
-              <p className="text-xs text-muted">
-                {shift.shiftName} • {shift.cashierName}
-              </p>
-            </div>
-          </div>
-
-          {/* Taskbar điều hướng hợp nhất trên Máy tính (Ẩn trên Điện thoại) */}
-          <nav
-            aria-label="Điều hướng chính Thu ngân (Desktop)"
-            className="hidden items-center gap-1.5 rounded-xl border border-sand-200 bg-cream p-1 md:flex"
-          >
-            {(
-              [
-                { id: 'home', label: 'Trang chủ', icon: Home },
-                { id: 'reservation', label: 'Đặt bàn', icon: Calendar },
-                { id: 'pos', label: 'Quầy POS & Bill', icon: DollarSign },
-                { id: 'shift', label: 'Kết ca & Cá nhân', icon: User },
-              ] as const
-            ).map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors ${
-                    isActive
-                      ? 'bg-primary-500 text-white shadow-warm-sm'
-                      : 'text-muted hover:bg-white/70 hover:text-ink'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => toggleCashDrawer('Mở két nhanh từ thanh công cụ')}
-              className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-colors ${
-                isCashDrawerOpen
-                  ? 'border-primary-400 bg-primary-50 text-primary-600 hover:bg-primary-100'
-                  : 'border-sand-300 bg-cream text-ink hover:bg-cream-dark'
-              }`}
-            >
-              {isCashDrawerOpen ? (
-                <Lock className="h-4 w-4 text-primary-600" />
-              ) : (
-                <LockOpen className="h-4 w-4 text-primary-500" />
-              )}
-              <span>{isCashDrawerOpen ? 'Đóng két' : 'Mở két'}</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
       {/* NỘI DUNG THEO TAB */}
       {activeTab === 'home' ? (
         <CashierHomeView
@@ -772,60 +694,6 @@ export default function PosCashierPage() {
           </button>
         </div>
       ) : null}
-
-      {/* Thanh Điều Hướng Dưới Cùng (Chỉ hiện trên Điện thoại < md, ẩn trên Máy tính) */}
-      <nav
-        aria-label="Điều hướng chính Thu ngân (Mobile)"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-sand-200 bg-white shadow-warm md:hidden"
-      >
-        <div className="mx-auto grid max-w-2xl grid-cols-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('home')}
-            className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 text-xs font-bold transition-colors ${
-              activeTab === 'home' ? 'text-primary-500' : 'text-muted hover:text-ink'
-            }`}
-          >
-            <Home className="h-5 w-5" />
-            <span>Trang chủ</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('reservation')}
-            className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 text-xs font-bold transition-colors ${
-              activeTab === 'reservation'
-                ? 'text-primary-500'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            <Calendar className="h-5 w-5" />
-            <span>Đặt bàn</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('pos')}
-            className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 text-xs font-bold transition-colors ${
-              activeTab === 'pos' ? 'text-primary-500' : 'text-muted hover:text-ink'
-            }`}
-          >
-            <DollarSign className="h-5 w-5" />
-            <span>Quầy POS &amp; Bill</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('shift')}
-            className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 text-xs font-bold transition-colors ${
-              activeTab === 'shift' ? 'text-primary-500' : 'text-muted hover:text-ink'
-            }`}
-          >
-            <User className="h-5 w-5" />
-            <span>Kết ca &amp; Cá nhân</span>
-          </button>
-        </div>
-      </nav>
     </div>
   );
 }
