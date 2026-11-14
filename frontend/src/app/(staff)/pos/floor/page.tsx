@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import {
+  ArrowLeft,
   CheckCircle2,
   CreditCard,
   GitMerge,
@@ -24,6 +25,7 @@ import { SplitMergeModal } from '@/components/pos/SplitMergeModal';
 import { SettlementSheet } from '@/components/pos/SettlementSheet';
 import { formatVND } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const STATUS_CONFIG: Record<
   CashierTableStatus,
@@ -135,7 +137,17 @@ export default function PosFloorPage() {
 
   return (
     <div className="min-h-screen bg-ops-bg font-sans text-ink">
-      <main className="mx-auto grid max-w-[1440px] grid-cols-1 gap-6 px-4 py-6 pb-24 md:px-8 md:pb-8 lg:grid-cols-12">
+      <div className="mx-auto max-w-[1440px] px-4 pt-4 md:px-8">
+        <Link
+          href="/pos"
+          className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-sm font-semibold text-[#2B2118] no-underline transition-transform hover:bg-neutral-50 active:scale-[0.98]"
+        >
+          <ArrowLeft className="h-4 w-4 text-[#2B2118]" />
+          <span>Trang chủ</span>
+        </Link>
+      </div>
+
+      <main className="mx-auto grid max-w-[1440px] grid-cols-1 gap-6 px-4 py-4 pb-24 md:px-8 md:pb-8 lg:grid-cols-12">
         {/* CỘT TRÁI (7 cols): Sơ đồ bàn + Lọc khu vực & Trạng thái */}
         <section className="flex flex-col gap-4 lg:col-span-7">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sand-200 bg-white p-5 shadow-warm">
