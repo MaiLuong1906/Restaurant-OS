@@ -318,7 +318,7 @@ export default function AttendancePage() {
                         type="button"
                         disabled={lockedSecondsLeft > 0}
                         onClick={() => handlePinAppend(digit)}
-                        className="h-16 text-2xl font-bold rounded-lg border border-ops-border bg-white hover:bg-neutral-50 active:scale-95 text-[#2B2118] flex items-center justify-center shadow-xs transition-transform disabled:opacity-40"
+                        className="h-16 text-2xl font-bold rounded-lg border border-ops-border bg-white hover:bg-neutral-50 active:scale-98 text-[#2B2118] flex items-center justify-center shadow-xs transition-transform disabled:opacity-40"
                       >
                         {digit}
                       </button>
@@ -327,7 +327,7 @@ export default function AttendancePage() {
                       type="button"
                       disabled={lockedSecondsLeft > 0 || pin.length === 0}
                       onClick={handlePinClear}
-                      className="h-16 text-sm font-bold rounded-lg border border-ops-border bg-neutral-100 text-[#2B2118] flex items-center justify-center active:scale-95 disabled:opacity-40"
+                      className="h-16 text-sm font-bold rounded-lg border border-ops-border bg-neutral-100 text-[#2B2118] flex items-center justify-center active:scale-98 disabled:opacity-40"
                     >
                       Xóa
                     </button>
@@ -335,7 +335,7 @@ export default function AttendancePage() {
                       type="button"
                       disabled={lockedSecondsLeft > 0}
                       onClick={() => handlePinAppend('0')}
-                      className="h-16 text-2xl font-bold rounded-lg border border-ops-border bg-white hover:bg-neutral-50 active:scale-95 text-[#2B2118] flex items-center justify-center shadow-xs transition-transform disabled:opacity-40"
+                      className="h-16 text-2xl font-bold rounded-lg border border-ops-border bg-white hover:bg-neutral-50 active:scale-98 text-[#2B2118] flex items-center justify-center shadow-xs transition-transform disabled:opacity-40"
                     >
                       0
                     </button>
@@ -343,7 +343,7 @@ export default function AttendancePage() {
                       type="button"
                       disabled={lockedSecondsLeft > 0 || pin.length === 0}
                       onClick={handlePinBackspace}
-                      className="h-16 text-xl font-bold rounded-lg border border-ops-border bg-neutral-100 text-[#2B2118] flex items-center justify-center active:scale-95 disabled:opacity-40"
+                      className="h-16 text-xl font-bold rounded-lg border border-ops-border bg-neutral-100 text-[#2B2118] flex items-center justify-center active:scale-98 disabled:opacity-40"
                     >
                       &larr;
                     </button>

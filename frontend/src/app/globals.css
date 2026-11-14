@@ -143,6 +143,16 @@
   --radius-card: 8px;
   --radius-playful: 8px;
 
+  /* Motion Tokens đã khóa (§13) */
+  --motion-fast: 140ms;
+  --motion-normal: 200ms;
+  --motion-medium: 280ms;
+  --motion-slow: 450ms;
+
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
   /* Nhấp nháy cho trạng thái quá SLA (dùng class animate-blink) */
   --animate-blink: blink 1s ease-in-out infinite;
   @keyframes blink {
@@ -202,4 +212,31 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(20, 18, 16, 0.5);
+}
+
+/* Motion Utilities theo Motion Design Guidelines */
+.hover-lift {
+  transition: transform var(--motion-normal) var(--ease-standard);
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+.btn-press {
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+.btn-press:active {
+  transform: scale(0.98);
+}
+
+/* Hỗ trợ khả năng tiếp cận (Accessibility) — Giảm chuyển động theo yêu cầu của hệ điều hành */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

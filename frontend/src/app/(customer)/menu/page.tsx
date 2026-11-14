@@ -104,11 +104,14 @@ export default function MenuCustomerPage() {
 
         <button
           onClick={() => setIsCartOpen(true)}
-          className="relative p-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/30 transition-transform active:scale-95"
+          className="relative p-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/30 transition-transform active:scale-98"
         >
           <ShoppingBag className="h-5 w-5" />
           {getTotalItemCount() > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white font-bold text-[11px] rounded-full flex items-center justify-center border-2 border-slate-950">
+            <span
+              key={getTotalItemCount()}
+              className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white font-bold text-[11px] rounded-full flex items-center justify-center border-2 border-slate-950 animate-in zoom-in-75 duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+            >
               {getTotalItemCount()}
             </span>
           )}
@@ -263,7 +266,7 @@ export default function MenuCustomerPage() {
               </div>
 
               {orderPlaced ? (
-                <div className="w-full py-3.5 rounded-xl bg-emerald-600 text-white font-bold text-sm flex items-center justify-center space-x-2 animate-bounce">
+                <div className="w-full py-3.5 rounded-xl bg-emerald-600 text-white font-bold text-sm flex items-center justify-center space-x-2 animate-in fade-in duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
                   <Check className="h-5 w-5" />
                   <span>Đã gửi đơn tới Bếp thành công!</span>
                 </div>

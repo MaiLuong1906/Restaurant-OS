@@ -377,7 +377,7 @@ export default function KdsWastePage() {
                     type="button"
                     disabled={isOutOfStock || quantity <= 1}
                     onClick={() => handleStepQuantity(-1)}
-                    className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-95 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-98 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Giảm số lượng"
                   >
                     &minus;
@@ -389,7 +389,7 @@ export default function KdsWastePage() {
                     type="button"
                     disabled={isOutOfStock || !currentDish || quantity >= currentDish.stockQuantity}
                     onClick={() => handleStepQuantity(1)}
-                    className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-95 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="h-12 w-12 rounded-lg border border-ops-border bg-white text-xl font-black text-ops-ink flex items-center justify-center active:scale-98 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Tăng số lượng"
                   >
                     &#43;
