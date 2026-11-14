@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { DishAvailability } from '@/types';
 import { kdsService } from '@/services/mock';
-import { ArrowLeft, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export default function SoldOutPage() {
   const [dishes, setDishes] = React.useState<DishAvailability[]>([]);
