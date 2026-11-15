@@ -7,7 +7,7 @@ import {
   CashierTable,
   CashierTableArea,
   DiscountRule,
-  InvoiceSplitPart,
+  MergedTableSnapshot,
   PaymentMethodType,
   ShiftSettlementRecord,
   TableReservation,
@@ -441,12 +441,9 @@ interface PosStoreState {
   checkInReservation: (reservationId: string) => void;
   cancelReservation: (reservationId: string) => void;
 
-  // UC3: Split / Merge Invoices
-  mergeTables: (sourceTableId: string, targetTableId: string) => void;
-  splitInvoiceEqual: (tableId: string, numParts: number) => void;
-  splitInvoiceByItems: (tableId: string, itemIdsGroupA: string[]) => void;
-  markSplitPartPaid: (tableId: string, partId: string, method: PaymentMethodType) => void;
-  clearSplitInvoice: (tableId: string) => void;
+  // UC3: Merge 2+ tables (keeping merged tables active OCCUPIED) & Split/unmerge selected tables from merged group
+  mergeTables: (sourceTableIds: string | string[], targetTableId: string) => void;
+  splitMergedTables: (masterTableId: string, memberTableIds: string[]) => void;
 
   // UC4: Process Counter Settlement & Payment (Lock Table, Apply Discount, ESC/POS, Cash Drawer)
   lockTableForSettlement: (tableId: string) => void;
@@ -745,30 +742,86 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     }).catch(() => {});
   },
 
-  // UC3: Split / Merge Invoices
-  mergeTables: (sourceTableId, targetTableId) => {
-    if (sourceTableId === targetTableId) return;
+  // UC3: Merge 2+ Tables (giữ trạng thái Đang phục vụ) & Split/Unmerge Tables from merged group
+  mergeTables: (sourceTableIds, targetTableId) => {
     const idempotencyKey = generateIdempotencyKey();
     const { tables } = get();
-    const source = tables.find((t) => t.id === sourceTableId);
-    const target = tables.find((t) => t.id === targetTableId);
-    if (!source || !target) return;
+    const normalizedIds = Array.from(
+      new Set((Array.isArray(sourceTableIds) ? sourceTableIds : [sourceTableIds]).filter((id) => id !== targetTableId))
+    );
+    if (normalizedIds.length === 0) return;
 
-    // Hợp nhất các món trùng tên & đơn giá, giữ nguyên số nguyên VND
-    const mergedItems = [...target.items];
-    for (const srcItem of source.items) {
-      const existingIdx = mergedItems.findIndex(
-        (it) => it.name === srcItem.name && it.unitPrice === srcItem.unitPrice && it.note === srcItem.note
+    const target = tables.find((t) => t.id === targetTableId);
+    if (
+      !target ||
+      target.mergedIntoTableId ||
+      target.status === 'LOCKED' ||
+      target.status === 'CLEANING' ||
+      target.status === 'RESERVED'
+    ) {
+      return;
+    }
+
+    const sources = normalizedIds
+      .map((id) => tables.find((t) => t.id === id))
+      .filter(
+        (src): src is CashierTable =>
+          Boolean(src) &&
+          !src!.mergedIntoTableId &&
+          !(src!.mergedMemberTables && src!.mergedMemberTables.length > 0) &&
+          (src!.status === 'OCCUPIED' || src!.status === 'OVERDUE' || src!.status === 'IDLE')
       );
-      if (existingIdx >= 0) {
-        mergedItems[existingIdx] = {
-          ...mergedItems[existingIdx],
-          qty: mergedItems[existingIdx].qty + srcItem.qty,
-        };
-      } else {
-        mergedItems.push({ ...srcItem, id: `${srcItem.id}_m` });
+
+    if (sources.length === 0) return;
+
+    const sourceIdSet = new Set(sources.map((s) => s.id));
+    const mergedItems = target.items.map((it) => ({ ...it }));
+    const newSnapshots: MergedTableSnapshot[] = [];
+    let addedGuests = 0;
+    let addedDeposit = 0;
+    let addedDiscount = 0;
+
+    for (const src of sources) {
+      newSnapshots.push({
+        tableId: src.id,
+        label: src.label,
+        originalStatus: src.status,
+        guests: src.guests,
+        seatedMin: src.seatedMin,
+        staff: src.staff,
+        depositAmount: src.depositAmount,
+        discountAmount: src.discountAmount,
+        discountLabel: src.discountLabel,
+        reservationId: src.reservationId,
+        allergyAlert: src.allergyAlert,
+        items: src.items.map((it) => ({ ...it })),
+      });
+
+      addedGuests += src.guests;
+      addedDeposit += src.depositAmount;
+      addedDiscount += src.discountAmount;
+
+      // Hợp nhất các món trùng tên, đơn giá & ghi chú; bảo toàn số nguyên VND
+      for (const srcItem of src.items) {
+        const existingIdx = mergedItems.findIndex(
+          (it) =>
+            it.name === srcItem.name &&
+            it.unitPrice === srcItem.unitPrice &&
+            (it.note ?? '') === (srcItem.note ?? '')
+        );
+        if (existingIdx >= 0) {
+          mergedItems[existingIdx] = {
+            ...mergedItems[existingIdx],
+            qty: mergedItems[existingIdx].qty + srcItem.qty,
+          };
+        } else {
+          mergedItems.push({ ...srcItem, id: `${srcItem.id}_m_${src.id}` });
+        }
       }
     }
+
+    const allMergedSnapshots = [...(target.mergedMemberTables ?? []), ...newSnapshots];
+    const mergedLabels = sources.map((s) => s.label).join(', ');
 
     set({
       tables: tables.map((t) => {
@@ -776,132 +829,146 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
           return {
             ...t,
             status: t.status === 'IDLE' ? 'OCCUPIED' : t.status,
-            guests: t.guests + source.guests,
-            depositAmount: t.depositAmount + source.depositAmount,
-            discountAmount: t.discountAmount + source.discountAmount,
+            guests: t.guests + addedGuests,
+            depositAmount: t.depositAmount + addedDeposit,
+            discountAmount: t.discountAmount + addedDiscount,
             items: mergedItems,
             splits: undefined,
+            mergedMemberTables: allMergedSnapshots,
           };
         }
-        if (t.id === sourceTableId) {
+        if (sourceIdSet.has(t.id)) {
           return {
             ...t,
-            status: 'CLEANING',
-            guests: 0,
-            seatedMin: 0,
+            status: 'OCCUPIED',
+            seatedMin: t.seatedMin || target.seatedMin || 1,
+            staff: t.staff || target.staff,
             depositAmount: 0,
             discountAmount: 0,
             discountLabel: undefined,
+            lockedBy: undefined,
             items: [],
             splits: undefined,
+            mergedIntoTableId: targetTableId,
+            mergedIntoTableLabel: target.label,
           };
         }
         return t;
       }),
       selectedTableId: targetTableId,
-      lastActionToast: `Đã gộp hóa đơn từ ${source.label} sang ${target.label} thành công.`,
+      lastActionToast: `Đã gộp ${mergedLabels} vào ${target.label}. Các bàn gộp vẫn giữ trạng thái Đang phục vụ.`,
     });
 
     fetchApi('/pos/invoices/merge', {
       method: 'POST',
       headers: { 'X-Idempotency-Key': idempotencyKey },
-      body: JSON.stringify({ sourceTableId, targetTableId }),
+      body: JSON.stringify({
+        sourceTableIds: sources.map((s) => s.id),
+        targetTableId,
+        idempotencyKey,
+      }),
     }).catch(() => {});
   },
 
-  splitInvoiceEqual: (tableId, numParts) => {
-    const { tables } = get();
-    const table = tables.find((t) => t.id === tableId);
-    if (!table || numParts < 2) return;
-
-    const totalPayable = computeTablePayable(table);
-    const baseShare = Math.floor(totalPayable / numParts);
-    const remainder = totalPayable - baseShare * numParts;
-
-    const splits: InvoiceSplitPart[] = Array.from({ length: numParts }, (_, idx) => ({
-      id: `split_${idx + 1}`,
-      label: `Phần ${idx + 1}/${numParts} (Chia đều)`,
-      amount: idx === 0 ? baseShare + remainder : baseShare,
-      status: 'UNPAID',
-    }));
-
-    set({
-      tables: tables.map((t) => (t.id === tableId ? { ...t, splits } : t)),
-      lastActionToast: `Đã tách hóa đơn ${table.label} thành ${numParts} phần bằng nhau.`,
-    });
-  },
-
-  splitInvoiceByItems: (tableId, itemIdsGroupA) => {
-    const { tables } = get();
-    const table = tables.find((t) => t.id === tableId);
-    if (!table || itemIdsGroupA.length === 0) return;
-
-    const totalPayable = computeTablePayable(table);
-    const rawSubtotal = computeTableSubtotal(table);
-    if (rawSubtotal <= 0) return;
-
-    const groupARaw = table.items
-      .filter((it) => itemIdsGroupA.includes(it.id))
-      .reduce((sum, it) => sum + it.qty * it.unitPrice, 0);
-
-    // Phân bổ tỷ lệ theo số nguyên VND
-    const amountA = Math.min(totalPayable, Math.round((groupARaw / rawSubtotal) * totalPayable));
-    const amountB = Math.max(0, totalPayable - amountA);
-
-    const splits: InvoiceSplitPart[] = [
-      {
-        id: 'split_items_a',
-        label: `Hóa đơn phụ A (${itemIdsGroupA.length} dòng món)`,
-        amount: amountA,
-        status: 'UNPAID',
-        itemIds: itemIdsGroupA,
-      },
-      {
-        id: 'split_items_b',
-        label: 'Hóa đơn phụ B (Các món còn lại)',
-        amount: amountB,
-        status: 'UNPAID',
-        itemIds: table.items.filter((it) => !itemIdsGroupA.includes(it.id)).map((it) => it.id),
-      },
-    ];
-
-    set({
-      tables: tables.map((t) => (t.id === tableId ? { ...t, splits } : t)),
-      lastActionToast: `Đã tách hóa đơn ${table.label} theo món thành 2 phiếu thu.`,
-    });
-  },
-
-  markSplitPartPaid: (tableId, partId, method) => {
+  splitMergedTables: (masterTableId, memberTableIds) => {
     const idempotencyKey = generateIdempotencyKey();
-    const { tables, shift } = get();
-    const table = tables.find((t) => t.id === tableId);
-    const part = table?.splits?.find((p) => p.id === partId);
-    if (!table || !part || part.status === 'PAID') return;
-
-    const nextSplits = table.splits?.map((p) =>
-      p.id === partId ? { ...p, status: 'PAID' as const } : p
-    );
-
-    const isCash = method === 'CASH';
-    set({
-      tables: tables.map((t) => (t.id === tableId ? { ...t, splits: nextSplits } : t)),
-      shift: {
-        ...shift,
-        cashSales: isCash ? shift.cashSales + part.amount : shift.cashSales,
-        qrAndCardSales: !isCash ? shift.qrAndCardSales + part.amount : shift.qrAndCardSales,
-      },
-      lastActionToast: `Đã thu ${part.label} (${part.amount.toLocaleString('vi-VN')} ₫) qua ${
-        method === 'CASH' ? 'Tiền mặt' : method === 'VIETQR' ? 'VietQR' : 'Thẻ'
-      } [${idempotencyKey.slice(0, 8)}].`,
-    });
-  },
-
-  clearSplitInvoice: (tableId) => {
     const { tables } = get();
+    const directTable = tables.find((t) => t.id === masterTableId);
+    if (!directTable) return;
+
+    const resolvedMasterId = directTable.mergedIntoTableId ?? directTable.id;
+    const master = tables.find((t) => t.id === resolvedMasterId);
+    if (!master || !master.mergedMemberTables || master.mergedMemberTables.length === 0) return;
+
+    const splitIdSet = new Set(memberTableIds);
+    const toDetach = master.mergedMemberTables.filter((snap) => splitIdSet.has(snap.tableId));
+    const remainingSnapshots = master.mergedMemberTables.filter(
+      (snap) => !splitIdSet.has(snap.tableId)
+    );
+    if (toDetach.length === 0) return;
+
+    const snapshotByTableId = new Map(toDetach.map((snap) => [snap.tableId, snap]));
+    const remainingMasterItems = master.items.map((it) => ({ ...it }));
+    let detachedGuests = 0;
+    let detachedDeposit = 0;
+    let detachedDiscount = 0;
+
+    for (const snap of toDetach) {
+      detachedGuests += snap.guests;
+      detachedDeposit += snap.depositAmount;
+      detachedDiscount += snap.discountAmount;
+
+      for (const origItem of snap.items) {
+        let qtyLeftToSubtract = origItem.qty;
+        for (let idx = remainingMasterItems.length - 1; idx >= 0 && qtyLeftToSubtract > 0; idx--) {
+          const cur = remainingMasterItems[idx];
+          if (
+            cur.name === origItem.name &&
+            cur.unitPrice === origItem.unitPrice &&
+            (cur.note ?? '') === (origItem.note ?? '')
+          ) {
+            const take = Math.min(cur.qty, qtyLeftToSubtract);
+            cur.qty -= take;
+            qtyLeftToSubtract -= take;
+            if (cur.qty <= 0) {
+              remainingMasterItems.splice(idx, 1);
+            }
+          }
+        }
+      }
+    }
+
+    const detachedLabels = toDetach.map((s) => s.label).join(', ');
+    const nextMasterDiscount = Math.max(0, master.discountAmount - detachedDiscount);
+
     set({
-      tables: tables.map((t) => (t.id === tableId ? { ...t, splits: undefined } : t)),
-      lastActionToast: 'Đã hủy chế độ tách hóa đơn, quay về hóa đơn gộp chung.',
+      tables: tables.map((t) => {
+        if (t.id === master.id) {
+          return {
+            ...t,
+            guests: Math.max(0, master.guests - detachedGuests),
+            depositAmount: Math.max(0, master.depositAmount - detachedDeposit),
+            discountAmount: nextMasterDiscount,
+            discountLabel: nextMasterDiscount > 0 ? master.discountLabel : undefined,
+            items: remainingMasterItems,
+            splits: undefined,
+            mergedMemberTables: remainingSnapshots.length > 0 ? remainingSnapshots : undefined,
+          };
+        }
+        const snap = snapshotByTableId.get(t.id);
+        if (snap) {
+          return {
+            ...t,
+            status: snap.originalStatus,
+            guests: snap.guests,
+            seatedMin: snap.seatedMin,
+            staff: snap.staff,
+            depositAmount: snap.depositAmount,
+            discountAmount: snap.discountAmount,
+            discountLabel: snap.discountLabel,
+            reservationId: snap.reservationId,
+            allergyAlert: snap.allergyAlert,
+            items: snap.items.map((it) => ({ ...it })),
+            splits: undefined,
+            mergedIntoTableId: undefined,
+            mergedIntoTableLabel: undefined,
+          };
+        }
+        return t;
+      }),
+      selectedTableId: toDetach.length === 1 ? toDetach[0].tableId : master.id,
+      lastActionToast: `Đã tách ${detachedLabels} ra khỏi nhóm ${master.label}.`,
     });
+
+    fetchApi('/pos/tables/split', {
+      method: 'POST',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        masterTableId: master.id,
+        memberTableIds: toDetach.map((s) => s.tableId),
+        idempotencyKey,
+      }),
+    }).catch(() => {});
   },
 
   // UC4 <<include>> Lock Table State
@@ -1092,9 +1159,7 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     if (!table) return;
 
     const payable = computeTablePayable(table);
-    const unpaidSplitSum = table.splits
-      ? table.splits.filter((s) => s.status === 'UNPAID').reduce((acc, s) => acc + s.amount, 0)
-      : payable;
+    const unpaidSplitSum = payable;
 
     if (printEscPos) {
       get().printReceiptEscPos(tableId, method, cashReceived);
@@ -1106,10 +1171,11 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
 
     const latestShift = get().shift;
     const isCash = method === 'CASH';
+    const mergedMemberIdSet = new Set((table.mergedMemberTables ?? []).map((m) => m.tableId));
 
     set({
       tables: tables.map((t) =>
-        t.id === tableId
+        t.id === tableId || mergedMemberIdSet.has(t.id)
           ? {
               ...t,
               status: 'CLEANING',
@@ -1121,6 +1187,9 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
               lockedBy: undefined,
               splits: undefined,
               allergyAlert: undefined,
+              mergedIntoTableId: undefined,
+              mergedIntoTableLabel: undefined,
+              mergedMemberTables: undefined,
               items: [],
             }
           : t
