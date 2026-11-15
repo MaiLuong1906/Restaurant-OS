@@ -91,6 +91,7 @@ export default function PosFloorPage() {
     printReceiptEscPos,
     processCounterSettlement,
     markTableCleanDone,
+    setToast,
   } = usePosStore();
 
   const [areaFilter, setAreaFilter] = React.useState<'ALL' | CashierTableArea>('ALL');
@@ -105,11 +106,27 @@ export default function PosFloorPage() {
   );
 
   React.useEffect(() => {
-    if (pendingSplitMerge) {
+    if (!pendingSplitMerge) return;
+    clearPendingSplitMerge();
+    if (selectedTableId) {
       setSplitMergeOpen(true);
-      clearPendingSplitMerge();
+    } else {
+      const firstOccupied = tables.find((t) => t.items.length > 0 || t.status === 'OCCUPIED');
+      if (firstOccupied) {
+        selectTable(firstOccupied.id);
+        setSplitMergeOpen(true);
+      } else {
+        setToast('Vui lòng chọn một bàn để thực hiện tách / gộp hóa đơn.');
+      }
     }
-  }, [pendingSplitMerge, clearPendingSplitMerge]);
+  }, [
+    pendingSplitMerge,
+    clearPendingSplitMerge,
+    selectedTableId,
+    tables,
+    selectTable,
+    setToast,
+  ]);
 
   React.useEffect(() => {
     syncRealtimeClockSeed();
