@@ -80,8 +80,11 @@ Backend tuân thủ kiến trúc phân lớp chuẩn mực (`com.restaurantos.*`
 
 ### 3.2. Quy tắc Quản lý Migration Database (`db/migration/`)
 - Mọi thay đổi cấu trúc DB bắt buộc phải viết thành file SQL trong `backend/src/main/resources/db/migration/`.
-- **Cú pháp đặt tên:** `V<Số_Thứ_Tự>__<Tên_Mô_Tả_Dạng_Snake_Case>.sql` (ví dụ: `V1__init_schema.sql`, `V2__add_bom_recipes.sql`).
-- **Tính bất biến (Immutability):** File migration một khi đã commit và chạy trên database thì **vĩnh viễn không được sửa lại nội dung**. Muốn thay đổi phải tạo file migration với số version tiếp theo.
+- **Cơ chế chống trùng lặp khi làm việc nhóm (Conflict-Free Versioning):**
+  - Để tránh xung đột phiên bản Flyway khi nhiều lập trình viên cùng tạo migration ở các nhánh khác nhau, hệ thống sử dụng chuẩn **Timestamp Versioning**: `V<YYYYMMDDHHmmss>__<tên_mô_tả_snake_case>.sql` (Ví dụ: `V20261101162000__add_pos_shift_table.sql`).
+  - **Lệnh tự động sinh file chuẩn:** Bắt buộc sử dụng lệnh `pnpm db:migration:create <tên_mô_tả>` (hoặc `pnpm db:migration:new <tên>`). Lệnh này sẽ tự động sinh timestamp, kiểm tra format và tạo file template với đầy đủ header ràng buộc.
+  *(Lưu ý: Các file khởi thủy `V1__init_schema.sql` và `V2__enterprise_modules_expansion.sql` giữ nguyên để đảm bảo tính liên tục của lịch sử schema).*
+- **Tính bất biến (Immutability):** File migration một khi đã commit và chạy trên database thì **vĩnh viễn không được sửa lại nội dung**. Muốn thay đổi phải tạo file migration mới với version tiếp theo.
 
 ---
 
