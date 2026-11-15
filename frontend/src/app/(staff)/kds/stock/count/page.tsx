@@ -136,71 +136,73 @@ export default function StockCountPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F14] text-[#E6EDF3] p-4 md:p-6 pb-24 font-sans select-none">
+    <div className="min-h-screen bg-[#F6F4F0] text-[#141210] p-4 md:p-6 pb-24 font-sans select-none">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b border-[#212C37]">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b border-[#E9E4DC]">
         <div className="flex items-center gap-3">
           <Link
             href="/kds/stock"
-            className="min-h-[48px] min-w-[48px] px-3 py-2 rounded-lg bg-[#151D24] hover:bg-[#1C2630] text-[#8B949E] hover:text-[#E6EDF3] transition-colors border border-[#212C37] flex items-center justify-center font-medium"
+            className="min-h-[48px] min-w-[48px] px-3.5 py-2 rounded-[8px] bg-[#FFFFFF] hover:bg-[#F6F4F0] active:scale-95 text-[#2B2118] transition-colors border border-[#E9E4DC] flex items-center justify-center font-bold text-sm shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
             aria-label="Quay lại Tồn kho"
           >
-            ← Kho
+            ← Tồn kho
           </Link>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#E6EDF3]">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#141210]">
               Kiểm đếm cuối ca
             </h1>
-            <p className="text-xs text-[#8B949E]">K3 — Đối chiếu số phần hệ thống & thực tế</p>
+            <p className="text-xs text-[#7A6A58]">
+              K3 · Đối chiếu số phần hệ thống & thực tế
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs px-3 py-1.5 rounded-full font-semibold bg-[#151D24] border border-[#212C37] text-[#8B949E]">
+          <span className="text-xs px-3 py-1.5 rounded-[8px] font-semibold bg-[#FFFFFF] border border-[#E9E4DC] text-[#7A6A58] shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
             Ca tối · Bếp chính
           </span>
         </div>
       </div>
 
       {loading && (
-        <div className="py-12 text-center text-[#8B949E] text-sm animate-pulse">
+        <div className="py-12 text-center text-[#7A6A58] text-sm animate-pulse">
           Đang tải dữ liệu kiểm đếm...
         </div>
       )}
 
       {error && (
-        <div className="p-4 mb-6 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] text-sm">
+        <div className="p-4 mb-6 rounded-[8px] bg-[#D14B3A]/10 border border-[#D14B3A]/30 text-[#D14B3A] text-sm">
           {error}
         </div>
       )}
 
       {/* Màn hình kết quả thành công */}
       {submitResult && (
-        <div className="max-w-xl mx-auto bg-[#151D24] border border-[#10B981]/40 rounded-2xl p-6 text-center space-y-5 animate-fade-in">
-          <div className="w-16 h-16 bg-[#10B981]/20 text-[#10B981] rounded-full flex items-center justify-center text-3xl mx-auto">
+        <div className="max-w-xl mx-auto bg-[#FFFFFF] border border-[#E9E4DC] rounded-[8px] p-6 text-center space-y-5 shadow-[0_1px_3px_rgba(0,0,0,0.08)] animate-fade-in">
+          <div className="w-16 h-16 bg-[#5F7F5E]/15 text-[#5F7F5E] rounded-full flex items-center justify-center text-3xl mx-auto">
             ✓
           </div>
           <div>
-            <h2 className="text-2xl font-black text-[#E6EDF3]">Xác nhận kiểm đếm thành công!</h2>
-            <p className="text-sm text-[#8B949E] mt-1">
+            <h2 className="text-2xl font-bold text-[#141210]">Đã ghi nhận kiểm đếm!</h2>
+            <p className="text-sm text-[#7A6A58] mt-1">
               Dữ liệu tồn kho thực tế đã được cập nhật vào hệ thống.
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 p-4 bg-[#1C2630] rounded-xl border border-[#212C37]">
+          <div className="grid grid-cols-3 gap-3 p-4 bg-[#F6F4F0] rounded-[8px] border border-[#E9E4DC]">
             <div>
-              <p className="text-xs text-[#8B949E]">Tổng số món</p>
-              <p className="text-xl font-black text-[#E6EDF3]">{summary.total}</p>
+              <p className="text-xs text-[#7A6A58]">Tổng số món</p>
+              <p className="text-xl font-bold text-[#141210] tabular-nums">{summary.total}</p>
             </div>
             <div>
-              <p className="text-xs text-[#8B949E]">Số món khớp</p>
-              <p className="text-xl font-black text-[#10B981]">{summary.matched}</p>
+              <p className="text-xs text-[#7A6A58]">Số món khớp</p>
+              <p className="text-xl font-bold text-[#5F7F5E] tabular-nums">{summary.matched}</p>
             </div>
             <div>
-              <p className="text-xs text-[#8B949E]">Chênh lệch</p>
+              <p className="text-xs text-[#7A6A58]">Chênh lệch</p>
               <p
-                className={`text-xl font-black ${
-                  summary.discrepant > 0 ? 'text-[#F59E0B]' : 'text-[#8B949E]'
+                className={`text-xl font-bold tabular-nums ${
+                  summary.discrepant > 0 ? 'text-[#D9A441]' : 'text-[#7A6A58]'
                 }`}
               >
                 {summary.discrepant}
@@ -211,7 +213,7 @@ export default function StockCountPage() {
           <button
             type="button"
             onClick={() => router.push('/kds/stock')}
-            className="w-full min-h-[48px] px-6 py-3.5 rounded-xl bg-[#10B981] hover:bg-[#0EA5E9] text-[#0B0F14] font-black text-base transition-all shadow-lg shadow-[#10B981]/20"
+            className="w-full min-h-[48px] px-6 py-3.5 rounded-[8px] bg-[#8C1D2C] hover:bg-[#6F1623] active:scale-95 text-[#FFFFFF] font-bold text-base transition-all shadow-sm"
           >
             Quay về Tồn kho
           </button>
@@ -220,7 +222,7 @@ export default function StockCountPage() {
 
       {/* Form kiểm đếm */}
       {!loading && !submitResult && items.length === 0 && (
-        <div className="py-12 text-center text-[#8B949E] text-sm">
+        <div className="py-12 text-center text-[#7A6A58] text-sm">
           Không có món ăn nào trong kho để kiểm đếm.
         </div>
       )}
@@ -228,10 +230,10 @@ export default function StockCountPage() {
       {!loading && !submitResult && items.length > 0 && (
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-6">
           {/* Hộp thông báo nghiệp vụ */}
-          <div className="p-4 rounded-xl bg-[#1C2630] border border-[#212C37] flex items-center gap-3">
+          <div className="p-4 rounded-[8px] bg-[#FFFFFF] border border-[#E9E4DC] flex items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
             <span className="text-2xl">📦</span>
-            <p className="text-xs md:text-sm text-[#8B949E]">
-              Phần thừa cuối ca chuyển sang ca sau nếu còn hạn
+            <p className="text-xs md:text-sm text-[#7A6A58]">
+              <span className="font-bold text-[#2B2118]">Phần thừa cuối ca:</span> chuyển sang ca sau nếu còn hạn dùng.
             </p>
           </div>
 
@@ -244,18 +246,20 @@ export default function StockCountPage() {
               return (
                 <div
                   key={row.dishId}
-                  className={`p-4 rounded-xl border transition-all ${
-                    hasDiff ? 'bg-[#151D24] border-[#F59E0B]/30' : 'bg-[#151D24] border-[#212C37]'
+                  className={`p-4 md:p-5 rounded-[8px] border transition-all shadow-[0_1px_3px_rgba(0,0,0,0.08)] ${
+                    hasDiff
+                      ? 'bg-[#FFFFFF] border-[#D9A441]/50'
+                      : 'bg-[#FFFFFF] border-[#E9E4DC]'
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <div>
-                      <h3 className="font-bold text-base md:text-lg text-[#E6EDF3]">
+                      <h3 className="font-bold text-base md:text-lg text-[#141210]">
                         {row.dishName}
                       </h3>
-                      <p className="text-xs text-[#8B949E]">
+                      <p className="text-xs text-[#7A6A58]">
                         Số phần hệ thống:{' '}
-                        <span className="font-bold text-[#E6EDF3]">{row.systemPortions} phần</span>
+                        <span className="font-bold text-[#141210] tabular-nums">{row.systemPortions} phần</span>
                       </p>
                     </div>
 
@@ -263,7 +267,7 @@ export default function StockCountPage() {
                       <div className="flex items-center gap-2">
                         <label
                           htmlFor={`count-${row.dishId}`}
-                          className="text-xs font-semibold text-[#8B949E]"
+                          className="text-xs font-semibold text-[#7A6A58]"
                         >
                           Thực tế:
                         </label>
@@ -275,17 +279,17 @@ export default function StockCountPage() {
                           step={1}
                           value={countedMap[row.dishId] ?? ''}
                           onChange={(e) => handleCountChange(row.dishId, e.target.value)}
-                          className="w-20 min-h-[48px] bg-[#1C2630] border border-[#212C37] rounded-lg px-2 text-center text-lg font-black text-[#E6EDF3] focus:outline-none focus:border-[#10B981]"
+                          className="w-20 min-h-[48px] bg-[#FFFFFF] border border-[#E9E4DC] focus:border-[#8C1D2C] rounded-[8px] px-2 text-center text-lg font-extrabold text-[#141210] tabular-nums focus:outline-none"
                         />
                       </div>
 
                       {/* Badge chênh lệch */}
                       <span
-                        className="text-xs px-3 py-1.5 rounded-full font-bold min-h-[32px] flex items-center justify-center border"
+                        className="text-xs px-3 py-1.5 rounded-full font-bold min-h-[32px] flex items-center justify-center border tabular-nums"
                         style={{
-                          backgroundColor: `${badge.color}20`,
+                          backgroundColor: `${badge.color}15`,
                           color: badge.color,
-                          borderColor: `${badge.color}40`,
+                          borderColor: `${badge.color}35`,
                         }}
                       >
                         {badge.label}
@@ -295,8 +299,8 @@ export default function StockCountPage() {
 
                   {/* Ô nhập lý do bắt buộc khi có chênh lệch */}
                   {hasDiff && (
-                    <div className="pt-3 border-t border-[#212C37]/80">
-                      <label className="block text-xs font-semibold text-[#EF4444] mb-1.5">
+                    <div className="pt-3 border-t border-[#E9E4DC]">
+                      <label className="block text-xs font-semibold text-[#D14B3A] mb-1.5">
                         * Bắt buộc nhập lý do chênh lệch:
                       </label>
                       <input
@@ -304,7 +308,7 @@ export default function StockCountPage() {
                         placeholder="Ví dụ: Rơi đổ lúc phục vụ, cháy hỏng, hao hụt sơ chế..."
                         value={reasonsMap[row.dishId] || ''}
                         onChange={(e) => handleReasonChange(row.dishId, e.target.value)}
-                        className="w-full min-h-[48px] bg-[#1C2630] border border-[#212C37] focus:border-[#F59E0B] rounded-lg px-3 text-sm text-[#E6EDF3] placeholder-[#8B949E]/50 focus:outline-none"
+                        className="w-full min-h-[48px] bg-[#F6F4F0] border border-[#E9E4DC] focus:border-[#8C1D2C] rounded-[8px] px-3.5 text-sm text-[#141210] placeholder-[#7A6A58]/60 focus:outline-none"
                       />
                     </div>
                   )}
@@ -315,7 +319,7 @@ export default function StockCountPage() {
 
           {/* Cảnh báo khi còn thiếu lý do */}
           {hasMissingReason && (
-            <div className="p-3.5 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#EF4444] text-xs md:text-sm font-medium">
+            <div className="p-3.5 rounded-[8px] bg-[#D14B3A]/10 border border-[#D14B3A]/30 text-[#D14B3A] text-xs md:text-sm font-medium">
               ⚠️ Vui lòng nhập lý do chênh lệch cho tất cả các món phát sinh thừa hoặc thiếu trước khi
               xác nhận.
             </div>
@@ -325,7 +329,7 @@ export default function StockCountPage() {
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className="w-full min-h-[48px] py-4 px-6 rounded-xl bg-[#10B981] hover:bg-[#0EA5E9] text-[#0B0F14] font-black text-base transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xl shadow-[#10B981]/10"
+            className="w-full min-h-[48px] py-3.5 px-6 rounded-[8px] bg-[#8C1D2C] hover:bg-[#6F1623] active:scale-95 text-[#FFFFFF] font-bold text-base transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           >
             {submitting ? 'Đang ghi nhận kiểm đếm...' : 'Xác nhận kiểm đếm'}
           </button>
