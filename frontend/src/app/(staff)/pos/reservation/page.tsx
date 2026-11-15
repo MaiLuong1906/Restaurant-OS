@@ -58,7 +58,7 @@ export default function PosReservationPage() {
         onCreateReservation={createReservation}
         onCheckInReservation={(resId) => {
           checkInReservation(resId);
-          router.push('/pos');
+          router.push('/pos/floor');
         }}
         onCancelReservation={cancelReservation}
       />
