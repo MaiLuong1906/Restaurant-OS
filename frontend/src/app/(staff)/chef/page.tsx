@@ -13,6 +13,7 @@ import {
   FileText,
   Check,
   RefreshCw,
+  Package,
 } from 'lucide-react';
 import { StaffHomeShell } from '@/components/staff/StaffHomeShell';
 import { QuickActions } from '@/components/staff/QuickActions';
@@ -119,32 +120,55 @@ export default function ChefHomePage() {
   }
 
   const roleCard = (
-    <section className="bg-white border border-sand-200 rounded-2xl p-5 md:p-6 shadow-warm flex flex-col justify-between">
-      <div>
-        <h2 className="text-xl font-bold text-ink">Bếp — KDS</h2>
-        <p className="mt-0.5 text-sm text-muted">Hàng đợi lúc này</p>
-        <div className="grid grid-cols-3 gap-2 text-center py-2 border-t border-dashed border-sand-200 my-4">
-          <div>
-            <b className="text-3xl font-extrabold text-ink">{waitingTickets.length}</b>
-            <span className="block text-xs text-muted mt-1">Ticket chờ</span>
-          </div>
-          <div>
-            <b className="text-3xl font-extrabold text-danger-600">{overdueTickets.length}</b>
-            <span className="block text-xs text-danger-700 font-bold mt-1">Quá SLA</span>
-          </div>
-          <div>
-            <b className="text-3xl font-extrabold text-ink">{totalPortions}</b>
-            <span className="block text-xs text-muted mt-1">Món cần làm</span>
+    <div className="space-y-4">
+      <section className="bg-white border border-sand-200 rounded-2xl p-5 md:p-6 shadow-warm flex flex-col justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-ink">Bếp — KDS</h2>
+          <p className="mt-0.5 text-sm text-muted">Hàng đợi lúc này</p>
+          <div className="grid grid-cols-3 gap-2 text-center py-2 border-t border-dashed border-sand-200 my-4">
+            <div>
+              <b className="text-3xl font-extrabold text-ink">{waitingTickets.length}</b>
+              <span className="block text-xs text-muted mt-1">Ticket chờ</span>
+            </div>
+            <div>
+              <b className="text-3xl font-extrabold text-danger-600">{overdueTickets.length}</b>
+              <span className="block text-xs text-danger-700 font-bold mt-1">Quá SLA</span>
+            </div>
+            <div>
+              <b className="text-3xl font-extrabold text-ink">{totalPortions}</b>
+              <span className="block text-xs text-muted mt-1">Món cần làm</span>
+            </div>
           </div>
         </div>
-      </div>
-      <Link
-        href="/kds"
-        className="mt-4 w-full h-12 rounded-lg bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white font-bold text-sm flex items-center justify-center transition-transform"
-      >
-        Vào bếp
-      </Link>
-    </section>
+        <Link
+          href="/kds"
+          className="mt-4 w-full h-12 rounded-lg bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white font-bold text-sm flex items-center justify-center transition-transform"
+        >
+          Vào bếp
+        </Link>
+      </section>
+
+      {/* Thẻ Tồn kho bếp */}
+      <section className="bg-white border border-sand-200 rounded-2xl p-5 md:p-6 shadow-warm flex flex-col justify-between">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0">
+            <Package className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-ink">Tồn kho bếp</h2>
+            <p className="mt-0.5 text-sm text-muted">
+              Quản lý số phần, định mức sơ chế & kiểm đếm ca
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/kds/stock"
+          className="mt-4 w-full min-h-[48px] h-12 rounded-lg bg-[#151D24] hover:bg-[#1C2630] text-[#E6EDF3] font-bold text-sm flex items-center justify-center transition-colors border border-[#212C37]"
+        >
+          Xem tồn kho
+        </Link>
+      </section>
+    </div>
   );
 
   const extraSections = (

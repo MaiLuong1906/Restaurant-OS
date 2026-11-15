@@ -468,6 +468,60 @@ export interface WasteTodayStats {
   portionCount: number;
 }
 
+// ==========================================
+// Kitchen Stock (K1–K3 Tồn kho bếp)
+// ==========================================
+
+export type StockItemStatus = 'out' | 'low' | 'ok';
+
+export interface DishBom {
+  rawKg: number;
+  preppedKg: number;
+  grams: number;
+}
+
+export interface StockDishMeta {
+  note?: string;
+  unit?: string;
+  description?: string;
+}
+
+export interface StockItem {
+  id: string;
+  name: string;
+  portions: number;
+  manualOut: boolean;
+  autoOut: boolean;
+  bom: DishBom | null;
+  meta?: StockDishMeta;
+}
+
+export interface StockItemWithStatus extends StockItem {
+  status: StockItemStatus;
+}
+
+export interface YieldAndMax {
+  yieldPercent: number;
+  maxPortions: number;
+}
+
+export interface StockCountSnapshot {
+  dishId: string;
+  dishName: string;
+  systemPortions: number;
+  countedPortions: number;
+  difference: number;
+  reason?: string;
+  countedAt: string;
+}
+
+export interface RecordStockCountResult {
+  countedAt: string;
+  totalDishes: number;
+  discrepanciesCount: number;
+  items: StockCountSnapshot[];
+}
+
 export interface WasteLogEntry {
   id: string;
   dishId: string;

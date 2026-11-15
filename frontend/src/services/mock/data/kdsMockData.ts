@@ -244,6 +244,121 @@ export const MOCK_DISH_AVAILABILITY: readonly import('../../../types').DishAvail
     remainingPortions: 6,
     waitingTables: [{ tableName: 'Bàn 06', ticketId: 't06', quantity: 2 }],
   },
+  {
+    dishId: 'dish-suon-nuong',
+    dishName: 'Sườn Nướng',
+    status: 'AVAILABLE',
+    remainingPortions: 42,
+    waitingTables: [],
+  },
+  {
+    dishId: 'dish-goi-cuon',
+    dishName: 'Gỏi Cuốn',
+    status: 'AVAILABLE',
+    remainingPortions: 2,
+    waitingTables: [],
+  },
+  {
+    dishId: 'dish-bo-luc-lac',
+    dishName: 'Bò Lúc Lắc',
+    status: 'SOLD_OUT',
+    remainingPortions: 0,
+    lastStock: 0,
+    waitingTables: [],
+    soldOutAt: '18:24',
+    markedBy: 'Hệ thống tự động',
+  },
+]);
+
+export const MOCK_STOCK_ITEMS: readonly import('../../../types').StockItem[] = Object.freeze([
+  {
+    id: 'dish-bo-luc-lac',
+    name: 'Bò Lúc Lắc',
+    portions: 0,
+    manualOut: false,
+    autoOut: true,
+    bom: null,
+    meta: {
+      note: 'Hết tự động — về 0 lúc 18:24',
+      description: 'Kho theo món (Tầng 1)',
+    },
+  },
+  {
+    id: 'dish-goi-cuon',
+    name: 'Gỏi Cuốn',
+    portions: 2,
+    manualOut: false,
+    autoOut: false,
+    bom: null,
+    meta: {
+      note: 'Định mức chưa có — nhập tay số phần',
+      description: 'Kho theo món (Tầng 1)',
+    },
+  },
+  {
+    id: 'dish-canh-chua',
+    name: 'Canh Chua Cá',
+    portions: 6,
+    manualOut: false,
+    autoOut: false,
+    bom: null,
+    meta: {
+      note: 'Nấu theo nồi — số phần = số bát đã nấu',
+      description: 'Kho theo món (Tầng 1)',
+    },
+  },
+  {
+    id: 'dish-banh-xeo',
+    name: 'Bánh Xèo',
+    portions: 8,
+    manualOut: false,
+    autoOut: false,
+    bom: null,
+    meta: {
+      note: 'Định mức chưa có — nhập tay số phần',
+      description: 'Kho theo món (Tầng 1)',
+    },
+  },
+  {
+    id: 'dish-nem-ran',
+    name: 'Nem Rán Phố Cổ',
+    portions: 12,
+    manualOut: false,
+    autoOut: false,
+    bom: null,
+    meta: {
+      note: 'Định mức chưa có — nhập tay số phần',
+      description: 'Kho theo món (Tầng 1)',
+    },
+  },
+  {
+    id: 'dish-com-ga',
+    name: 'Cơm Gà Xối Mỡ',
+    portions: 15,
+    manualOut: false,
+    autoOut: false,
+    bom: null,
+    meta: {
+      note: 'Định mức chưa có — nhập tay số phần',
+      description: 'Kho theo món (Tầng 1)',
+    },
+  },
+  {
+    id: 'dish-suon-nuong',
+    name: 'Sườn Nướng',
+    portions: 42,
+    manualOut: false,
+    autoOut: false,
+    bom: {
+      rawKg: 100,
+      preppedKg: 72,
+      grams: 250,
+    },
+    meta: {
+      note: 'Sườn đã lọc 72 kg · Yield 72% · 250 g/phần',
+      description: 'Sườn đã lọc 72 kg · 250 g/phần',
+    },
+  },
 ]);
 
 export const MOCK_ORDER_CHANGES: readonly import('../../../types').OrderChangeAlertData[] = Object.freeze([
