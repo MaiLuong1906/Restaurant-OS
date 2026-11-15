@@ -94,6 +94,48 @@ export function validatePrepQuantity(
 }
 
 // ==========================================
+// K1 Light Restyle Grouping & Cell Helpers
+// ==========================================
+
+export interface StockGroups {
+  urgent: StockItemWithStatus[];
+  watch: StockItemWithStatus[];
+  stable: StockItemWithStatus[];
+}
+
+export function groupStockItems(items: readonly StockItemWithStatus[]): StockGroups {
+  const sorted = sortStockItems(items);
+
+  const urgent: StockItemWithStatus[] = [];
+  const watch: StockItemWithStatus[] = [];
+  const stable: StockItemWithStatus[] = [];
+
+  for (const item of sorted) {
+    if (item.portions <= 2) {
+      urgent.push(item);
+    } else if (item.portions <= 10) {
+      watch.push(item);
+    } else {
+      stable.push(item);
+    }
+  }
+
+  return { urgent, watch, stable };
+}
+
+export interface PortionDisplay {
+  filled: number;
+  overflow: number;
+}
+
+export function getPortionDisplay(portions: number): PortionDisplay {
+  const nonNegative = Math.max(0, portions);
+  const filled = Math.min(nonNegative, 10);
+  const overflow = Math.max(0, nonNegative - 10);
+  return { filled, overflow };
+}
+
+// ==========================================
 // K3 Count Helpers
 // ==========================================
 

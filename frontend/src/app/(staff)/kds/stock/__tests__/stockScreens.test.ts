@@ -48,6 +48,47 @@ describe('K1–K2 Stock Screens & Helpers Unit Tests', () => {
         expect(sorted[i].status).toBe('ok');
       }
     });
+
+    it('groupStockItems partitions items into urgent (<=2), watch (3-10), stable (>10)', async () => {
+      const { groupStockItems } = await import('../stock-helpers');
+      const items = await stockService.getStockItems();
+      const groups = groupStockItems(items);
+
+      // Urgent: Bò Lúc Lắc (0) + Gỏi Cuốn (2)
+      expect(groups.urgent.length).toBe(2);
+      expect(groups.urgent[0].id).toBe('dish-bo-luc-lac');
+      expect(groups.urgent[1].id).toBe('dish-goi-cuon');
+
+      // Watch: Canh Chua Cá (6), Bánh Xèo (8)
+      expect(groups.watch.length).toBe(2);
+      expect(groups.watch[0].portions).toBe(6);
+      expect(groups.watch[1].portions).toBe(8);
+
+      // Stable: Nem Rán (12), Cơm Gà (15), Sườn Nướng (42)
+      expect(groups.stable.length).toBe(3);
+      expect(groups.stable[0].portions).toBe(12);
+      expect(groups.stable[1].portions).toBe(15);
+      expect(groups.stable[2].portions).toBe(42);
+    });
+
+    it('getPortionDisplay handles 0, <= 10, and overflow (>10) correctly', async () => {
+      const { getPortionDisplay } = await import('../stock-helpers');
+
+      // 0 portions
+      expect(getPortionDisplay(0)).toEqual({ filled: 0, overflow: 0 });
+
+      // 2 portions
+      expect(getPortionDisplay(2)).toEqual({ filled: 2, overflow: 0 });
+
+      // 10 portions
+      expect(getPortionDisplay(10)).toEqual({ filled: 10, overflow: 0 });
+
+      // 11 portions
+      expect(getPortionDisplay(11)).toEqual({ filled: 10, overflow: 1 });
+
+      // 42 portions (Sườn Nướng) -> 10 filled + 32 overflow
+      expect(getPortionDisplay(42)).toEqual({ filled: 10, overflow: 32 });
+    });
   });
 
   describe('getStockSummary', () => {
