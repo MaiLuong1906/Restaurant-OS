@@ -3,6 +3,7 @@
 import * as React from 'react';
 import StaffLayout from '@/components/staff/StaffLayout';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { homeHrefForRole } from '@/app/login/login-helpers';
 import {
   CHEF_QUICK_ACTIONS,
   WAITER_QUICK_ACTIONS,
@@ -13,6 +14,8 @@ export default function StaffSegmentLayout({ children }: { children: React.React
   const staffUser = useAuthStore((s) => s.staffUser);
   const posActions = usePosQuickActions();
 
+  const homeHref = (homeHrefForRole(staffUser?.role) as '/staff' | '/pos' | '/chef' | '/wait') || '/chef';
+
   const quickActions =
     staffUser?.role === 'WAITER'
       ? WAITER_QUICK_ACTIONS
@@ -21,7 +24,7 @@ export default function StaffSegmentLayout({ children }: { children: React.React
       : CHEF_QUICK_ACTIONS;
 
   return (
-    <StaffLayout homeHref="/chef" quickActions={quickActions}>
+    <StaffLayout homeHref={homeHref} quickActions={quickActions}>
       {children}
     </StaffLayout>
   );

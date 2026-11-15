@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { staffService } from '@/services/mock/mockStaffService';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { homeHrefForRole } from '@/app/login/login-helpers';
 import {
   TodayAttendance,
   LeaveBalance,
@@ -211,12 +212,14 @@ export default function PersonalPage() {
     router.replace('/login');
   };
 
+  const homeHref = homeHrefForRole(staffUser?.role);
+
   return (
     <div className="w-full max-w-[480px] lg:max-w-4xl mx-auto px-4 py-4 space-y-4">
       {/* Nút back về Trang chủ */}
       <div>
         <Link
-          href="/staff"
+          href={homeHref}
           className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
         >
           <ArrowLeft className="w-4 h-4 text-[#2B2118]" />
