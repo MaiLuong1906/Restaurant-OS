@@ -8,6 +8,18 @@ import {
 import { resolveReservationTargetDate } from '../../lib/utils';
 
 describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguyên VND)', () => {
+  it('quản lý selectedTableId khởi tạo là null, cho phép chọn bàn và gỡ chọn bàn', () => {
+    // Khởi tạo ban đầu là null
+    expect(usePosStore.getState().selectedTableId).toBeNull();
+
+    // Chọn bàn t1
+    usePosStore.getState().selectTable('t1');
+    expect(usePosStore.getState().selectedTableId).toBe('t1');
+
+    // Gỡ chọn bàn về null
+    usePosStore.getState().selectTable(null);
+    expect(usePosStore.getState().selectedTableId).toBeNull();
+  });
   it('phải tính đúng tạm tính và tổng cần thu (kèm VAT 8% và trừ cọc VND số nguyên)', () => {
     const table4 = usePosStore.getState().tables.find((t) => t.id === 't4');
     expect(table4).toBeDefined();

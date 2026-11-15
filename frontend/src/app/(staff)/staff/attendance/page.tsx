@@ -465,14 +465,6 @@ export default function AttendancePage() {
         ) : (
           /* ============ B3: Chấm công ============ */
           <div className="space-y-6">
-            <Link
-              href="/staff"
-              className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Trang chủ</span>
-            </Link>
-
             <div>
               <h1 className="text-2xl font-bold text-[#2B2118]">Chấm công</h1>
               <p className="text-xs text-ops-muted mt-0.5">Thứ Năm, 05/11/2026</p>
