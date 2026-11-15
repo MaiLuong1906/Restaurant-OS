@@ -1,10 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useCartStore } from '@/stores/useCartStore';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  useCartStore,
+  type CustomerPaymentMethod,
+} from '@/stores/useCartStore';
 import { formatVND } from '@/lib/utils';
-import { triggerHaptic } from '@/lib/customer-menu-data';
+import {
+  FALLBACK_DISH_IMAGE,
+  triggerHaptic,
+} from '@/lib/customer-menu-data';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { CallStaffSheet } from '@/components/customer/CallStaffSheet';
 import {
@@ -12,6 +18,8 @@ import {
   Leaf,
   ReceiptText,
   QrCode,
+  Banknote,
+  CreditCard,
   FileText,
   Download,
   ChefHat,
@@ -26,11 +34,21 @@ import {
 } from 'lucide-react';
 
 const RATING_LABELS: Record<number, string> = {
+  0: 'Chạm vào ngôi sao để chấm điểm trải nghiệm',
   1: 'Cần cải thiện • 1 sao',
   2: 'Tạm ổn • 2 sao',
   3: 'Hài lòng • 3 sao',
   4: 'Rất ngon • 4 sao',
   5: 'Tuyệt hảo • 5 sao',
+};
+
+const PAYMENT_METHOD_META: Record<
+  CustomerPaymentMethod,
+  { label: string; icon: typeof QrCode }
+> = {
+  vietqr: { label: 'Chuyển khoản VietQR', icon: QrCode },
+  cash: { label: 'Tiền mặt tại bàn', icon: Banknote },
+  pos: { label: 'Quẹt thẻ POS tận bàn', icon: CreditCard },
 };
 
 const FEEDBACK_TAGS = [
@@ -40,26 +58,49 @@ const FEEDBACK_TAGS = [
   { id: 'fair-price', label: 'Giá hợp lý', icon: ShieldCheck },
 ];
 
-export default function CustomerPaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter();
-  const [rating, setRating] = useState(5);
-  const [selectedTags, setSelectedTags] = useState<string[]>([
-    'Món ăn ngon đậm đà',
-    'Phục vụ nhanh nhẹn',
-  ]);
+  const searchParams = useSearchParams();
+
+  const [rating, setRating] = useState(0);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [receiptActionNote, setReceiptActionNote] = useState<string | null>(
+    null
+  );
   const [isCallStaffOpen, setIsCallStaffOpen] = useState(false);
 
-  const { tableNumber, getPlacedSubtotal } = useCartStore();
+  const {
+    tableNumber,
+    hasMemberPromo,
+    lastPaymentMethod,
+    lastPaidTotal,
+    getPlacedSubtotal,
+  } = useCartStore();
   const displayTable = tableNumber || 'Bàn 04';
 
+  const urlMethod = searchParams.get('method') as CustomerPaymentMethod | null;
+  const activeMethod: CustomerPaymentMethod =
+    urlMethod && urlMethod in PAYMENT_METHOD_META
+      ? urlMethod
+      : lastPaymentMethod || 'vietqr';
+  const MethodIcon = PAYMENT_METHOD_META[activeMethod].icon;
+  const methodLabel = PAYMENT_METHOD_META[activeMethod].label;
+
+  const urlTotal = Number(searchParams.get('total'));
   const rawSubtotal = getPlacedSubtotal();
-  const memberDiscount = Math.round(rawSubtotal * 0.1);
+  const memberDiscount = hasMemberPromo ? Math.round(rawSubtotal * 0.1) : 0;
   const afterDiscount = rawSubtotal - memberDiscount;
   const vatAmount = Math.round(afterDiscount * 0.08);
+  const computedPayable = Math.round((afterDiscount + vatAmount) / 100) * 100;
+
   const finalPayable =
-    Math.round((afterDiscount + vatAmount) / 100) * 100 || 429600;
+    Number.isFinite(urlTotal) && urlTotal > 0
+      ? Math.round(urlTotal)
+      : lastPaidTotal > 0
+        ? lastPaidTotal
+        : computedPayable;
 
   const toggleFeedbackTag = (label: string) => {
     triggerHaptic(10);
@@ -69,6 +110,7 @@ export default function CustomerPaymentSuccessPage() {
   };
 
   const handleSubmitReview = () => {
+    if (rating === 0) return;
     triggerHaptic(25);
     setReviewSubmitted(true);
   };
@@ -76,7 +118,7 @@ export default function CustomerPaymentSuccessPage() {
   return (
     <div className="min-h-screen bg-[#fff8f6] text-[#1e1b1a] pb-12">
       <CustomerHeader
-        title="Hoàn Tất & Đánh Giá"
+        title="Hoàn Tất"
         subtitle="Cảm ơn quý khách"
         tableNumber={displayTable}
         showBack
@@ -126,14 +168,10 @@ export default function CustomerPaymentSuccessPage() {
               <span className="font-bold text-[#1e1b1a]">#HD-202410-04</span>
             </div>
             <div className="flex items-center justify-between text-[#56423c]">
-              <span>Thời gian:</span>
-              <span className="text-[#1e1b1a]">12:45 • Hôm nay</span>
-            </div>
-            <div className="flex items-center justify-between text-[#56423c]">
               <span>Phương thức:</span>
               <span className="flex items-center gap-1 font-semibold text-[#1e1b1a]">
-                <QrCode className="h-3.5 w-3.5 text-[#9a401c]" />
-                <span>Chuyển khoản VietQR</span>
+                <MethodIcon className="h-3.5 w-3.5 text-[#9a401c]" />
+                <span>{methodLabel}</span>
               </span>
             </div>
           </div>
@@ -155,7 +193,12 @@ export default function CustomerPaymentSuccessPage() {
           <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               type="button"
-              onClick={() => triggerHaptic(10)}
+              onClick={() => {
+                triggerHaptic(10);
+                setReceiptActionNote(
+                  'Hóa đơn VAT điện tử (#HD-202410-04) sẽ được xuất tại quầy thu ngân.'
+                );
+              }}
               className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg bg-[#f5ecea] hover:bg-[#efe6e4] px-3 py-2 text-[11px] font-bold text-[#1e1b1a] transition-colors"
             >
               <FileText className="h-4 w-4 text-[#9a401c]" />
@@ -163,13 +206,24 @@ export default function CustomerPaymentSuccessPage() {
             </button>
             <button
               type="button"
-              onClick={() => triggerHaptic(10)}
+              onClick={() => {
+                triggerHaptic(10);
+                setReceiptActionNote(
+                  'Đã lưu tóm tắt biên nhận #HD-202410-04 trên thiết bị của Quý khách.'
+                );
+              }}
               className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg bg-[#f5ecea] hover:bg-[#efe6e4] px-3 py-2 text-[11px] font-bold text-[#1e1b1a] transition-colors"
             >
               <Download className="h-4 w-4 text-[#615e5b]" />
               <span>Tải biên nhận</span>
             </button>
           </div>
+
+          {receiptActionNote && (
+            <div className="rounded-lg bg-[#fbf2f0] px-3 py-2 text-[11px] font-medium text-[#56423c] border border-[#dcc1b8]/40">
+              {receiptActionNote}
+            </div>
+          )}
         </div>
 
         {/* Memory Highlight Banner */}
@@ -179,7 +233,10 @@ export default function CustomerPaymentSuccessPage() {
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR1gRtNUikXs05mHFRAlVgVFl17BMZnFQGhfuT_y5b9M4DpjfkSGNPRmOKCIGLBqmMUEJr-mWq9BXmkPMxQMoVkyFaYgDYgNKc2oqFTTCnr-Dv01YDsZ_ZNvSj-r6qcy-bZIOlMTiAlzr3le1bcjTqAHqwC-wSJT-XBvwWdmMyPZVvcqkctqWGJ2Eqb0bht9qWTCoY4SB8wmA8F0kzHnbLZFntjFJjUWQwJnaoLg"
             alt="Phố Cổ Dine"
             loading="lazy"
-            className="h-14 w-14 shrink-0 rounded-lg object-cover"
+            onError={(e) => {
+              e.currentTarget.src = FALLBACK_DISH_IMAGE;
+            }}
+            className="h-14 w-14 shrink-0 rounded-lg object-cover bg-[#f5ecea]"
           />
           <div className="min-w-0">
             <div className="flex items-center gap-1 text-[11px] font-bold uppercase text-[#9a401c]">
@@ -240,7 +297,7 @@ export default function CustomerPaymentSuccessPage() {
           {/* Quick Feedback Tags */}
           <div className="space-y-2">
             <p className="text-[11px] font-semibold text-[#56423c]">
-              Điều Quý khách hài lòng nhất:
+              Điều Quý khách hài lòng nhất (tùy chọn):
             </p>
             <div className="flex flex-wrap gap-2">
               {FEEDBACK_TAGS.map((tag) => {
@@ -301,15 +358,17 @@ export default function CustomerPaymentSuccessPage() {
         <div className="space-y-2.5 pt-1">
           <button
             type="button"
-            disabled={reviewSubmitted}
+            disabled={reviewSubmitted || rating === 0}
             onClick={handleSubmitReview}
-            className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-[#9a401c] hover:bg-[#ba5831] text-sm font-bold text-white shadow-md active:scale-[0.98] transition-all disabled:opacity-60"
+            className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-[#9a401c] hover:bg-[#ba5831] text-sm font-bold text-white shadow-md active:scale-[0.98] transition-all disabled:opacity-50"
           >
             <Send className="h-4 w-4" />
             <span>
               {reviewSubmitted
                 ? 'Đã ghi nhận phản hồi!'
-                : 'Gửi đánh giá & Kết thúc'}
+                : rating === 0
+                  ? 'Chọn số sao để gửi đánh giá'
+                  : 'Gửi đánh giá & Kết thúc'}
             </span>
           </button>
 
@@ -338,5 +397,19 @@ export default function CustomerPaymentSuccessPage() {
         onClose={() => setIsCallStaffOpen(false)}
       />
     </div>
+  );
+}
+
+export default function CustomerPaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#fff8f6] text-[#1e1b1a] flex items-center justify-center text-xs font-semibold">
+          Đang tải hóa đơn...
+        </div>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   STAFF_QUICK_REQUESTS,
   triggerHaptic,
@@ -35,6 +35,17 @@ export function CallStaffSheet({
   const [customNote, setCustomNote] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const toggleRequest = (requestText: string) => {
@@ -51,7 +62,7 @@ export function CallStaffSheet({
     setIsSubmitted(true);
   };
 
-  const handleCancelRequest = () => {
+  const handleSendAnotherRequest = () => {
     setSelectedRequests([]);
     setCustomNote('');
     setIsSubmitted(false);
@@ -90,8 +101,17 @@ export function CallStaffSheet({
       : `Hỗ trợ tổng quát tại ${tableNumber}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-[#1e1b1a]/60 backdrop-blur-xs">
-      <div className="mx-auto flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-[#fff8f6] text-[#1e1b1a] shadow-2xl">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Gọi nhân viên hỗ trợ"
+      onClick={onClose}
+      className="fixed inset-0 z-[60] flex flex-col justify-end bg-[#1e1b1a]/60 backdrop-blur-xs"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="mx-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-[#fff8f6] text-[#1e1b1a] shadow-2xl"
+      >
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-[#dcc1b8]/50 px-4 py-3.5">
           <div className="flex items-center gap-2">
@@ -117,7 +137,7 @@ export function CallStaffSheet({
           {/* Ambient Banner */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#342f2e] via-[#56423c] to-[#9a401c] p-4 text-white shadow-sm">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[#7ffc97]">
-              <span className="h-2 w-2 rounded-full bg-[#7ffc97] animate-ping" />
+              <span className="h-2 w-2 rounded-full bg-[#7ffc97]" />
               <span>Đội ngũ phục vụ trực sẵn</span>
             </div>
             <p className="mt-1 font-display text-base font-bold">
@@ -223,7 +243,7 @@ export function CallStaffSheet({
             <span>Gửi Yêu Cầu Hỗ Trợ</span>
           </button>
 
-          {/* Emergency Hotline Strip */}
+          {/* Direct Support Strip */}
           <div className="flex items-center justify-between rounded-xl bg-white p-3.5 shadow-xs border border-[#dcc1b8]/40">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#efe6e4] text-[#1e1b1a]">
@@ -231,19 +251,16 @@ export function CallStaffSheet({
               </div>
               <div>
                 <p className="text-xs font-bold text-[#1e1b1a]">
-                  Cần hỗ trợ khẩn cấp?
+                  Cần hỗ trợ trực tiếp tại quầy?
                 </p>
                 <p className="text-[11px] text-[#56423c]">
-                  Hotline Quản lý: 0984 123 456
+                  Quầy lễ tân Tầng 1 • Khu Tràng Tiền
                 </p>
               </div>
             </div>
-            <a
-              href="tel:0984123456"
-              className="rounded-full bg-[#e7e1dd] px-3.5 py-2 text-xs font-bold text-[#1d1b19] active:scale-95 transition-transform"
-            >
-              Gọi ngay
-            </a>
+            <span className="rounded-full bg-[#e7e1dd] px-3 py-1.5 text-[11px] font-bold text-[#1d1b19]">
+              Trực 24/7
+            </span>
           </div>
         </div>
 
@@ -285,10 +302,10 @@ export function CallStaffSheet({
                 </button>
                 <button
                   type="button"
-                  onClick={handleCancelRequest}
-                  className="min-h-[40px] w-full rounded-full py-2 text-xs font-semibold text-[#ba1a1a] active:scale-95 transition-transform"
+                  onClick={handleSendAnotherRequest}
+                  className="min-h-[40px] w-full rounded-full py-2 text-xs font-semibold text-[#56423c] hover:text-[#9a401c] active:scale-95 transition-transform"
                 >
-                  Hủy yêu cầu này
+                  Gửi thêm yêu cầu khác
                 </button>
               </div>
             </div>

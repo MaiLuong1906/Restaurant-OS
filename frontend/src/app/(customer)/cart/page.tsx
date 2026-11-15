@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCartStore } from '@/stores/useCartStore';
+import { useCartStore, getCartLineId } from '@/stores/useCartStore';
 import { formatVND, generateIdempotencyKey } from '@/lib/utils';
-import { triggerHaptic } from '@/lib/customer-menu-data';
+import {
+  FALLBACK_DISH_IMAGE,
+  triggerHaptic,
+} from '@/lib/customer-menu-data';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { CustomerBottomNav } from '@/components/customer/CustomerBottomNav';
 import { CallStaffSheet } from '@/components/customer/CallStaffSheet';
@@ -19,17 +22,29 @@ import {
   ChevronRight,
   CheckCircle2,
   RefreshCw,
+  Coffee,
+  Leaf,
 } from 'lucide-react';
 
 export default function CustomerCartPage() {
   const router = useRouter();
-  const [editingNoteDishId, setEditingNoteDishId] = useState<string | null>(
+  const [editingNoteLineId, setEditingNoteLineId] = useState<string | null>(
     null
   );
   const [tempDishNote, setTempDishNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
   const [isCallStaffOpen, setIsCallStaffOpen] = useState(false);
+
+  const submitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
+    };
+  }, []);
 
   const {
     tableNumber,
@@ -56,21 +71,23 @@ export default function CustomerCartPage() {
     setIsSubmitting(true);
     const idempotencyKey = generateIdempotencyKey();
 
-    setTimeout(() => {
+    if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
+    submitTimerRef.current = setTimeout(() => {
       submitOrderToKitchen(idempotencyKey);
       setIsSubmitting(false);
       setIsSubmittedSuccess(true);
-      setTimeout(() => {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
+      navTimerRef.current = setTimeout(() => {
         router.push('/orders');
-      }, 900);
-    }, 800);
+      }, 850);
+    }, 700);
   };
 
   return (
     <div className="min-h-screen bg-[#fff8f6] text-[#1e1b1a] pb-28">
       <CustomerHeader
-        title="Phố Cổ"
-        subtitle="Giỏ Hàng Tạm Tính"
+        title="Giỏ Hàng"
+        subtitle="Đơn tạm tính tại bàn"
         tableNumber={displayTable}
         showBack
         onOpenCallStaff={() => setIsCallStaffOpen(true)}
@@ -88,8 +105,8 @@ export default function CustomerCartPage() {
                 {displayTable} • Đơn tạm tính
               </p>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[#56423c]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#00873a] animate-pulse" />
-                <span>Đang kết nối POS bếp trực tiếp</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#00873a]" />
+                <span>Kết nối POS bếp trực tiếp</span>
               </p>
             </div>
           </div>
@@ -116,41 +133,48 @@ export default function CustomerCartPage() {
               >
                 Khám phá Thực đơn
               </button>
-              <button
-                type="button"
-                onClick={() => router.push('/orders')}
-                className="min-h-[44px] w-full rounded-full bg-[#e7e1dd] py-2.5 text-xs font-bold text-[#1d1b19] active:scale-95 transition-transform"
-              >
-                Xem món đã đặt ({placedCount} món)
-              </button>
+              {placedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => router.push('/orders')}
+                  className="min-h-[44px] w-full rounded-full bg-[#e7e1dd] py-2.5 text-xs font-bold text-[#1d1b19] active:scale-95 transition-transform"
+                >
+                  Xem món đã đặt ({placedCount} phần)
+                </button>
+              )}
             </div>
           </div>
         ) : (
           <div className="space-y-3">
             {items.map((item) => {
+              const lineId = getCartLineId(
+                item.dish.id,
+                item.selectedModifiers
+              );
               const modifierExtra = item.selectedModifiers.reduce(
                 (acc, m) => acc + m.extraPrice,
                 0
               );
               const unitPrice = item.dish.price + modifierExtra;
               const lineTotal = unitPrice * item.quantity;
-              const isEditingThisNote = editingNoteDishId === item.dish.id;
+              const isEditingThisNote = editingNoteLineId === lineId;
 
               return (
                 <div
-                  key={`${item.dish.id}-${JSON.stringify(item.selectedModifiers)}`}
+                  key={lineId}
                   className="rounded-xl bg-white p-3.5 shadow-2xs border border-[#dcc1b8]/40 space-y-2.5"
                 >
                   <div className="flex items-start gap-3">
-                    {item.dish.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.dish.imageUrl}
-                        alt={item.dish.name}
-                        loading="lazy"
-                        className="h-20 w-20 shrink-0 rounded-lg object-cover bg-[#efe6e4]"
-                      />
-                    ) : null}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.dish.imageUrl || FALLBACK_DISH_IMAGE}
+                      alt={item.dish.name}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src = FALLBACK_DISH_IMAGE;
+                      }}
+                      className="h-20 w-20 shrink-0 rounded-lg object-cover bg-[#efe6e4]"
+                    />
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
@@ -159,8 +183,8 @@ export default function CustomerCartPage() {
                         </h3>
                         <button
                           type="button"
-                          aria-label="Xóa món"
-                          onClick={() => removeItem(item.dish.id)}
+                          aria-label="Xóa dòng món"
+                          onClick={() => removeItem(lineId)}
                           className="p-1 text-[#615e5b] hover:text-[#ba1a1a] transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -206,8 +230,8 @@ export default function CustomerCartPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          updateItemNote(item.dish.id, tempDishNote.trim());
-                          setEditingNoteDishId(null);
+                          updateItemNote(lineId, tempDishNote.trim());
+                          setEditingNoteLineId(null);
                         }}
                         className="rounded-lg bg-[#9a401c] px-3 py-1.5 text-xs font-bold text-white"
                       >
@@ -220,7 +244,7 @@ export default function CustomerCartPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setEditingNoteDishId(item.dish.id);
+                        setEditingNoteLineId(lineId);
                         setTempDishNote(item.note || '');
                       }}
                       className="flex items-center gap-1 text-xs font-medium text-[#615e5b] hover:text-[#9a401c] transition-colors"
@@ -233,7 +257,7 @@ export default function CustomerCartPage() {
                       <button
                         type="button"
                         aria-label="Giảm số lượng"
-                        onClick={() => updateQuantity(item.dish.id, -1)}
+                        onClick={() => updateQuantity(lineId, -1)}
                         className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#1e1b1a] shadow-2xs active:scale-90 transition-transform"
                       >
                         <Minus className="h-3.5 w-3.5" />
@@ -244,7 +268,7 @@ export default function CustomerCartPage() {
                       <button
                         type="button"
                         aria-label="Tăng số lượng"
-                        onClick={() => updateQuantity(item.dish.id, 1)}
+                        onClick={() => updateQuantity(lineId, 1)}
                         className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#1e1b1a] shadow-2xs active:scale-90 transition-transform"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -279,21 +303,37 @@ export default function CustomerCartPage() {
             className="w-full resize-none rounded-lg bg-[#f5ecea] p-2.5 text-xs text-[#1e1b1a] placeholder:text-[#615e5b] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#9a401c]"
           />
 
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-1">
             {[
-              { label: '☕ Lên nước trước', value: 'Mang đồ uống lên trước giúp em' },
-              { label: '🌿 Không hành', value: 'Không bỏ hành lá' },
-              { label: '🥣 Thêm bát thìa', value: 'Cho thêm bát thìa trẻ em' },
-            ].map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                onClick={() => setNotes(chip.value)}
-                className="shrink-0 rounded-full bg-[#f5ecea] hover:bg-[#efe6e4] px-2.5 py-1 text-[11px] font-medium text-[#56423c] transition-colors"
-              >
-                {chip.label}
-              </button>
-            ))}
+              {
+                label: 'Lên nước trước',
+                value: 'Mang đồ uống lên trước giúp em',
+                icon: Coffee,
+              },
+              {
+                label: 'Không hành',
+                value: 'Không bỏ hành lá',
+                icon: Leaf,
+              },
+              {
+                label: 'Thêm bát thìa',
+                value: 'Cho thêm bát thìa trẻ em',
+                icon: Utensils,
+              },
+            ].map((chip) => {
+              const ChipIcon = chip.icon;
+              return (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => setNotes(chip.value)}
+                  className="shrink-0 flex items-center gap-1.5 rounded-full bg-[#f5ecea] hover:bg-[#efe6e4] px-3 py-1 text-[11px] font-medium text-[#56423c] transition-colors"
+                >
+                  <ChipIcon className="h-3 w-3 text-[#9a401c]" />
+                  <span>{chip.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -315,7 +355,7 @@ export default function CustomerCartPage() {
             type="button"
             disabled={items.length === 0 || isSubmitting}
             onClick={handleSubmitKitchen}
-            className={`flex h-14 w-full items-center justify-between rounded-full px-5 text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-50 ${
+            className={`flex min-h-[58px] w-full items-center justify-between rounded-full px-5 py-2.5 text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-50 ${
               isSubmittedSuccess
                 ? 'bg-[#00873a]'
                 : 'bg-[#9a401c] hover:bg-[#ba5831]'
@@ -350,26 +390,28 @@ export default function CustomerCartPage() {
           </button>
 
           {/* Request Bill / View Receipt Link */}
-          <button
-            type="button"
-            onClick={() => router.push('/checkout')}
-            className="flex w-full items-center justify-between gap-2.5 rounded-xl bg-[#fbf2f0] hover:bg-[#f5ecea] p-3 text-left transition-colors active:scale-[0.98]"
-          >
-            <div className="flex min-w-0 items-center gap-2.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7ffc97] text-[#002109]">
-                <CreditCard className="h-5 w-5" />
+          {placedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => router.push('/checkout')}
+              className="flex w-full items-center justify-between gap-2.5 rounded-xl bg-[#fbf2f0] hover:bg-[#f5ecea] p-3 text-left transition-colors active:scale-[0.98]"
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7ffc97] text-[#002109]">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-[#1e1b1a]">
+                    Yêu cầu thanh toán / Xem hóa đơn
+                  </p>
+                  <p className="truncate text-[11px] text-[#615e5b]">
+                    Đối chiếu {placedCount} phần đã đặt và chọn phương thức thanh toán
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-bold text-[#1e1b1a]">
-                  Yêu cầu thanh toán / Xem hóa đơn
-                </p>
-                <p className="truncate text-[11px] text-[#615e5b]">
-                  Bấm để xem hóa đơn tổng hợp và xác nhận thanh toán
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-[#615e5b] shrink-0" />
-          </button>
+              <ChevronRight className="h-4 w-4 text-[#615e5b] shrink-0" />
+            </button>
+          )}
 
           {/* Add More Dishes Button */}
           <button

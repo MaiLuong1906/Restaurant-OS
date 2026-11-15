@@ -1,7 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { CustomerDish, triggerHaptic } from '@/lib/customer-menu-data';
+import { useState, useEffect, useRef } from 'react';
+import {
+  CustomerDish,
+  FALLBACK_DISH_IMAGE,
+  triggerHaptic,
+} from '@/lib/customer-menu-data';
 import { formatVND } from '@/lib/utils';
 import {
   X,
@@ -34,58 +38,42 @@ export function DishDetailSheet({
   const [chefNote, setChefNote] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [addedSuccess, setAddedSuccess] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (dish) {
-      setSelectedPortionId(dish.portionSizes?.[0]?.id || 'standard');
+      setSelectedPortionId(dish.portionSizes?.[0]?.id || '');
       setSelectedAddonIds([]);
       setChefNote('');
       setQuantity(1);
       setAddedSuccess(false);
     }
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
   }, [dish]);
+
+  useEffect(() => {
+    if (!dish) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dish, onClose]);
 
   if (!dish) return null;
 
-  const portionOptions = dish.portionSizes ?? [
-    {
-      id: 'standard',
-      label: 'Phần tiêu chuẩn',
-      subtext: 'Phù hợp 1 - 2 người dùng',
-      price: dish.price,
-    },
-    {
-      id: 'large',
-      label: 'Phần lớn gia đình',
-      subtext: 'Phù hợp nhóm 3 - 4 người',
-      price: dish.price + 45000,
-    },
-  ];
-
-  const addonOptions = dish.addons ?? [
-    {
-      id: 'bun-tuoi',
-      label: 'Thêm bún tươi Phú Đô',
-      subtext: 'Đĩa 150g sợi mềm mướt',
-      extraPrice: 10000,
-    },
-    {
-      id: 'rau-song',
-      label: 'Thêm rau sống tươi vườn',
-      subtext: 'Kinh giới, tía tô, xà lách sạch',
-      extraPrice: 10000,
-    },
-    {
-      id: 'nuoc-cham',
-      label: 'Thêm nước chấm đặc biệt',
-      subtext: 'Bát mắm tỏi ớt kèm đu đủ cà rốt',
-      extraPrice: 5000,
-    },
-  ];
+  const portionOptions = dish.portionSizes ?? [];
+  const addonOptions = dish.addons ?? [];
 
   const activePortion =
     portionOptions.find((p) => p.id === selectedPortionId) || portionOptions[0];
-  const portionDelta = activePortion.price - dish.price;
+  const portionDelta = activePortion ? activePortion.price - dish.price : 0;
 
   const addonsExtraTotal = addonOptions
     .filter((a) => selectedAddonIds.includes(a.id))
@@ -102,11 +90,18 @@ export function DishDetailSheet({
   };
 
   const handleConfirmAdd = () => {
+    if (addedSuccess) return;
     triggerHaptic(20);
     const modifiers: { name: string; selected: string; extraPrice: number }[] =
       [];
 
-    if (portionDelta > 0 || dish.portionSizes) {
+    // Chỉ đẩy modifier Kích thước phần khi khách chọn phần khác mặc định (extraPrice > 0)
+    // để khi chọn phần chuẩn sẽ gộp chung dòng với nút Thêm nhanh trên card
+    if (
+      activePortion &&
+      portionOptions.length > 0 &&
+      (portionDelta !== 0 || activePortion.id !== portionOptions[0].id)
+    ) {
       modifiers.push({
         name: 'Kích thước phần',
         selected: activePortion.label,
@@ -126,29 +121,42 @@ export function DishDetailSheet({
 
     onAddToCart(dish, modifiers, chefNote.trim(), quantity);
     setAddedSuccess(true);
-    setTimeout(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = setTimeout(() => {
       onClose();
-    }, 650);
+    }, 600);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-[#342f2e]/55 backdrop-blur-xs">
-      <div className="mx-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-[#fff8f6] text-[#1e1b1a] shadow-2xl">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Chi tiết món ${dish.name}`}
+      onClick={onClose}
+      className="fixed inset-0 z-[60] flex flex-col justify-end bg-[#342f2e]/55 backdrop-blur-xs"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="mx-auto flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-[#fff8f6] text-[#1e1b1a] shadow-2xl"
+      >
         {/* Top Grab Pill */}
         <div className="flex w-full items-center justify-center pt-2 pb-1 bg-[#fff8f6]">
           <div className="h-1 w-10 rounded-full bg-[#e7e1dd]" />
         </div>
 
         {/* Hero Image */}
-        <div className="relative h-56 w-full shrink-0 overflow-hidden bg-[#efe6e4]">
-          {dish.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={dish.imageUrl}
-              alt={dish.name}
-              className="h-full w-full object-cover select-none"
-            />
-          ) : null}
+        <div className="relative h-52 w-full shrink-0 overflow-hidden bg-[#efe6e4]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={dish.imageUrl || FALLBACK_DISH_IMAGE}
+            alt={dish.name}
+            onError={(e) => {
+              e.currentTarget.src = FALLBACK_DISH_IMAGE;
+            }}
+            className="h-full w-full object-cover select-none"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-[#fff8f6] via-transparent to-black/30" />
 
           <button
@@ -160,16 +168,25 @@ export function DishDetailSheet({
             <X className="h-5 w-5" />
           </button>
 
-          <div className="absolute bottom-3 left-4 flex items-center gap-1.5 rounded-full bg-[#00873a] px-2.5 py-1 text-white shadow-xs">
-            <Leaf className="h-3.5 w-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">
-              Bếp Phố Cổ Tự Nhiên
-            </span>
-          </div>
+          {dish.isVegetarian ? (
+            <div className="absolute bottom-3 left-4 flex items-center gap-1.5 rounded-full bg-[#00873a] px-2.5 py-1 text-white shadow-xs">
+              <Leaf className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">
+                Món Chay Thanh Đạm
+              </span>
+            </div>
+          ) : (
+            <div className="absolute bottom-3 left-4 flex items-center gap-1.5 rounded-full bg-[#9a401c] px-2.5 py-1 text-white shadow-xs">
+              <Utensils className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">
+                Chuẩn Vị Truyền Thống
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Scrollable Options */}
-        <div className="flex-1 overflow-y-auto px-4 pt-2 pb-28 space-y-5">
+        <div className="flex-1 overflow-y-auto px-4 pt-2 pb-6 space-y-5">
           {/* Title & Base Price */}
           <div>
             <h2 className="font-display text-xl font-bold tracking-tight text-[#1e1b1a]">
@@ -190,123 +207,127 @@ export function DishDetailSheet({
             </p>
           </div>
 
-          {/* Group 1: Portion Size (Radio) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="font-display text-sm font-bold text-[#1e1b1a]">
-                  Kích thước phần
+          {/* Group 1: Portion Size (Radio) - Chỉ hiển thị khi món có dữ liệu portionSizes */}
+          {portionOptions.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-display text-sm font-bold text-[#1e1b1a]">
+                    Kích thước phần
+                  </span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#9a401c]" />
+                </div>
+                <span className="rounded-full bg-[#ffdbcf] px-2.5 py-0.5 text-[11px] font-bold text-[#9a401c]">
+                  Bắt buộc
                 </span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#9a401c]" />
               </div>
-              <span className="rounded-full bg-[#ffdbcf] px-2.5 py-0.5 text-[11px] font-bold text-[#9a401c]">
-                Bắt buộc
-              </span>
-            </div>
-            <p className="text-xs text-[#615e5b]">
-              Vui lòng chọn 1 kích cỡ phù hợp khẩu phần của bạn
-            </p>
+              <p className="text-xs text-[#615e5b]">
+                Vui lòng chọn 1 kích cỡ phù hợp khẩu phần của bạn
+              </p>
 
-            <div className="space-y-2 pt-1">
-              {portionOptions.map((option) => {
-                const isSelected = activePortion.id === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic(10);
-                      setSelectedPortionId(option.id);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl p-3.5 text-left transition-all ${
-                      isSelected
-                        ? 'bg-[#f5ecea] ring-1.5 ring-[#9a401c]'
-                        : 'bg-[#fbf2f0] hover:bg-[#f5ecea]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-5 w-5 items-center justify-center rounded-full ${
-                          isSelected ? 'bg-[#9a401c]' : 'bg-[#e9e1df]'
-                        }`}
-                      >
-                        {isSelected ? (
-                          <div className="h-2 w-2 rounded-full bg-white" />
-                        ) : null}
+              <div className="space-y-2 pt-1">
+                {portionOptions.map((option) => {
+                  const isSelected = activePortion?.id === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(10);
+                        setSelectedPortionId(option.id);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl p-3.5 text-left transition-all ${
+                        isSelected
+                          ? 'bg-[#f5ecea] ring-1.5 ring-[#9a401c]'
+                          : 'bg-[#fbf2f0] hover:bg-[#f5ecea]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                            isSelected ? 'bg-[#9a401c]' : 'bg-[#e9e1df]'
+                          }`}
+                        >
+                          {isSelected ? (
+                            <div className="h-2 w-2 rounded-full bg-white" />
+                          ) : null}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-[#1e1b1a]">
+                            {option.label}
+                          </p>
+                          <p className="text-[11px] text-[#615e5b]">
+                            {option.subtext}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-[#1e1b1a]">
-                          {option.label}
-                        </p>
-                        <p className="text-[11px] text-[#615e5b]">
-                          {option.subtext}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="ops-nums text-xs font-bold text-[#1e1b1a]">
-                      {formatVND(option.price)}
-                    </span>
-                  </button>
-                );
-              })}
+                      <span className="ops-nums text-xs font-bold text-[#1e1b1a]">
+                        {formatVND(option.price)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Group 2: Add-ons (Checkbox) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-display text-sm font-bold text-[#1e1b1a]">
-                Món ăn kèm thêm
-              </span>
-              <span className="text-[11px] font-medium text-[#615e5b]">
-                Tùy chọn
-              </span>
-            </div>
-            <p className="text-xs text-[#615e5b]">
-              Chọn thêm đồ ăn kèm theo sở thích vị giác của bạn
-            </p>
+          {/* Group 2: Add-ons (Checkbox) - Chỉ hiển thị khi món có dữ liệu addons */}
+          {addonOptions.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-display text-sm font-bold text-[#1e1b1a]">
+                  Món ăn kèm thêm
+                </span>
+                <span className="text-[11px] font-medium text-[#615e5b]">
+                  Tùy chọn
+                </span>
+              </div>
+              <p className="text-xs text-[#615e5b]">
+                Chọn thêm đồ ăn kèm theo sở thích vị giác của bạn
+              </p>
 
-            <div className="space-y-2 pt-1">
-              {addonOptions.map((addon) => {
-                const isChecked = selectedAddonIds.includes(addon.id);
-                return (
-                  <button
-                    key={addon.id}
-                    type="button"
-                    onClick={() => toggleAddon(addon.id)}
-                    className={`flex w-full items-center justify-between rounded-xl p-3.5 text-left transition-all ${
-                      isChecked
-                        ? 'bg-[#f5ecea] ring-1.5 ring-[#9a401c]'
-                        : 'bg-[#fbf2f0] hover:bg-[#f5ecea]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-5 w-5 items-center justify-center rounded-md ${
-                          isChecked
-                            ? 'bg-[#9a401c] text-white'
-                            : 'bg-[#e9e1df]'
-                        }`}
-                      >
-                        {isChecked ? <Check className="h-3.5 w-3.5" /> : null}
+              <div className="space-y-2 pt-1">
+                {addonOptions.map((addon) => {
+                  const isChecked = selectedAddonIds.includes(addon.id);
+                  return (
+                    <button
+                      key={addon.id}
+                      type="button"
+                      onClick={() => toggleAddon(addon.id)}
+                      className={`flex w-full items-center justify-between rounded-xl p-3.5 text-left transition-all ${
+                        isChecked
+                          ? 'bg-[#f5ecea] ring-1.5 ring-[#9a401c]'
+                          : 'bg-[#fbf2f0] hover:bg-[#f5ecea]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-5 w-5 items-center justify-center rounded-md ${
+                            isChecked
+                              ? 'bg-[#9a401c] text-white'
+                              : 'bg-[#e9e1df]'
+                          }`}
+                        >
+                          {isChecked ? <Check className="h-3.5 w-3.5" /> : null}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-[#1e1b1a]">
+                            {addon.label}
+                          </p>
+                          <p className="text-[11px] text-[#615e5b]">
+                            {addon.subtext}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-[#1e1b1a]">
-                          {addon.label}
-                        </p>
-                        <p className="text-[11px] text-[#615e5b]">
-                          {addon.subtext}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="ops-nums text-xs font-bold text-[#9a401c]">
-                      +{formatVND(addon.extraPrice)}
-                    </span>
-                  </button>
-                );
-              })}
+                      <span className="ops-nums text-xs font-bold text-[#9a401c]">
+                        +{formatVND(addon.extraPrice)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Group 3: Chef Note */}
           <div className="space-y-2">
@@ -333,7 +354,7 @@ export function DishDetailSheet({
         </div>
 
         {/* Sticky Bottom Add-to-Cart Bar */}
-        <div className="border-t border-[#dcc1b8]/50 bg-[#fff8f6]/95 px-4 py-3 shadow-[0_-6px_24px_-6px_rgba(41,37,36,0.12)] backdrop-blur-md">
+        <div className="shrink-0 border-t border-[#dcc1b8]/50 bg-[#fff8f6] px-4 py-3.5 shadow-[0_-6px_24px_-6px_rgba(41,37,36,0.12)]">
           <div className="flex items-center gap-3">
             {/* Stepper */}
             <div className="flex shrink-0 items-center justify-between rounded-full bg-[#efe6e4] px-1.5 py-1 min-w-[110px]">

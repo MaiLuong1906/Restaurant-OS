@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import {
   PHO_CO_DISHES,
   CustomerDish,
+  FALLBACK_DISH_IMAGE,
   triggerHaptic,
 } from '@/lib/customer-menu-data';
 import { formatVND } from '@/lib/utils';
@@ -46,16 +47,55 @@ const RECENT_SEARCH_DEFAULT = [
 ];
 
 const TRENDING_TAGS = [
-  { label: 'Nem rán Phố Cổ', highlight: true },
-  { label: 'Nộm bò bóp thấu', highlight: false },
-  { label: 'Nấm đông cô kho tộ chay', isVeg: true },
-  { label: 'Chả cá Lã Vọng', highlight: false },
-  { label: 'Chè hạt sen', highlight: false },
+  { label: 'Nem rán Phố Cổ' },
+  { label: 'Nộm bò bóp thấu' },
+  { label: 'Nấm đông cô kho tộ chay' },
+  { label: 'Chả cá Lã Vọng' },
+  { label: 'Chè hạt sen' },
 ];
 
-export default function MenuCustomerPage() {
+const MENU_SECTIONS: {
+  subCategory: Exclude<CategoryFilter, 'ALL'>;
+  title: string;
+  subtitle: string;
+  badgeText?: string;
+}[] = [
+  {
+    subCategory: 'APPETIZER',
+    title: 'Khai Vị',
+    subtitle: 'Thanh đạm, kích thích vị giác',
+  },
+  {
+    subCategory: 'MAIN',
+    title: 'Món Chính & Đặc Sản',
+    subtitle: 'Đậm đà hương vị truyền thống ngàn năm',
+    badgeText: 'Đặc sản bếp đỏ',
+  },
+  {
+    subCategory: 'SOUP',
+    title: 'Món Nước & Lẩu',
+    subtitle: 'Nước dùng ninh xương ngọt thanh, nóng hổi',
+  },
+  {
+    subCategory: 'DESSERT',
+    title: 'Tráng Miệng',
+    subtitle: 'Ngọt dịu thanh tao hương vị Hà Thành',
+  },
+  {
+    subCategory: 'DRINK',
+    title: 'Thức Uống',
+    subtitle: 'Trà sen, thức uống giải nhiệt ủ lạnh',
+  },
+];
+
+function MenuCustomerContent() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<CustomerTabKey>('menu');
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get('tab');
+
+  const [activeTab, setActiveTab] = useState<CustomerTabKey>(
+    urlTab === 'search' ? 'search' : 'menu'
+  );
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMood, setActiveMood] = useState<MoodFilter>('ALL');
@@ -65,6 +105,14 @@ export default function MenuCustomerPage() {
   const [selectedDishForDetail, setSelectedDishForDetail] =
     useState<CustomerDish | null>(null);
   const [isCallStaffOpen, setIsCallStaffOpen] = useState(false);
+
+  useEffect(() => {
+    if (urlTab === 'search') {
+      setActiveTab('search');
+    } else if (urlTab === 'menu') {
+      setActiveTab('menu');
+    }
+  }, [urlTab]);
 
   const {
     tableNumber,
@@ -81,6 +129,15 @@ export default function MenuCustomerPage() {
   const cartTotal = getTotalAmount();
   const placedCount = getPlacedItemCount();
 
+  const handleTabChange = (tab: CustomerTabKey) => {
+    setActiveTab(tab);
+    if (tab === 'search') {
+      router.replace('/menu?tab=search', { scroll: false });
+    } else if (tab === 'menu') {
+      router.replace('/menu', { scroll: false });
+    }
+  };
+
   // Filter dishes for Menu view
   const menuDishes = PHO_CO_DISHES.filter((dish) => {
     if (activeCategory !== 'ALL' && dish.subCategory !== activeCategory) {
@@ -95,11 +152,6 @@ export default function MenuCustomerPage() {
     }
     return true;
   });
-
-  const appetizerDishes = menuDishes.filter(
-    (d) => d.subCategory === 'APPETIZER'
-  );
-  const mainDishes = menuDishes.filter((d) => d.subCategory !== 'APPETIZER');
 
   // Filter dishes for Search & Discovery view
   const searchResults = PHO_CO_DISHES.filter((dish) => {
@@ -148,16 +200,17 @@ export default function MenuCustomerPage() {
         }`}
       >
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-[#f5ecea]">
-          {dish.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={dish.imageUrl}
-              alt={dish.name}
-              loading="lazy"
-              sizes="96px"
-              className="h-full w-full object-cover"
-            />
-          ) : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={dish.imageUrl || FALLBACK_DISH_IMAGE}
+            alt={dish.name}
+            loading="lazy"
+            sizes="96px"
+            onError={(e) => {
+              e.currentTarget.src = FALLBACK_DISH_IMAGE;
+            }}
+            className="h-full w-full object-cover"
+          />
           {dish.badge ? (
             <span
               className={`absolute top-1 left-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
@@ -241,9 +294,7 @@ export default function MenuCustomerPage() {
     <div className="min-h-screen bg-[#fff8f6] text-[#1e1b1a] pb-36">
       <CustomerHeader
         title="Phố Cổ"
-        subtitle={
-          activeTab === 'search' ? 'Tìm Kiếm & Gợi Ý Món Ăn' : 'Thực Đơn'
-        }
+        subtitle={activeTab === 'search' ? 'Tìm & Gợi Ý Món' : 'Thực Đơn'}
         tableNumber={displayTable}
         onOpenCallStaff={() => setIsCallStaffOpen(true)}
       />
@@ -259,7 +310,7 @@ export default function MenuCustomerPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setActiveTab('search')}
+                  onFocus={() => handleTabChange('search')}
                   placeholder="Tìm kiếm khai vị, phở cuốn, bún chả..."
                   className="w-full bg-transparent text-xs text-[#1e1b1a] placeholder:text-[#89726a] focus:outline-none"
                 />
@@ -267,7 +318,7 @@ export default function MenuCustomerPage() {
                   type="button"
                   aria-label="Lọc món chay"
                   onClick={() => {
-                    setActiveTab('search');
+                    handleTabChange('search');
                     setActiveMood('VEG');
                   }}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f5ecea] text-[#00873a] hover:bg-[#e9e1df] transition-colors"
@@ -284,8 +335,8 @@ export default function MenuCustomerPage() {
                   <Utensils className="h-3.5 w-3.5 text-[#9a401c]" />
                   <span>Đang phục vụ {displayTable} • Tầng 1</span>
                 </div>
-                <div className="flex items-center gap-1 text-[11px] font-semibold text-[#00873a]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#00873a] animate-ping" />
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#00873a]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#00873a]" />
                   <span>Bếp sẵn sàng</span>
                 </div>
               </div>
@@ -293,14 +344,52 @@ export default function MenuCustomerPage() {
 
             {/* Sticky Category Filter Bar */}
             <div className="sticky top-16 z-30 bg-[#fff8f6]/95 py-2 backdrop-blur-md shadow-[0_4px_16px_-4px_rgba(154,64,28,0.06)]">
-              <div className="flex items-center gap-2 overflow-x-auto px-4 no-scrollbar">
+              <div className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {[
-                  { id: 'ALL', label: 'Tất cả', count: PHO_CO_DISHES.length, icon: Utensils },
-                  { id: 'APPETIZER', label: 'Khai vị', count: 4, icon: Sparkles },
-                  { id: 'MAIN', label: 'Món chính', count: 4, icon: Flame },
-                  { id: 'SOUP', label: 'Món Nước & Lẩu', icon: Soup },
-                  { id: 'DESSERT', label: 'Tráng miệng', icon: Cake },
-                  { id: 'DRINK', label: 'Thức uống', icon: Coffee },
+                  {
+                    id: 'ALL',
+                    label: 'Tất cả',
+                    count: PHO_CO_DISHES.length,
+                    icon: Utensils,
+                  },
+                  {
+                    id: 'APPETIZER',
+                    label: 'Khai vị',
+                    count: PHO_CO_DISHES.filter(
+                      (d) => d.subCategory === 'APPETIZER'
+                    ).length,
+                    icon: Sparkles,
+                  },
+                  {
+                    id: 'MAIN',
+                    label: 'Món chính',
+                    count: PHO_CO_DISHES.filter((d) => d.subCategory === 'MAIN')
+                      .length,
+                    icon: Flame,
+                  },
+                  {
+                    id: 'SOUP',
+                    label: 'Món Nước & Lẩu',
+                    count: PHO_CO_DISHES.filter((d) => d.subCategory === 'SOUP')
+                      .length,
+                    icon: Soup,
+                  },
+                  {
+                    id: 'DESSERT',
+                    label: 'Tráng miệng',
+                    count: PHO_CO_DISHES.filter(
+                      (d) => d.subCategory === 'DESSERT'
+                    ).length,
+                    icon: Cake,
+                  },
+                  {
+                    id: 'DRINK',
+                    label: 'Thức uống',
+                    count: PHO_CO_DISHES.filter(
+                      (d) => d.subCategory === 'DRINK'
+                    ).length,
+                    icon: Coffee,
+                  },
                 ].map((cat) => {
                   const Icon = cat.icon;
                   const isActive = activeCategory === cat.id;
@@ -337,55 +426,57 @@ export default function MenuCustomerPage() {
               </div>
             </div>
 
-            {/* Section 1: Khai Vị */}
-            {appetizerDishes.length > 0 && (
-              <section className="px-4 pt-3 pb-2">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-5 w-1.5 rounded-full bg-[#9a401c]" />
-                    <h2 className="font-display text-lg font-bold text-[#1e1b1a]">
-                      Khai Vị
-                    </h2>
-                    <span className="text-xs text-[#56423c]">
-                      Thanh đạm, kích thích vị giác
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-bold text-[#9a401c]">
-                    {appetizerDishes.length} món
-                  </span>
-                </div>
-                <div className="space-y-2.5">
-                  {appetizerDishes.map(renderDishCard)}
-                </div>
-              </section>
-            )}
+            {/* Dish Sections by SubCategory */}
+            {MENU_SECTIONS.map((sec) => {
+              const sectionDishes = menuDishes.filter(
+                (d) => d.subCategory === sec.subCategory
+              );
+              if (sectionDishes.length === 0) return null;
 
-            {/* Section 2: Món Chính & Đặc Sản */}
-            {mainDishes.length > 0 && (
-              <section className="px-4 pt-4 pb-2">
-                <div className="relative mb-3 overflow-hidden rounded-2xl bg-[#f5ecea] p-3.5 shadow-xs border border-[#dcc1b8]/40">
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div>
+              return (
+                <section key={sec.subCategory} className="px-4 pt-3.5 pb-2">
+                  {sec.badgeText ? (
+                    <div className="relative mb-3 overflow-hidden rounded-2xl bg-[#f5ecea] p-3.5 shadow-xs border border-[#dcc1b8]/40">
+                      <div className="relative z-10 flex items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 w-1.5 rounded-full bg-[#9a401c]" />
+                            <h2 className="font-display text-lg font-bold text-[#1e1b1a]">
+                              {sec.title}
+                            </h2>
+                          </div>
+                          <p className="mt-0.5 text-xs text-[#56423c]">
+                            {sec.subtitle}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-[#ffdbcf] px-2.5 py-1 text-[11px] font-bold text-[#380d00]">
+                          {sec.badgeText}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-2.5 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="h-5 w-1.5 rounded-full bg-[#9a401c]" />
                         <h2 className="font-display text-lg font-bold text-[#1e1b1a]">
-                          Món Chính &amp; Thực Thực
+                          {sec.title}
                         </h2>
+                        <span className="text-xs text-[#56423c]">
+                          {sec.subtitle}
+                        </span>
                       </div>
-                      <p className="mt-0.5 text-xs text-[#56423c]">
-                        Đậm đà hương vị truyền thống ngàn năm
-                      </p>
+                      <span className="shrink-0 text-[11px] font-bold text-[#9a401c]">
+                        {sectionDishes.length} món
+                      </span>
                     </div>
-                    <span className="rounded-full bg-[#ffdbcf] px-2.5 py-1 text-[11px] font-bold text-[#380d00]">
-                      Đặc sản bếp đỏ
-                    </span>
+                  )}
+
+                  <div className="space-y-2.5">
+                    {sectionDishes.map(renderDishCard)}
                   </div>
-                </div>
-                <div className="space-y-2.5">
-                  {mainDishes.map(renderDishCard)}
-                </div>
-              </section>
-            )}
+                </section>
+              );
+            })}
 
             {/* Reassurance & Custom Taste Note Banner */}
             <div className="px-4 pt-4 pb-2">
@@ -440,7 +531,7 @@ export default function MenuCustomerPage() {
               </div>
 
               {/* Mood / Diet Filters */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-1">
                 {[
                   { id: 'ALL', label: 'Tất cả', icon: Sparkles },
                   { id: 'VEG', label: 'Món chay', icon: Leaf },
@@ -502,7 +593,7 @@ export default function MenuCustomerPage() {
               </div>
             )}
 
-            {/* Trending at Table 04 */}
+            {/* Trending at Table */}
             {!searchQuery && (
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
@@ -519,12 +610,7 @@ export default function MenuCustomerPage() {
                       onClick={() => setSearchQuery(trend.label)}
                       className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1e1b1a] shadow-2xs border border-[#dcc1b8]/40 active:scale-95 transition-transform"
                     >
-                      {trend.highlight && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#9a401c] animate-pulse" />
-                      )}
-                      {trend.isVeg && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#006b2c]" />
-                      )}
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#9a401c]" />
                       <span>{trend.label}</span>
                     </button>
                   ))}
@@ -547,7 +633,7 @@ export default function MenuCustomerPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveTab('menu');
+                      handleTabChange('menu');
                       setActiveCategory('APPETIZER');
                     }}
                     className="flex flex-col justify-between rounded-xl bg-[#fbf2f0] p-3.5 text-left shadow-2xs border border-[#dcc1b8]/40 hover:bg-[#f5ecea]"
@@ -573,7 +659,7 @@ export default function MenuCustomerPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveTab('menu');
+                      handleTabChange('menu');
                       setActiveCategory('MAIN');
                     }}
                     className="flex flex-col justify-between rounded-xl bg-[#fbf2f0] p-3.5 text-left shadow-2xs border border-[#dcc1b8]/40 hover:bg-[#f5ecea]"
@@ -622,7 +708,7 @@ export default function MenuCustomerPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveTab('menu');
+                      handleTabChange('menu');
                       setActiveCategory('SOUP');
                     }}
                     className="flex flex-col justify-between rounded-xl bg-[#fbf2f0] p-3.5 text-left shadow-2xs border border-[#dcc1b8]/40 hover:bg-[#f5ecea]"
@@ -733,8 +819,22 @@ export default function MenuCustomerPage() {
         activeTab={activeTab}
         cartCount={cartCount}
         ordersCount={placedCount}
-        onTabChange={(tab) => setActiveTab(tab)}
+        onTabChange={handleTabChange}
       />
     </div>
+  );
+}
+
+export default function MenuCustomerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#fff8f6] text-[#1e1b1a] flex items-center justify-center text-xs font-semibold">
+          Đang tải thực đơn Phố Cổ...
+        </div>
+      }
+    >
+      <MenuCustomerContent />
+    </Suspense>
   );
 }

@@ -58,6 +58,10 @@ export default function TableQrEntryPage({ params }: PageProps) {
           <span>Khám Phá Thực Đơn Ngay</span>
           <ArrowRight className="h-4 w-4" />
         </button>
+
+        <p className="mt-4 text-[11px] font-medium text-[#56423c]">
+          Đặc sản hôm nay: Bún chả than hoa • Chả cá Lã Vọng • Lẩu riêu cua
+        </p>
       </div>
     </div>
   );

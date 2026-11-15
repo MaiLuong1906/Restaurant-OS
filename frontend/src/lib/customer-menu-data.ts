@@ -1,4 +1,7 @@
-import type { Dish } from '../types';
+import type { Dish, OrderItemStatus } from '../types';
+
+export const FALLBACK_DISH_IMAGE =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23f5ecea'/><circle cx='100' cy='92' r='34' fill='%23ffdbcf'/><path d='M84 92h32M100 76v32' stroke='%239a401c' stroke-width='4' stroke-linecap='round'/><text x='100' y='152' text-anchor='middle' font-family='sans-serif' font-size='12' font-weight='bold' fill='%239a401c'>Phố Cổ Dine</text></svg>";
 
 export interface CustomerDish extends Dish {
   badge?: string;
@@ -31,7 +34,7 @@ export interface PlacedBatchItem {
   unitLabel: string;
   quantity: number;
   unitPrice: number; // VND integer
-  status: 'COOKING' | 'SERVED';
+  status: OrderItemStatus;
   cookingNote?: string;
   etaText?: string;
   expedited?: boolean;
@@ -336,22 +339,22 @@ export const INITIAL_PLACED_BATCHES: PlacedBatch[] = [
           'https://lh3.googleusercontent.com/aida-public/AB6AXuBaGCjDiXZ_2p66-rdoTXQGiZ9ieJZpsOajIgBhzNT6JVcvZMArx4EzN0-Nga1a99GiYWV4h1CxwTRK6AOADalGT6-l6WMqQ0viodQHpVtM3ltT0ef0cy67pMkOdEA4vP4sghuiN0x9x8w4FVO5FfT0Y6omSJpmkD3a7T4Ojz1iEHIDXAApPLDQ1Qh_O9lWB8SlpPW7jPz7GUoOWi3zM-Kpy3Eo9YGxWAacFp1GIw',
         unitLabel: '1 nồi',
         quantity: 1,
-        unitPrice: 385000,
-        status: 'COOKING',
+        unitPrice: 320000,
+        status: 'WAITING',
         cookingNote: 'Bếp đang đun sôi nước lẩu',
-        etaText: 'Đang nấu (~5-7p)',
+        etaText: 'Chờ bếp (~5-7p)',
         expedited: false,
       },
       {
         id: 'placed-item-2',
         dishId: 'dish-nom-bo',
-        dishName: 'Nộm Bò Bóp Thấu',
+        dishName: 'Nộm Bò Bóp Thấu Chua Ngọt',
         description: 'Khế chua, chuối chát, mè rang thơm bùi',
         imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuA-EdyRkIfDX-_85fGo7mQJnZoP8wt-od5UVv4O6hIhDGTSAs4kEIPV3jEvaoQL1DSAxuhi8xxJ9uFFiv-j0R3qIfuoFkK3NccR_5EK89ijlRGhWLdeNNTtN-kFHEiHwSzTqUMDGy4jyQaeKkaqxaezgj1x5EQ-8hW7IcXkMmCNttcwz2VZrUOXxwzmEbbV2NlTQHxHFZrVCDUBO78LAzeSOd8ESbkJ8-2Ziy1fNA',
         unitLabel: '1 đĩa',
         quantity: 1,
-        unitPrice: 145000,
+        unitPrice: 110000,
         status: 'SERVED',
       },
     ],
@@ -366,19 +369,19 @@ export const INITIAL_PLACED_BATCHES: PlacedBatch[] = [
       {
         id: 'placed-item-3',
         dishId: 'dish-nem-ran',
-        dishName: 'Nem Rán Phố Cổ',
+        dishName: 'Nem Rán Phố Cổ Giòn Rụm',
         description: 'Vỏ bánh tráng giòn rụm, thịt nạc dăm & nấm hương',
         imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuDGjFOQcUofhJV4JKnIoBjfs-QWGm1I19eUXoDHh_hGXG2Elf47_bndl-QvOYVUFiFSIxCXIhobezuCVNFvWTdj3Q9BIxFWq21MQbfeS0qW19ZQzSuCKaLQSp-4uePGfej5vTcD1uDj5_THHwUy2C171sryLw9eUVEh4eLMQH5SnfvYhf2sVro8Wqm7wZctBKRROARp1EK7YHoPmURYbQ7uYmCrUzmcTtqHRlekUQ',
         unitLabel: '1 phần',
         quantity: 1,
-        unitPrice: 95000,
+        unitPrice: 85000,
         status: 'SERVED',
       },
       {
         id: 'placed-item-4',
         dishId: 'dish-bun-cha',
-        dishName: 'Bún Chả Nướng Phố Cổ',
+        dishName: 'Bún Chả Nướng Phố Cổ Than Hoa',
         description: 'Chả miếng than hoa & chả viên kèm dưa góp đu đủ',
         imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuAw6SlbMBs2oo_Kjtvxn5AsTsd8omuvptasfsbFyL7dj6NvxLf07t1yEA8ZJdHnTBE6lVBHpI26ZlrYfrydPHMTAWj4R0YTmPeEbr594djuWyIixzS7ZYXuVHDF4K_3cf38azr45o-XULsHB2cZyIElZtVIDHtXXC0LmCBeJu21zcfUvQQNLvX-J8Q_mho9acym9-y4lx6DR7kU3cGicdL61Wsg4qeQnEJUPN9_Ew',
@@ -396,7 +399,7 @@ export const INITIAL_PLACED_BATCHES: PlacedBatch[] = [
           'https://lh3.googleusercontent.com/aida-public/AB6AXuDPRF8Rw43ff1p-JzhUdfM84xgtL_V8GIFeDcDNOaOVrkrHX0gK0BKS4hvwhcETecvEaLWQ4MVbEvrP1Ta98kzuveoZ6CY_YNo0hT5ZGaMPKvPO0WdYbNZKeH1EDIy42zMtJzoSGt-rttYt4Y0amBlskISKwlXf54L1PJGIS6BMVCD0P9pWMA7vB9gt9wqg8l3AUNHr0cwTlWGlF2EIPJRmR0m1IerEulgewgwAdQ',
         unitLabel: '1 ly',
         quantity: 1,
-        unitPrice: 55000,
+        unitPrice: 45000,
         status: 'SERVED',
       },
     ],
