@@ -13,7 +13,6 @@ import {
   RecentAttendanceEntry,
 } from '@/types';
 import {
-  ArrowLeft,
   Copy,
   Check,
   CheckCircle2,
@@ -216,6 +215,7 @@ export default function PersonalPage() {
 
   return (
     <div className="w-full max-w-[480px] lg:max-w-4xl mx-auto px-4 py-4 space-y-4">
+
       {/* Nút back về Trang chủ */}
       <div>
         <Link

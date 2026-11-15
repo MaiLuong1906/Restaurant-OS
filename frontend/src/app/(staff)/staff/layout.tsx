@@ -23,6 +23,13 @@ export default function StaffSegmentLayout({ children }: { children: React.React
       ? posActions
       : CHEF_QUICK_ACTIONS;
 
+  const homeHref =
+    staffUser?.role === 'WAITER'
+      ? '/wait'
+      : staffUser?.role === 'CASHIER'
+      ? '/pos'
+      : '/chef';
+
   return (
     <StaffLayout homeHref={homeHref} quickActions={quickActions}>
       {children}

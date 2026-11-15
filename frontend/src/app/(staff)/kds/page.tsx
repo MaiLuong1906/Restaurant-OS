@@ -229,10 +229,18 @@ export default function KitchenDisplayScreen() {
             )}
           </button>
 
+          {/* Đường vào K1 Kho bếp */}
+          <Link
+            href="/kds/stock"
+            className="min-h-[48px] h-12 px-3.5 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
+          >
+            <span>Kho</span>
+          </Link>
+
           {/* Đường vào A7 Hết món */}
           <Link
             href="/kds/sold-out"
-            className="h-10 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
+            className="min-h-[48px] h-12 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
           >
             <span>Hết món</span>
           </Link>
@@ -240,7 +248,7 @@ export default function KitchenDisplayScreen() {
           {/* Đường vào A9 Ghi hủy */}
           <Link
             href="/kds/waste"
-            className="h-10 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
+            className="min-h-[48px] h-12 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
           >
             <span>Ghi hủy</span>
           </Link>

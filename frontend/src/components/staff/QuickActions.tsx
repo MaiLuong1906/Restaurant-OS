@@ -89,6 +89,10 @@ export const WAITER_QUICK_ACTIONS: QuickActionItem[] = [
 export function usePosQuickActions(): QuickActionItem[] {
   const router = useRouter();
   const setPosIntent = useQuickActionIntentStore((s) => s.setPosIntent);
+  const setPendingReservationSubTab = useQuickActionIntentStore(
+    (s) => s.setPendingReservationSubTab
+  );
+  const setPendingSplitMerge = useQuickActionIntentStore((s) => s.setPendingSplitMerge);
 
   return React.useMemo<QuickActionItem[]>(
     () => [
@@ -97,8 +101,9 @@ export function usePosQuickActions(): QuickActionItem[] {
         label: 'Check-in khách',
         sub: 'Nhận bàn & Khấu trừ cọc',
         onClick: () => {
+          setPendingReservationSubTab('checkin');
           setPosIntent('checkin');
-          router.push('/pos');
+          router.push('/pos/reservation');
         },
       },
       {
@@ -106,8 +111,9 @@ export function usePosQuickActions(): QuickActionItem[] {
         label: 'Gộp / tách bàn',
         sub: 'Chia đều / Theo món / Gộp',
         onClick: () => {
+          setPendingSplitMerge(true);
           setPosIntent('splitmerge');
-          router.push('/pos');
+          router.push('/pos/floor');
         },
       },
       {
@@ -122,11 +128,11 @@ export function usePosQuickActions(): QuickActionItem[] {
         sub: 'Kiểm tiền mặt & Chốt ca',
         onClick: () => {
           setPosIntent('settlement');
-          router.push('/pos');
+          router.push('/pos/shift');
         },
       },
     ],
-    [router, setPosIntent]
+    [router, setPosIntent, setPendingReservationSubTab, setPendingSplitMerge]
   );
 }
 
