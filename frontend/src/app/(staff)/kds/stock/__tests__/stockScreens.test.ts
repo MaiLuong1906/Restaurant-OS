@@ -7,6 +7,11 @@ import {
   stockStatusLabel,
   validatePrepQuantity,
   stockStatusRank,
+  computeCountDiff,
+  getCountDiffBadge,
+  isValidCountedInput,
+  hasMissingCountReasons,
+  summarizeStockCount,
 } from '../stock-helpers';
 
 describe('K1–K2 Stock Screens & Helpers Unit Tests', () => {
@@ -125,6 +130,83 @@ describe('K1–K2 Stock Screens & Helpers Unit Tests', () => {
       expect(after.portions).toBe(15);
       expect(after.autoOut).toBe(false);
       expect(after.manualOut).toBe(false);
+    });
+  });
+
+  describe('K3 Count Helpers & Flow', () => {
+    it('computeCountDiff correctly calculates counted - system', () => {
+      expect(computeCountDiff(42, 42)).toBe(0);
+      expect(computeCountDiff(40, 42)).toBe(-2);
+      expect(computeCountDiff(45, 42)).toBe(3);
+    });
+
+    it('getCountDiffBadge returns correct labels and hex colors', () => {
+      const match = getCountDiffBadge(0);
+      expect(match.label).toBe('Khớp (±0)');
+      expect(match.color).toBe('#10B981');
+
+      const missing = getCountDiffBadge(-2);
+      expect(missing.label).toBe('Thiếu -2 phần');
+      expect(missing.color).toBe('#EF4444');
+
+      const surplus = getCountDiffBadge(3);
+      expect(surplus.label).toBe('Thừa +3 phần');
+      expect(surplus.color).toBe('#F59E0B');
+    });
+
+    it('isValidCountedInput validates non-negative integers only', () => {
+      expect(isValidCountedInput(0)).toBe(true);
+      expect(isValidCountedInput(10)).toBe(true);
+      expect(isValidCountedInput('5')).toBe(true);
+
+      expect(isValidCountedInput('')).toBe(false);
+      expect(isValidCountedInput(-1)).toBe(false);
+      expect(isValidCountedInput(2.5)).toBe(false);
+      expect(isValidCountedInput(NaN)).toBe(false);
+      expect(isValidCountedInput(undefined)).toBe(false);
+    });
+
+    it('hasMissingCountReasons checks that all discrepant items have a non-blank reason', () => {
+      // Khớp hết -> không cần reason
+      expect(
+        hasMissingCountReasons([
+          { dishId: '1', dishName: 'A', systemPortions: 10, countedPortions: 10, diff: 0, reason: '' },
+        ])
+      ).toBe(false);
+
+      // Có lệch nhưng chưa có reason -> true (thiếu reason)
+      expect(
+        hasMissingCountReasons([
+          { dishId: '1', dishName: 'A', systemPortions: 10, countedPortions: 8, diff: -2, reason: '' },
+        ])
+      ).toBe(true);
+
+      // Có lệch nhưng reason chỉ có khoảng trắng -> true
+      expect(
+        hasMissingCountReasons([
+          { dishId: '1', dishName: 'A', systemPortions: 10, countedPortions: 8, diff: -2, reason: '   ' },
+        ])
+      ).toBe(true);
+
+      // Có lệch và có reason hợp lệ -> false (đã đủ reason)
+      expect(
+        hasMissingCountReasons([
+          { dishId: '1', dishName: 'A', systemPortions: 10, countedPortions: 8, diff: -2, reason: 'Rơi vỡ' },
+        ])
+      ).toBe(false);
+    });
+
+    it('summarizeStockCount tallies total, matched, and discrepant count rows', () => {
+      const rows = [
+        { dishId: '1', dishName: 'A', systemPortions: 10, countedPortions: 10, diff: 0, reason: '' },
+        { dishId: '2', dishName: 'B', systemPortions: 5, countedPortions: 3, diff: -2, reason: 'Hỏng' },
+        { dishId: '3', dishName: 'C', systemPortions: 2, countedPortions: 4, diff: 2, reason: 'Thừa' },
+      ];
+
+      const res = summarizeStockCount(rows);
+      expect(res.total).toBe(3);
+      expect(res.matched).toBe(1);
+      expect(res.discrepant).toBe(2);
     });
   });
 });

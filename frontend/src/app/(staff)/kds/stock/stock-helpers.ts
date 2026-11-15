@@ -92,3 +92,73 @@ export function validatePrepQuantity(
 
   return null;
 }
+
+// ==========================================
+// K3 Count Helpers
+// ==========================================
+
+export interface CountRow {
+  dishId: string;
+  dishName: string;
+  systemPortions: number;
+  countedPortions: number;
+  diff: number;
+  reason: string;
+}
+
+export interface CountDiffBadge {
+  label: string;
+  color: string;
+}
+
+export function computeCountDiff(countedPortions: number, systemPortions: number): number {
+  return countedPortions - systemPortions;
+}
+
+export function getCountDiffBadge(diff: number): CountDiffBadge {
+  if (diff === 0) {
+    return { label: 'Khớp (±0)', color: '#10B981' };
+  }
+  if (diff < 0) {
+    return { label: `Thiếu ${diff} phần`, color: '#EF4444' };
+  }
+  return { label: `Thừa +${diff} phần`, color: '#F59E0B' };
+}
+
+export function isValidCountedInput(raw: unknown): boolean {
+  if (raw === '' || raw === null || raw === undefined) return false;
+  const num = Number(raw);
+  return Number.isInteger(num) && num >= 0;
+}
+
+export function hasMissingCountReasons(rows: readonly CountRow[]): boolean {
+  for (const row of rows) {
+    if (row.diff !== 0 && (!row.reason || row.reason.trim() === '')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function summarizeStockCount(rows: readonly CountRow[]): {
+  total: number;
+  matched: number;
+  discrepant: number;
+} {
+  let matched = 0;
+  let discrepant = 0;
+
+  for (const row of rows) {
+    if (row.diff === 0) {
+      matched += 1;
+    } else {
+      discrepant += 1;
+    }
+  }
+
+  return {
+    total: rows.length,
+    matched,
+    discrepant,
+  };
+}
