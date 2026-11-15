@@ -104,6 +104,9 @@ export default function PosFloorPage() {
 
   const pendingSplitMerge = useQuickActionIntentStore((s) => s.pendingSplitMerge);
   const clearPendingSplitMerge = useQuickActionIntentStore((s) => s.clearPendingSplitMerge);
+  const setPendingReservationSubTab = useQuickActionIntentStore(
+    (s) => s.setPendingReservationSubTab
+  );
 
   React.useEffect(() => {
     if (pendingSplitMerge) {
@@ -184,6 +187,7 @@ export default function PosFloorPage() {
               <button
                 type="button"
                 onClick={() => {
+                  setPendingReservationSubTab('checkin');
                   router.push('/pos/reservation');
                 }}
                 className="min-h-11 cursor-pointer rounded-xl bg-primary-500 px-3.5 text-xs font-bold text-white shadow-warm-sm hover:bg-primary-600"
