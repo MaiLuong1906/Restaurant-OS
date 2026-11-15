@@ -250,4 +250,82 @@ describe('K1–K2 Stock Screens & Helpers Unit Tests', () => {
       expect(res.discrepant).toBe(2);
     });
   });
+
+  describe('resolveStockBackAction helper', () => {
+    it('returns fallback when historyLength <= 1', async () => {
+      const { resolveStockBackAction } = await import('../stock-helpers');
+      expect(
+        resolveStockBackAction({
+          historyLength: 1,
+          referrer: 'https://app.example/chef',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('fallback');
+
+      expect(
+        resolveStockBackAction({
+          historyLength: 0,
+          referrer: 'https://app.example/chef',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('fallback');
+    });
+
+    it('returns fallback when referrer is empty, whitespace, or invalid', async () => {
+      const { resolveStockBackAction } = await import('../stock-helpers');
+      expect(
+        resolveStockBackAction({
+          historyLength: 5,
+          referrer: '',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('fallback');
+
+      expect(
+        resolveStockBackAction({
+          historyLength: 5,
+          referrer: '   ',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('fallback');
+
+      expect(
+        resolveStockBackAction({
+          historyLength: 5,
+          referrer: 'not-a-url',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('fallback');
+    });
+
+    it('returns fallback when referrer is cross-origin', async () => {
+      const { resolveStockBackAction } = await import('../stock-helpers');
+      expect(
+        resolveStockBackAction({
+          historyLength: 5,
+          referrer: 'https://other.example/chef',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('fallback');
+    });
+
+    it('returns back when historyLength > 1 and referrer is on same origin', async () => {
+      const { resolveStockBackAction } = await import('../stock-helpers');
+      expect(
+        resolveStockBackAction({
+          historyLength: 2,
+          referrer: 'https://app.example/kds',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('back');
+
+      expect(
+        resolveStockBackAction({
+          historyLength: 4,
+          referrer: 'https://app.example/chef',
+          currentOrigin: 'https://app.example',
+        })
+      ).toBe('back');
+    });
+  });
 });

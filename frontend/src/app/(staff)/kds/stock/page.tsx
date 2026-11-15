@@ -9,11 +9,24 @@ import {
   groupStockItems,
   getPortionDisplay,
   stockStatusLabel,
+  resolveStockBackAction,
 } from './stock-helpers';
 
 export default function StockOverviewPage() {
   const router = useRouter();
   const [, startTransition] = useTransition();
+
+  const handleBack = () => {
+    const historyLength = typeof window !== 'undefined' ? window.history.length : 0;
+    const referrer = typeof document !== 'undefined' ? document.referrer : '';
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const action = resolveStockBackAction({ historyLength, referrer, currentOrigin });
+    if (action === 'back') {
+      router.back();
+    } else {
+      router.push('/chef');
+    }
+  };
 
   const [items, setItems] = useState<StockItemWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,13 +215,14 @@ export default function StockOverviewPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-[#E9E4DC]">
         <div className="flex items-center gap-3">
-          <Link
-            href="/chef"
+          <button
+            type="button"
+            onClick={handleBack}
             className="min-h-[48px] min-w-[48px] px-3 py-2 rounded-[8px] bg-[#FFFFFF] hover:bg-[#F6F4F0] text-[#2B2118] transition-colors border border-[#E9E4DC] flex items-center justify-center font-bold text-sm shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-            aria-label="Quay lại trang Bếp"
+            aria-label="Quay lại"
           >
-            ← Bếp
-          </Link>
+            ← Quay lại
+          </button>
           <div>
             <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#141210]">
               Tồn kho theo món

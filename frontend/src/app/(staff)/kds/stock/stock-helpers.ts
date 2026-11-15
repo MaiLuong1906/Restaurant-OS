@@ -135,6 +135,28 @@ export function getPortionDisplay(portions: number): PortionDisplay {
   return { filled, overflow };
 }
 
+export interface StockBackActionInput {
+  historyLength: number;
+  referrer: string;
+  currentOrigin: string;
+}
+
+export function resolveStockBackAction(input: StockBackActionInput): 'back' | 'fallback' {
+  if (input.historyLength <= 1) return 'fallback';
+  if (!input.referrer || !input.referrer.trim()) return 'fallback';
+  if (!input.currentOrigin) return 'fallback';
+
+  try {
+    const referrerUrl = new URL(input.referrer);
+    if (referrerUrl.origin === input.currentOrigin) {
+      return 'back';
+    }
+    return 'fallback';
+  } catch {
+    return 'fallback';
+  }
+}
+
 // ==========================================
 // K3 Count Helpers
 // ==========================================
