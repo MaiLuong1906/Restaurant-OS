@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useWaiterStore } from '@/stores/useWaiterStore';
-import { WaiterTopBar } from '@/components/waiter/WaiterTopBar';
 import { WaiterBottomNav } from '@/components/waiter/WaiterBottomNav';
 import { WaiterFloorPlan } from '@/components/waiter/WaiterFloorPlan';
 import { WaiterOrderView } from '@/components/waiter/WaiterOrderView';
@@ -34,9 +33,6 @@ function WaiterMainContent() {
 
   return (
     <div className="flex min-h-screen flex-col bg-ops-bg text-ink antialiased">
-      {/* Top Bar Navigation */}
-      <WaiterTopBar />
-
       {/* Main Work Area */}
       <main className="w-full flex-1 max-w-[1720px] mx-auto px-3.5 sm:px-6 py-4 sm:py-6 pb-28 lg:pb-12">
         {activeTab === 'floor' ? <WaiterFloorPlan /> : null}
