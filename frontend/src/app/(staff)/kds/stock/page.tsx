@@ -229,7 +229,6 @@ export default function StockOverviewPage() {
           }}
           className="hidden md:flex min-h-[48px] px-5 py-2.5 rounded-[8px] bg-[#8C1D2C] hover:bg-[#6F1623] active:scale-95 text-[#FFFFFF] font-bold text-sm transition-all items-center gap-2 shadow-sm"
         >
-          <span>📋</span>
           <span>Kiểm đếm cuối ca</span>
         </button>
       </div>
@@ -245,7 +244,6 @@ export default function StockOverviewPage() {
           }}
           className="w-full min-h-[48px] py-3 px-4 rounded-[8px] bg-[#8C1D2C] hover:bg-[#6F1623] active:scale-95 text-[#FFFFFF] font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
         >
-          <span>📋</span>
           <span>Kiểm đếm cuối ca</span>
         </button>
       </div>
