@@ -30,7 +30,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-brown-900/60 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-brown-900/60 p-4 sm:items-center animate-in fade-in duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
       onClick={onClose}
       role="presentation"
     >
@@ -38,7 +38,10 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn('w-full max-w-lg rounded-card bg-white p-6 shadow-warm-lg', className)}
+        className={cn(
+          'w-full max-w-lg rounded-card bg-white p-6 shadow-warm-lg animate-in zoom-in-[0.96] duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
+          className,
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-4">

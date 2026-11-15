@@ -94,7 +94,7 @@ export class MockKdsService implements KdsService {
     return { alert: deepClone(alert), ticket: deepClone(ticket) };
   }
 
-  async deferOrderChange(alertId: string): Promise<void> {
+  async deferOrderChange(_alertId: string): Promise<void> {
     await simulateLatency(50);
     // Defer keeps the alert pending (no-op)
   }
