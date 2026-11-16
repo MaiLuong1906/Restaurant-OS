@@ -1,26 +1,141 @@
 'use client';
 
 import * as React from 'react';
-import { MessageCircle, X, Send } from 'lucide-react';
+import Link from 'next/link';
+import { MessageCircle, X, Send, Calendar, Users, Clock, Tag } from 'lucide-react';
+import {
+  ChatMessage,
+  DishCardData,
+  BookingCardData,
+  VoucherCardData,
+  ChatStreamEvent,
+} from '@/lib/ai-chat-contract';
+import { getAiChatService, getOrCreateSessionId } from '@/lib/ai-chat-client';
+import { FALLBACK_DISH_IMAGE } from '@/lib/customer-menu-data';
+import { formatVnd } from '@/lib/formatMoney';
 
-interface ChatMessage {
-  id: number;
-  role: 'user' | 'assistant';
-  text: string;
+function DishBubbleCard({ dish }: { dish: DishCardData }) {
+  const [imgSrc, setImgSrc] = React.useState(dish.imageUrl || FALLBACK_DISH_IMAGE);
+  const [hasFallback, setHasFallback] = React.useState(false);
+
+  const handleError = () => {
+    if (!hasFallback) {
+      setHasFallback(true);
+      setImgSrc(FALLBACK_DISH_IMAGE);
+    }
+  };
+
+  return (
+    <div className="mt-2 bg-white rounded-lg border border-[#E9E4DC] overflow-hidden shadow-xs flex flex-col">
+      <div className="relative aspect-16/9 w-full bg-[#E9E4DC]/30 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imgSrc}
+          alt={dish.name}
+          onError={handleError}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+        {dish.badge && (
+          <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#8C1D2C] text-white text-[10px] font-semibold">
+            {dish.badge}
+          </span>
+        )}
+      </div>
+      <div className="p-3 flex-1 flex flex-col justify-between">
+        <div>
+          <h4 className="text-xs sm:text-sm font-bold text-[#141210] line-clamp-1">{dish.name}</h4>
+          <p className="mt-0.5 text-[11px] text-[#7A6A58] line-clamp-2 leading-relaxed">
+            {dish.description}
+          </p>
+        </div>
+        <div className="mt-2.5 pt-2 border-t border-[#E9E4DC]/60 flex items-center justify-between">
+          <span className="text-xs font-bold text-[#8C1D2C]">{formatVnd(dish.price)}</span>
+          <Link
+            href="/menu"
+            className="text-[11px] font-semibold text-[#7A6A58] hover:text-[#8C1D2C] transition-colors"
+          >
+            Chi tiết &rarr;
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BookingBubbleCard({ booking }: { booking: BookingCardData }) {
+  return (
+    <div className="mt-2 p-3 bg-white rounded-lg border border-[#E9E4DC] shadow-xs space-y-2">
+      <div className="flex items-center justify-between border-b border-[#E9E4DC]/60 pb-1.5">
+        <span className="text-xs font-bold text-[#8C1D2C]">Thông Tin Đặt Bàn</span>
+        {booking.isSample && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#E9E4DC]/60 text-[#7A6A58]">
+            Dữ liệu mẫu demo
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs text-[#141210]">
+        <div className="flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-[#7A6A58]" />
+          <span>{booking.date}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-[#7A6A58]" />
+          <span>{booking.time}</span>
+        </div>
+        <div className="flex items-center gap-1.5 col-span-2">
+          <Users className="w-3.5 h-3.5 text-[#7A6A58]" />
+          <span>Số lượng: {booking.partySize} khách</span>
+        </div>
+      </div>
+      <div className="pt-1 text-[11px] text-[#7A6A58] flex items-center justify-between">
+        <span>Trạng thái: {booking.status}</span>
+        {booking.note && <span className="italic">{booking.note}</span>}
+      </div>
+    </div>
+  );
+}
+
+function VoucherBubbleCard({ voucher }: { voucher: VoucherCardData }) {
+  return (
+    <div className="mt-2 p-3 bg-white rounded-lg border border-[#E9E4DC] shadow-xs space-y-2">
+      <div className="flex items-center justify-between border-b border-[#E9E4DC]/60 pb-1.5">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#8C1D2C]">
+          <Tag className="w-3.5 h-3.5" />
+          <span>{voucher.code}</span>
+        </div>
+        {voucher.isSample && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#E9E4DC]/60 text-[#7A6A58]">
+            Dữ liệu mẫu demo
+          </span>
+        )}
+      </div>
+      <div>
+        <h4 className="text-xs font-bold text-[#141210]">{voucher.title}</h4>
+        <p className="mt-0.5 text-xs font-semibold text-[#8C1D2C]">{voucher.discountText}</p>
+        <p className="mt-1 text-[11px] text-[#7A6A58] leading-relaxed">{voucher.conditions}</p>
+      </div>
+      <div className="pt-1 border-t border-[#E9E4DC]/40 text-[10px] text-[#7A6A58]">
+        Hạn sử dụng: {voucher.validUntil}
+      </div>
+    </div>
+  );
 }
 
 export function AiChatWidget() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState('');
+  const [isThinking, setIsThinking] = React.useState(false);
+  const [sessionId, setSessionId] = React.useState('');
+
   const [messages, setMessages] = React.useState<ChatMessage[]>([
     {
-      id: 1,
+      id: 'msg-1',
       role: 'assistant',
       text: 'Xin chào quý khách! Em là Trợ lý ẩm thực Phố Cổ. Em có thể hỗ trợ quý khách đặt bàn, gợi ý món ngon, món chay hoặc các thông tin ưu đãi hấp dẫn hôm nay.',
     },
   ]);
 
-  const nextIdRef = React.useRef(2);
   const isOpenRef = React.useRef(isOpen);
   isOpenRef.current = isOpen;
 
@@ -34,27 +149,81 @@ export function AiChatWidget() {
     'Voucher hôm nay',
   ];
 
-  const sendMessage = React.useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-
-    const userMsgId = nextIdRef.current++;
-    const userMsg: ChatMessage = {
-      id: userMsgId,
-      role: 'user',
-      text: trimmed,
-    };
-
-    const replyMsgId = nextIdRef.current++;
-    const assistantMsg: ChatMessage = {
-      id: replyMsgId,
-      role: 'assistant',
-      text: `Dạ, em đã ghi nhận yêu cầu "${trimmed}" của quý khách. Đội ngũ nhân viên Phố Cổ sẽ sẵn sàng hỗ trợ quý khách ngay ạ!`,
-    };
-
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setInputValue('');
+  // Initialize UUID session
+  React.useEffect(() => {
+    setSessionId(getOrCreateSessionId());
   }, []);
+
+  const sendMessage = React.useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isThinking) return;
+
+      const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        text: trimmed,
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setInputValue('');
+      setIsThinking(true);
+
+      const assistantMsgId = `asst-${Date.now()}`;
+      let textAccumulator = '';
+      const cardsAccumulator: NonNullable<ChatMessage['cards']> = [];
+
+      const service = getAiChatService();
+      service.sendMessage({
+        sessionId: sessionId || getOrCreateSessionId(),
+        message: trimmed,
+        onEvent: (event: ChatStreamEvent) => {
+          if (event.type === 'text') {
+            textAccumulator = textAccumulator ? `${textAccumulator}\n${event.text}` : event.text;
+          } else if (event.type === 'dish_card') {
+            cardsAccumulator.push({ type: 'dish', data: event.dish });
+          } else if (event.type === 'booking_card') {
+            cardsAccumulator.push({ type: 'booking', data: event.booking });
+          } else if (event.type === 'voucher_card') {
+            cardsAccumulator.push({ type: 'voucher', data: event.voucher });
+          } else if (event.type === 'error') {
+            textAccumulator = event.message;
+          }
+
+          setMessages((prev) => {
+            const existingIdx = prev.findIndex((m) => m.id === assistantMsgId);
+            const updatedMsg: ChatMessage = {
+              id: assistantMsgId,
+              role: 'assistant',
+              text: textAccumulator,
+              cards: [...cardsAccumulator],
+            };
+            if (existingIdx >= 0) {
+              const copy = [...prev];
+              copy[existingIdx] = updatedMsg;
+              return copy;
+            }
+            return [...prev, updatedMsg];
+          });
+        },
+        onError: (err) => {
+          setIsThinking(false);
+          const errorMsg: ChatMessage = {
+            id: `err-${Date.now()}`,
+            role: 'assistant',
+            text:
+              err.message ||
+              'Dạ hiện tại máy chủ AI chưa sẵn sàng. Quý khách vui lòng thử lại sau giây lát ạ!',
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        },
+        onDone: () => {
+          setIsThinking(false);
+        },
+      });
+    },
+    [isThinking, sessionId]
+  );
 
   // External trigger phoco:open-booking
   React.useEffect(() => {
@@ -95,7 +264,7 @@ export function AiChatWidget() {
       inputRef.current?.focus();
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [isOpen, messages]);
+  }, [isOpen, messages, isThinking]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,16 +333,42 @@ export function AiChatWidget() {
                   className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] px-3.5 py-2.5 rounded-lg text-xs sm:text-sm leading-relaxed ${
+                    className={`max-w-[85%] px-3.5 py-2.5 rounded-lg text-xs sm:text-sm leading-relaxed ${
                       m.role === 'user'
                         ? 'bg-[#8C1D2C] text-white rounded-br-xs'
                         : 'bg-[#F5F2EA] text-[#141210] border border-[#E9E4DC]/60 rounded-bl-xs'
                     }`}
                   >
-                    {m.text}
+                    {m.text && <p className="whitespace-pre-line">{m.text}</p>}
+                    {m.cards && m.cards.length > 0 && (
+                      <div className="space-y-2 mt-2">
+                        {m.cards.map((c, idx) => {
+                          if (c.type === 'dish') {
+                            return <DishBubbleCard key={idx} dish={c.data} />;
+                          }
+                          if (c.type === 'booking') {
+                            return <BookingBubbleCard key={idx} booking={c.data} />;
+                          }
+                          if (c.type === 'voucher') {
+                            return <VoucherBubbleCard key={idx} voucher={c.data} />;
+                          }
+                          return null;
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
+
+              {/* Thinking Indicator */}
+              {isThinking && (
+                <div className="flex justify-start">
+                  <div className="px-3 py-2 rounded-lg bg-[#F5F2EA] border border-[#E9E4DC]/60 text-xs text-[#7A6A58] italic">
+                    Đang kiểm tra...
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -184,8 +379,9 @@ export function AiChatWidget() {
                   <button
                     key={chip}
                     type="button"
+                    disabled={isThinking}
                     onClick={() => sendMessage(chip)}
-                    className="px-2.5 py-1 text-xs rounded-full bg-white border border-[#E9E4DC] text-[#141210] hover:border-[#8C1D2C] hover:text-[#8C1D2C] transition-colors"
+                    className="px-2.5 py-1 text-xs rounded-full bg-white border border-[#E9E4DC] text-[#141210] hover:border-[#8C1D2C] hover:text-[#8C1D2C] disabled:opacity-50 transition-colors"
                   >
                     {chip}
                   </button>
@@ -201,14 +397,15 @@ export function AiChatWidget() {
               <input
                 ref={inputRef}
                 type="text"
+                disabled={isThinking}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Nhập câu hỏi hoặc yêu cầu..."
-                className="flex-1 min-h-[40px] px-3.5 py-2 text-xs sm:text-sm rounded-lg border border-[#E9E4DC] bg-[#F5F2EA]/30 text-[#141210] placeholder-[#7A6A58] focus:outline-hidden focus:border-[#8C1D2C]"
+                placeholder={isThinking ? 'Đang phản hồi...' : 'Nhập câu hỏi hoặc yêu cầu...'}
+                className="flex-1 min-h-[40px] px-3.5 py-2 text-xs sm:text-sm rounded-lg border border-[#E9E4DC] bg-[#F5F2EA]/30 text-[#141210] placeholder-[#7A6A58] focus:outline-hidden focus:border-[#8C1D2C] disabled:opacity-50"
               />
               <button
                 type="submit"
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isThinking}
                 aria-label="Gửi tin nhắn"
                 className="inline-flex items-center justify-center min-h-[40px] px-3.5 py-2 rounded-lg bg-[#8C1D2C] hover:bg-[#6F1623] disabled:opacity-40 disabled:hover:bg-[#8C1D2C] text-white transition-colors"
               >
