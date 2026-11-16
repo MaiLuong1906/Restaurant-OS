@@ -4,6 +4,8 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { HomeHero } from '@/components/guest/HomeHero';
+import { FeaturedDishes } from '@/components/guest/FeaturedDishes';
+import { AboutSection } from '@/components/guest/AboutSection';
 
 export default function GuestHomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -113,14 +115,13 @@ export default function GuestHomePage() {
         {/* Full-viewport Hero */}
         <HomeHero onBookTable={handleBooking} />
 
-        {/* Minimal Anchor Targets for Non-broken Links */}
-        <section id="about" className="py-16 px-4 max-w-5xl mx-auto border-t border-[#E9E4DC]">
-          <h2 className="text-2xl font-bold text-[#141210] mb-3">Về quán Phố Cổ</h2>
-          <p className="text-sm text-[#7A6A58] leading-relaxed max-w-2xl">
-            Phố Cổ mang đậm dấu ấn kiến trúc và ẩm thực gia truyền Hà Nội. Mỗi món ăn là một câu chuyện về hương vị mộc mạc, đậm đà được gìn giữ qua nhiều thế hệ.
-          </p>
-        </section>
+        {/* Featured Dishes Section */}
+        <FeaturedDishes />
 
+        {/* About Section */}
+        <AboutSection />
+
+        {/* Minimal Anchor Targets for Non-broken Links */}
         <section id="offers" className="py-16 px-4 max-w-5xl mx-auto border-t border-[#E9E4DC]">
           <h2 className="text-2xl font-bold text-[#141210] mb-3">Ưu đãi hôm nay</h2>
           <p className="text-sm text-[#7A6A58] leading-relaxed max-w-2xl">
