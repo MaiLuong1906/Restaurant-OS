@@ -6,6 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { HomeHero } from '@/components/guest/HomeHero';
 import { FeaturedDishes } from '@/components/guest/FeaturedDishes';
 import { AboutSection } from '@/components/guest/AboutSection';
+import { GuestFooter } from '@/components/guest/GuestFooter';
 
 export default function GuestHomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -128,14 +129,10 @@ export default function GuestHomePage() {
             Nhận ngay voucher ưu đãi đặt bàn sớm trong khung giờ vàng và các combo trải nghiệm ẩm thực đặc sắc.
           </p>
         </section>
-
-        <section id="contact" className="py-16 px-4 max-w-5xl mx-auto border-t border-[#E9E4DC]">
-          <h2 className="text-2xl font-bold text-[#141210] mb-3">Liên hệ</h2>
-          <p className="text-sm text-[#7A6A58] leading-relaxed max-w-2xl">
-            Chào đón quý thực khách ghé thăm hoặc liên hệ đặt bàn trước để có trải nghiệm phục vụ tốt nhất.
-          </p>
-        </section>
       </main>
+
+      {/* Guest Footer */}
+      <GuestFooter />
     </div>
   );
 }
