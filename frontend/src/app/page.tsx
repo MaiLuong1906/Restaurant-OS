@@ -1,135 +1,140 @@
-import Link from 'next/link';
-import { UtensilsCrossed, CreditCard, LayoutDashboard, Sparkles, ChefHat, QrCode } from 'lucide-react';
+'use client';
 
-export default function HomePage() {
-  const modules = [
-    {
-      title: 'Khách Gọi Món QR',
-      description: 'Khách hàng quét mã tại bàn, xem thực đơn 3D mượt mà, đặt món realtime.',
-      href: '/qr/table-01',
-      icon: QrCode,
-      tag: 'Customer Portal',
-      badgeColor: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-      action: 'Thử nghiệm Bàn 01',
-    },
-    {
-      title: 'Màn Hình Bếp KDS',
-      description: 'Điều phối chế biến realtime (<50ms), gom món thông minh, nền tối #0B0F14.',
-      href: '/kds',
-      icon: ChefHat,
-      tag: 'Kitchen Display',
-      badgeColor: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-      action: 'Vào Bếp Chế Biến',
-    },
-    {
-      title: 'Thu Ngân & Bàn Ăn POS',
-      description: 'Quản lý sơ đồ bàn, gộp bàn, thanh toán QR VietQR & MoMo chuẩn xác.',
-      href: '/pos',
-      icon: CreditCard,
-      tag: 'Point of Sale',
-      badgeColor: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-      action: 'Mở Quầy Thu Ngân',
-    },
-    {
-      title: 'Quản Trị & Kho BOM',
-      description: 'Kiểm soát hao hụt nguyên vật liệu theo định lượng thực đơn, báo cáo doanh thu.',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      tag: 'Back Office',
-      badgeColor: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-      action: 'Xem Báo Cáo',
-    },
+import * as React from 'react';
+import Link from 'next/link';
+import { Menu, X } from 'lucide-react';
+import { HomeHero } from '@/components/guest/HomeHero';
+
+export default function GuestHomePage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
+  const handleBooking = () => {
+    setMobileMenuOpen(false);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('phoco:open-booking'));
+    }
+  };
+
+  const navLinks = [
+    { label: 'Thực đơn', href: '/menu', isExternal: false },
+    { label: 'Về quán', href: '#about', isExternal: false },
+    { label: 'Ưu đãi', href: '#offers', isExternal: false },
+    { label: 'Liên hệ', href: '#contact', isExternal: false },
+    { label: 'Hub', href: '/hub', isExternal: false },
   ];
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-[#0B0F14] text-slate-100">
-      {/* Header */}
-      <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <UtensilsCrossed className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                Restaurant OS
-              </span>
-              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/30">
-                v1.0 Monorepo
-              </span>
-            </div>
+    <div className="min-h-screen bg-[#F5F2EA] text-[#141210] font-sans antialiased selection:bg-[#8C1D2C] selection:text-white">
+      {/* Top Navbar */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#F5F2EA]/95 backdrop-blur-md border-b border-[#E9E4DC]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          {/* Brand */}
+          <Link
+            href="/"
+            className="text-xl font-bold tracking-tight text-[#8C1D2C] flex items-center gap-2"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#8C1D2C]" />
+            Phố Cổ
+          </Link>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-6">
+            {navLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="text-sm font-medium text-[#7A6A58] hover:text-[#141210] transition-colors"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Right Actions (Desktop) */}
+          <div className="hidden md:flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleBooking}
+              className="inline-flex items-center justify-center min-h-[40px] px-5 py-2 rounded-lg bg-[#8C1D2C] hover:bg-[#6F1623] text-white text-sm font-semibold transition-colors active:scale-[0.98] shadow-xs"
+            >
+              Đặt bàn
+            </button>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <span className="flex items-center space-x-2 text-xs text-slate-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Hệ thống sẵn sàng</span>
-            </span>
+          {/* Mobile Actions */}
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBooking}
+              className="inline-flex items-center justify-center min-h-[38px] px-3.5 py-1.5 rounded-lg bg-[#8C1D2C] text-white text-xs font-semibold active:scale-[0.98]"
+            >
+              Đặt bàn
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={mobileMenuOpen}
+              className="p-2 rounded-lg text-[#7A6A58] hover:text-[#141210] hover:bg-[#E9E4DC]/50 transition-colors"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-b border-[#E9E4DC] bg-[#F5F2EA] px-4 pt-2 pb-4 space-y-1 shadow-sm">
+            {navLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="block px-3 py-2.5 rounded-lg text-sm font-medium text-[#141210] hover:bg-white transition-colors"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleBooking}
+                className="w-full flex items-center justify-center min-h-[44px] px-4 py-2.5 rounded-lg bg-[#8C1D2C] text-white text-sm font-semibold active:scale-[0.98]"
+              >
+                Đặt bàn ngay
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 pt-16 pb-12 text-center">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/60 text-xs text-slate-300 mb-6">
-          <Sparkles className="h-3.5 w-3.5 text-orange-400" />
-          <span>Kiến trúc Microservices & Realtime STOMP WebSocket</span>
-        </div>
-        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight max-w-4xl mx-auto leading-tight">
-          Hệ Điều Hành Quản Trị & Vận Hành{' '}
-          <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">
-            Nhà Hàng Toàn Diện
-          </span>
-        </h1>
-        <p className="mt-4 text-slate-400 text-base md:text-lg max-w-2xl mx-auto">
-          Tối ưu hóa quy trình từ lúc khách quét QR, tự động phân phối đơn tới bếp KDS trong &lt;50ms,
-          tự động trừ kho nguyên vật liệu BOM và thanh toán đa kênh.
-        </p>
-      </section>
+      {/* Main Content */}
+      <main>
+        {/* Full-viewport Hero */}
+        <HomeHero onBookTable={handleBooking} />
 
-      {/* Modules Grid */}
-      <section className="max-w-7xl mx-auto px-6 pb-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {modules.map((m) => {
-            const Icon = m.icon;
-            return (
-              <div
-                key={m.title}
-                className="group relative flex flex-col justify-between p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 hover:border-orange-500/40 hover:bg-slate-900/90 transition-all duration-300 shadow-xl hover:shadow-orange-500/5"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="h-12 w-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-200 group-hover:scale-105 group-hover:bg-orange-500 group-hover:text-white transition-all duration-300">
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border ${m.badgeColor}`}>
-                      {m.tag}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">
-                    {m.title}
-                  </h3>
-                  <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                    {m.description}
-                  </p>
-                </div>
+        {/* Minimal Anchor Targets for Non-broken Links */}
+        <section id="about" className="py-16 px-4 max-w-5xl mx-auto border-t border-[#E9E4DC]">
+          <h2 className="text-2xl font-bold text-[#141210] mb-3">Về quán Phố Cổ</h2>
+          <p className="text-sm text-[#7A6A58] leading-relaxed max-w-2xl">
+            Phố Cổ mang đậm dấu ấn kiến trúc và ẩm thực gia truyền Hà Nội. Mỗi món ăn là một câu chuyện về hương vị mộc mạc, đậm đà được gìn giữ qua nhiều thế hệ.
+          </p>
+        </section>
 
-                <Link
-                  href={m.href}
-                  className="w-full inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-orange-600 text-xs font-semibold text-slate-200 hover:text-white transition-all duration-200 border border-slate-700/60 hover:border-orange-500 shadow"
-                >
-                  {m.action} &rarr;
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+        <section id="offers" className="py-16 px-4 max-w-5xl mx-auto border-t border-[#E9E4DC]">
+          <h2 className="text-2xl font-bold text-[#141210] mb-3">Ưu đãi hôm nay</h2>
+          <p className="text-sm text-[#7A6A58] leading-relaxed max-w-2xl">
+            Nhận ngay voucher ưu đãi đặt bàn sớm trong khung giờ vàng và các combo trải nghiệm ẩm thực đặc sắc.
+          </p>
+        </section>
 
-      {/* Tech Stack Footer */}
-      <footer className="border-t border-slate-800/80 py-8 bg-slate-950/80 text-xs text-slate-500 text-center">
-        <p>Restaurant OS Monorepo &bull; Next.js 15 App Router &bull; Spring Boot 3 &bull; FastAPI AI Whisper &bull; PostgreSQL Supabase</p>
-      </footer>
-    </main>
+        <section id="contact" className="py-16 px-4 max-w-5xl mx-auto border-t border-[#E9E4DC]">
+          <h2 className="text-2xl font-bold text-[#141210] mb-3">Liên hệ</h2>
+          <p className="text-sm text-[#7A6A58] leading-relaxed max-w-2xl">
+            Chào đón quý thực khách ghé thăm hoặc liên hệ đặt bàn trước để có trải nghiệm phục vụ tốt nhất.
+          </p>
+        </section>
+      </main>
+    </div>
   );
 }
