@@ -7,6 +7,7 @@ import { HomeHero } from '@/components/guest/HomeHero';
 import { FeaturedDishes } from '@/components/guest/FeaturedDishes';
 import { AboutSection } from '@/components/guest/AboutSection';
 import { GuestFooter } from '@/components/guest/GuestFooter';
+import { AiChatWidget } from '@/components/guest/AiChatWidget';
 
 export default function GuestHomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -133,6 +134,9 @@ export default function GuestHomePage() {
 
       {/* Guest Footer */}
       <GuestFooter />
+
+      {/* AI Chat Widget */}
+      <AiChatWidget />
     </div>
   );
 }
