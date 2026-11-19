@@ -78,10 +78,7 @@ export default function PosFloorPage() {
     initializeWebSocket,
     checkInReservation,
     mergeTables,
-    splitInvoiceEqual,
-    splitInvoiceByItems,
-    markSplitPartPaid,
-    clearSplitInvoice,
+    splitMergedTables,
     lockTableForSettlement,
     unlockTableState,
     applyDiscountRule,
@@ -114,7 +111,7 @@ export default function PosFloorPage() {
         selectTable(firstOccupied.id);
         setSplitMergeOpen(true);
       } else {
-        setToast('Vui lòng chọn một bàn để thực hiện tách / gộp hóa đơn.');
+        setToast('Vui lòng chọn một bàn để thực hiện tách / gộp bàn.');
       }
     }
   }, [
@@ -276,6 +273,19 @@ export default function PosFloorPage() {
                     <p className="mt-1 text-xs text-muted">
                       {t.area} • {t.seats} ghế
                     </p>
+                    {t.mergedIntoTableId ? (
+                      <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-primary-50 px-2 py-0.5 text-[10px] font-bold text-primary-600">
+                        <GitMerge className="h-3 w-3" />
+                        <span>Đã gộp → {t.mergedIntoTableLabel}</span>
+                      </p>
+                    ) : t.mergedMemberTables && t.mergedMemberTables.length > 0 ? (
+                      <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-sage-100 px-2 py-0.5 text-[10px] font-bold text-sage-700">
+                        <GitMerge className="h-3 w-3" />
+                        <span>
+                          Gộp {t.mergedMemberTables.map((m) => m.label).join(', ')}
+                        </span>
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="mt-3 border-t border-sand-200/80 pt-2.5">
@@ -286,6 +296,10 @@ export default function PosFloorPage() {
                         </p>
                         <p className="text-[11px] text-muted">Chờ khách Check-in</p>
                       </div>
+                    ) : t.mergedIntoTableId ? (
+                      <span className="text-xs font-medium text-primary-600">
+                        Tính bill chung tại {t.mergedIntoTableLabel}
+                      </span>
                     ) : t.items.length > 0 ? (
                       <div className="flex items-baseline justify-between">
                         <span className="text-xs text-muted">
@@ -363,6 +377,61 @@ export default function PosFloorPage() {
                   >
                     <UserCheck className="h-4 w-4" />
                     <span>Check-in Nhận Bàn &amp; Mở Hóa Đơn</span>
+                  </button>
+                </div>
+              ) : null}
+
+              {/* Nếu bàn đang được gộp vào một bàn chính khác */}
+              {selectedTable.mergedIntoTableId ? (
+                <div className="rounded-xl border border-primary-200 bg-primary-50/50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary-600">
+                    Bàn đang gộp phục vụ
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-ink">
+                    {selectedTable.label} đang gộp chung với{' '}
+                    <strong>{selectedTable.mergedIntoTableLabel}</strong> (trạng thái: Đang phục vụ).
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    Mọi món ăn và hóa đơn đang được tổng hợp tại {selectedTable.mergedIntoTableLabel}.
+                    Nếu gộp nhầm bàn, bạn có thể tách ngay bàn này ra khỏi nhóm.
+                  </p>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setSplitMergeOpen(true)}
+                      className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-primary-500 px-3 text-xs font-bold text-white shadow-warm-sm hover:bg-primary-600"
+                    >
+                      <GitMerge className="h-4 w-4" />
+                      <span>Tách bàn khỏi {selectedTable.mergedIntoTableLabel}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => selectTable(selectedTable.mergedIntoTableId!)}
+                      className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-sand-300 bg-white px-3 text-xs font-bold text-ink hover:bg-cream-dark"
+                    >
+                      <span>Xem bill tại {selectedTable.mergedIntoTableLabel}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Nếu bàn chính đang gộp thêm các bàn thành viên */}
+              {selectedTable.mergedMemberTables && selectedTable.mergedMemberTables.length > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sage-200 bg-sage-100/60 px-4 py-3 text-xs">
+                  <div>
+                    <span className="font-bold text-sage-800">
+                      Đang gộp cùng ({selectedTable.mergedMemberTables.length} bàn):{' '}
+                    </span>
+                    <span className="font-extrabold text-ink">
+                      {selectedTable.mergedMemberTables.map((m) => m.label).join(', ')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSplitMergeOpen(true)}
+                    className="min-h-9 cursor-pointer rounded-lg border border-sage-300 bg-white px-3 text-[11px] font-bold text-sage-800 hover:bg-cream"
+                  >
+                    Quản lý Tách / Gộp
                   </button>
                 </div>
               ) : null}
@@ -472,7 +541,7 @@ export default function PosFloorPage() {
               {/* Các nút chức năng theo đúng Use Case Diagram */}
               {selectedTable.items.length > 0 ? (
                 <div className="flex flex-col gap-2.5">
-                  {/* Hàng nút phụ: Tách/Gộp hóa đơn + Khóa bàn + In tạm tính */}
+                  {/* Hàng nút phụ: Tách/Gộp bàn + Khóa bàn + In tạm tính */}
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -480,7 +549,7 @@ export default function PosFloorPage() {
                       className="flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-sand-300 bg-white px-3 text-xs font-bold text-ink hover:bg-cream-dark"
                     >
                       <GitMerge className="h-4 w-4 text-primary-500" />
-                      <span>Tách / Gộp Hóa đơn</span>
+                      <span>Tách / Gộp Bàn</span>
                     </button>
 
                     <button
@@ -586,18 +655,15 @@ export default function PosFloorPage() {
         </aside>
       </main>
 
-      {/* Modal Tách / Gộp Hóa đơn (UC3) */}
+      {/* Modal Tách / Gộp Bàn (UC3) */}
       {selectedTable ? (
         <SplitMergeModal
           open={splitMergeOpen}
           onClose={() => setSplitMergeOpen(false)}
           sourceTable={selectedTable}
           allTables={tables}
-          onSplitEqual={splitInvoiceEqual}
-          onSplitByItems={splitInvoiceByItems}
-          onMarkSplitPaid={markSplitPartPaid}
-          onClearSplit={clearSplitInvoice}
           onMergeTables={mergeTables}
+          onSplitMergedTables={splitMergedTables}
         />
       ) : null}
 

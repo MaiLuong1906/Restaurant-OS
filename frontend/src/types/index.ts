@@ -317,6 +317,21 @@ export interface DiscountRule {
   value: number; // % hoặc số nguyên VND
 }
 
+export interface MergedTableSnapshot {
+  tableId: string;
+  label: string;
+  originalStatus: CashierTableStatus;
+  guests: number;
+  seatedMin: number;
+  staff: string;
+  depositAmount: number; // VND integer
+  discountAmount: number; // VND integer
+  discountLabel?: string;
+  reservationId?: string;
+  allergyAlert?: string;
+  items: CashierInvoiceItem[];
+}
+
 export interface CashierTable {
   id: string;
   label: string;
@@ -334,6 +349,9 @@ export interface CashierTable {
   lockedBy?: string;
   splits?: InvoiceSplitPart[];
   allergyAlert?: string;
+  mergedIntoTableId?: string;
+  mergedIntoTableLabel?: string;
+  mergedMemberTables?: MergedTableSnapshot[];
 }
 
 export type ReservationStatus = 'CONFIRMED' | 'CHECKED_IN' | 'CANCELLED';
