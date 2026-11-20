@@ -1,16 +1,21 @@
 -- ====================================================================
 -- V3__reconciled_enterprise_schema.sql: Lược Đồ Doanh Nghiệp Chuẩn Hóa Theo Locked Decisions
 -- Dự án: Restaurant OS (PostgreSQL 16+ / Flyway 10+)
--- Căn cứ nghiệp vụ: SPEC-ROS-USECASE-MASTER-01 & Locked Decisions (05/11 & 15/11)
+-- Căn cứ nghiệp vụ: SPEC-ROS-USECASE-MASTER-01 & Locked Decisions (05/11, 15/11 & 18/11)
+--
+-- PHẠM VI SCHEMA & ĐỊNH HƯỚNG MIGRATION:
+--   - Bảng 'vouchers': Thuộc domain AI Guest Chatbot, sẽ do lane AI triển khai trong Migration V4.
+--   - Bảng 'leave_requests', 'payslips', 'tips': Thuộc HR nâng cao, dời sang giai đoạn sau MVP.
+--
 -- Thay đổi cốt lõi:
 --   1. BỎ trạm bếp kitchen_stations và cột station_id trên dishes, order_items.
 --   2. BỎ COOKING và cooking_started_at trong order_items (chỉ giữ WAITING, READY, SERVED, REJECTED).
 --   3. BỎ PREPARING trong orders (chỉ giữ PLACED, CONFIRMED, SERVED, COMPLETED, CANCELLED).
---   4. BỎ HOÀN TOÀN Geofence và FaceID/Biometric trong time_entries (chuyển sang chấm công mã PIN/QR/IoT).
---   5. BỎ bảng sự đồng ý sinh trắc học biometric_consents.
+--   4. BỎ HOÀN TOÀN chấm công time_entries và biometric_consents (đã tinh gọn bỏ luồng chấm công ngày 17-18/11).
+--   5. BỎ cột batch_number trên order_items (KDS/FE gom mẻ động theo dish_id + note + allergy_note).
 --   6. BẮT BUỘC nhập reason trong stock_audit_items khi có chênh lệch (variance != 0).
---   7. CHỐT công thức VAT tính SAU giảm giá trong bills.
---   8. CHỐT bộ 6 vai trò gồm cả OWNER và STAFF.
+--   7. CHỐT công thức VAT tính SAU giảm giá trong bills (tuân thủ Thông tư 219/2013/TT-BTC, đồng bộ POS).
+--   8. CHỐT bộ 6 vai trò gồm cả OWNER và STAFF (đồng bộ StaffLayout frontend).
 --   9. BỔ SUNG quy tắc xử lý phần thừa cuối ca (action_on_excess: CARRY_FORWARD / DISCARD_WASTE).
 -- ====================================================================
 
@@ -49,10 +54,9 @@ BEGIN
     END IF;
 END $$;
 
--- 1.3. Nâng cấp bảo mật mã PIN nhân sự (Chống Brute-force & Khóa tạm)
+-- 1.3. Nâng cấp quản lý nhân sự (Soft Delete)
+-- Lưu ý: PIN chấm công theo user đã bỏ cùng luồng chấm công; PIN KDS là mã PIN chung tablet, không gắn với user.
 ALTER TABLE users 
-    ADD COLUMN IF NOT EXISTS failed_pin_attempts INT NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS pin_locked_until TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 -- 1.4. Loại bỏ bảng Sự đồng ý Sinh trắc học (Đã chốt bỏ FaceID chấm công)
@@ -62,7 +66,13 @@ DROP TABLE IF EXISTS biometric_consents CASCADE;
 -- 2. MODULE 2: KHU VỰC, BÀN ĂN, GỘP BÀN & YÊU CẦU PHỤC VỤ (FLOOR PLAN)
 -- --------------------------------------------------------------------
 
--- 2.1. Cập nhật trạng thái bàn ăn (Hỗ trợ RESERVED)
+-- 2.1. Cập nhật trạng thái bàn ăn (Hỗ trợ RESERVED & BILLING)
+-- Quy chuẩn ánh xạ màu giao diện Frontend (POS/Floor):
+--   - VACANT: Bàn trống (màu xám / viền nhạt)
+--   - SERVING: Đang phục vụ (màu xanh dương / xanh lá)
+--   - BILLING: Đang yêu cầu / chờ thanh toán (màu vàng cảnh báo)
+--   - CLEANING: Đang dọn dẹp (màu tím / xám đậm)
+--   - RESERVED: Đã đặt trước (màu cam nhạt kèm badge đặt chỗ)
 ALTER TABLE restaurant_tables 
     ADD COLUMN IF NOT EXISTS occupied_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS assigned_staff_id UUID REFERENCES users(id);
@@ -103,21 +113,8 @@ WHERE o.status NOT IN ('COMPLETED', 'CANCELLED')
 ON CONFLICT (order_id, table_id) DO NOTHING;
 
 -- 2.3. Bảng Yêu cầu Phục vụ từ mã QR bàn (table_service_requests)
-CREATE TABLE IF NOT EXISTS table_service_requests (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    table_id UUID NOT NULL REFERENCES restaurant_tables(id),
-    request_type VARCHAR(50) NOT NULL CHECK (request_type IN ('UTENSILS', 'ICE_TEA', 'BILL_REQUEST', 'OTHER')),
-    custom_note TEXT,
-    status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACKNOWLEDGED', 'RESOLVED')),
-    idempotency_key VARCHAR(100) UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    resolved_by UUID REFERENCES users(id),
-    resolved_at TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_service_req_pending 
-    ON table_service_requests(table_id, created_at) 
-    WHERE status = 'PENDING';
+-- Lưu ý phạm vi: Tạm hoãn tạo bảng này ở V3 để bám sát danh mục 20 màn hình đã chốt; 
+-- tính năng gọi phục vụ/xin đá/xin bill sẽ đưa vào migration bổ sung khi triển khai luồng QR tương ứng.
 
 -- --------------------------------------------------------------------
 -- 3. MODULE 3: THỰC ĐƠN, KÍCH CỠ PHẦN ĂN & NHÓM TOPPING (LOẠI BỎ TRẠM BẾP)
@@ -222,12 +219,15 @@ END $$;
 -- 4.2. Nâng cấp bảng chi tiết món trong đơn (order_items) - BỎ COOKING & station_id & cooking_started_at
 ALTER TABLE order_items DROP COLUMN IF EXISTS station_id CASCADE;
 ALTER TABLE order_items DROP COLUMN IF EXISTS cooking_started_at CASCADE;
+ALTER TABLE order_items DROP COLUMN IF EXISTS batch_number CASCADE;
 
+-- Lưu ý quy tắc mẻ nấu KDS: FE và STOMP WebSocket gom mẻ động trên memory theo tiêu chí (dish_id + note + allergy_note);
+-- các cột allergy_flags (dishes) và allergy_note (order_items) từ V2 được giữ nguyên phục vụ phân loại dị ứng.
+-- Cờ is_expedited: Đánh dấu món ưu tiên/hối bếp (do phục vụ hối món hoặc khi chờ quá SLA), hiển thị badge ƯU TIÊN trên KDS.
 ALTER TABLE order_items 
     ADD COLUMN IF NOT EXISTS portion_id UUID REFERENCES dish_portions(id),
     ADD COLUMN IF NOT EXISTS dish_name_snapshot VARCHAR(255),
     ADD COLUMN IF NOT EXISTS portion_name_snapshot VARCHAR(50),
-    ADD COLUMN IF NOT EXISTS batch_number INT NOT NULL DEFAULT 1 CHECK (batch_number > 0),
     ADD COLUMN IF NOT EXISTS is_expedited BOOLEAN NOT NULL DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS expedited_at TIMESTAMPTZ;
 
@@ -239,6 +239,16 @@ SET
     portion_name_snapshot = dp.portion_name
 FROM dishes d
 JOIN dish_portions dp ON dp.dish_id = d.id AND dp.is_default = TRUE
+WHERE oi.dish_id = d.id AND oi.portion_id IS NULL;
+
+-- Dự phòng an toàn: nếu còn order_items trỏ món chưa có default portion, gán portion bất kỳ của món đó
+UPDATE order_items oi
+SET 
+    portion_id = dp.id,
+    dish_name_snapshot = COALESCE(oi.dish_name_snapshot, d.name, 'Món ăn'),
+    portion_name_snapshot = COALESCE(oi.portion_name_snapshot, dp.portion_name, 'Tiêu Chuẩn')
+FROM dishes d
+JOIN dish_portions dp ON dp.dish_id = d.id
 WHERE oi.dish_id = d.id AND oi.portion_id IS NULL;
 
 ALTER TABLE order_items 
@@ -277,6 +287,8 @@ ALTER TABLE order_item_voids
 -- --------------------------------------------------------------------
 
 -- 5.1. Ràng buộc số học trên hóa đơn (bills): VAT tính SAU chiết khấu
+-- Lưu ý service_charge: Đã có NOT NULL DEFAULT 0 từ V2; nếu FE chưa kích hoạt phí phục vụ thì mặc định là 0 VND,
+-- công thức toán vẫn đảm bảo đúng chuẩn Thông tư 219/2013/TT-BTC.
 DO $$ 
 BEGIN
     -- Xóa constraint cũ nếu đã tạo
@@ -340,6 +352,7 @@ FROM dish_portions dp
 WHERE dr.dish_id = dp.dish_id AND dp.is_default = TRUE AND dr.portion_id IS NULL;
 
 -- 6.3. Bảng Nhật ký Mẻ Sơ Chế & Tỷ lệ Yield (prep_batches)
+-- Lưu ý: expires_at được backend tính toán tự động dựa trên thời điểm prepped_at + shelf_life_hours của nguyên liệu.
 CREATE TABLE IF NOT EXISTS prep_batches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_code VARCHAR(50) NOT NULL UNIQUE,
@@ -361,7 +374,10 @@ CREATE INDEX IF NOT EXISTS idx_prep_batches_fifo
     ON prep_batches(prepped_item_id, expires_at) 
     WHERE is_depleted = FALSE;
 
--- 6.4. Bảng Mẻ Xuất Chế Biến / Nấu Mẻ Lớn (production_runs & production_run_outputs)
+-- 6.4. Bảng Lệnh Sản Xuất / Nấu Mẻ Lớn Tầng B ra Tầng C (production_runs & production_run_outputs)
+-- Phân biệt 2 khái niệm "Mẻ":
+--   - production_runs: Lệnh sản xuất nấu mẻ Tầng B tiêu hao bán thành phẩm để sinh ra suất ăn Tầng C nhập kho.
+--   - "Mẻ nấu KDS": Nhóm các ticket món nóng theo (dish_id + note + allergy_note) để đầu bếp chế biến trực tiếp theo ca.
 CREATE TABLE IF NOT EXISTS production_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     run_code VARCHAR(50) NOT NULL UNIQUE,
@@ -414,30 +430,11 @@ ALTER TABLE kitchen_wastages
     ADD COLUMN IF NOT EXISTS void_item_id UUID REFERENCES order_item_voids(id);
 
 -- --------------------------------------------------------------------
--- 7. MODULE 7: NHÂN SỰ, CHẤM CÔNG TINH GỌN (BỎ GEOFENCE & BỎ FACEID)
+-- 7. MODULE 7: LOẠI BỎ TOÀN BỘ CHẤM CÔNG (ĐÃ CHỐT BỎ NGÀY 17-18/11)
 -- --------------------------------------------------------------------
 
--- 7.1. Tinh gọn bảng chấm công time_entries: Bỏ Geofence, Bỏ FaceID, chuyển sang mã PIN/QR/IoT
-ALTER TABLE time_entries 
-    DROP COLUMN IF EXISTS clock_in_lat CASCADE,
-    DROP COLUMN IF EXISTS clock_in_lng CASCADE,
-    DROP COLUMN IF EXISTS is_geofence_verified CASCADE,
-    DROP COLUMN IF EXISTS face_verified_url CASCADE;
-
-ALTER TABLE time_entries 
-    ADD COLUMN IF NOT EXISTS clock_in_method VARCHAR(20) NOT NULL DEFAULT 'PIN',
-    ADD COLUMN IF NOT EXISTS notes TEXT;
-
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'chk_time_entries_clock_in_method'
-    ) THEN
-        ALTER TABLE time_entries 
-            ADD CONSTRAINT chk_time_entries_clock_in_method 
-            CHECK (clock_in_method IN ('PIN', 'QR_BADGE', 'IOT_DEVICE', 'MANUAL'));
-    END IF;
-END $$;
+-- 7.1. Xóa bỏ hoàn toàn bảng chấm công time_entries (Dự án tinh gọn còn 20 màn hình, xóa luồng B3-B5)
+DROP TABLE IF EXISTS time_entries CASCADE;
 
 -- --------------------------------------------------------------------
 -- 8. CÁC HÀM VÀ TRIGGER TOÀN VẸN NGHIỆP VỤ
@@ -504,6 +501,8 @@ FOR EACH ROW
 EXECUTE FUNCTION fn_sync_order_tables_on_close();
 
 -- 8.3. Trigger Khóa Bàn Tự Động Khi Đơn Hàng Mới Được Tạo
+-- Luồng mở đơn: Khi một đơn hàng mới được tạo (kể cả bàn trước đó là VACANT hay RESERVED khách vừa tới nhận bàn),
+-- bàn chính thức chuyển sang SERVING kèm thời điểm mở bàn occupied_at.
 CREATE OR REPLACE FUNCTION fn_auto_create_order_table()
 RETURNS TRIGGER AS $$
 BEGIN
