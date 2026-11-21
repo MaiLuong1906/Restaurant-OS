@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { ApiKdsService } from '../ApiKdsService';
 
-describe('ApiKdsService Live Integration', () => {
+const isLive = process.env.RUN_LIVE_TESTS === '1';
+
+describe.skipIf(!isLive)('ApiKdsService Live Integration', () => {
   it('lấy danh sách tickets thật từ BE thành công', async () => {
     const service = new ApiKdsService();
     const tickets = await service.getTickets();
