@@ -8,6 +8,8 @@ import {
   WasteLogEntry,
   CreateWasteLogRequest,
 } from '../../types';
+import { KdsService } from '../kds/KdsService';
+export type { KdsService };
 import {
   MOCK_TICKETS,
   MOCK_ORDER_CHANGES,
@@ -16,21 +18,7 @@ import {
 } from './data/kdsMockData';
 import { simulateLatency, deepClone, createNotFoundError, createValidationError } from './mockUtils';
 
-export interface KdsService {
-  getTickets(): Promise<Ticket[]>;
-  getTicketById(ticketId: string): Promise<Ticket>;
-  updateTicketStatus(ticketId: string, status: OrderItemStatus, idempotencyKey: string): Promise<Ticket>;
-  updateItemStatus(ticketId: string, itemId: string, status: OrderItemStatus, idempotencyKey: string): Promise<Ticket>;
-  getPendingOrderChanges(): Promise<OrderChangeAlertData[]>;
-  acknowledgeOrderChange(alertId: string, idempotencyKey?: string): Promise<{ alert: OrderChangeAlertData; ticket: Ticket }>;
-  deferOrderChange(alertId: string): Promise<void>;
-  listDishAvailability(): Promise<DishAvailability[]>;
-  markSoldOut(dishId: string, idempotencyKey: string): Promise<DishAvailability>;
-  reopenDish(dishId: string, quantity: number, idempotencyKey: string): Promise<DishAvailability>;
-  getWasteDishOptions(): Promise<WasteDishOption[]>;
-  getWasteTodayStats(): Promise<WasteTodayStats>;
-  createWasteLog(req: CreateWasteLogRequest): Promise<WasteLogEntry>;
-}
+// export KdsService is imported from ../kds/KdsService
 
 export class MockKdsService implements KdsService {
   private tickets: Ticket[];
