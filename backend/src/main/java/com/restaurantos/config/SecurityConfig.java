@@ -49,6 +49,10 @@ public class SecurityConfig {
                 // 5. Xác thực người dùng (Auth endpoints)
                 .requestMatchers("/api/v1/auth/**").permitAll()
 
+                // 6. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
+                // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
+                .requestMatchers("/api/v1/reservations/**").permitAll()
+
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
                 .anyRequest().authenticated()
             );
