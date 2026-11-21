@@ -1,6 +1,8 @@
 package com.restaurantos.repository;
 
 import com.restaurantos.entity.UserEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -54,4 +56,26 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
             @Param("roleCode") String roleCode,
             @Param("search") String search,
             @Param("isActive") Boolean isActive);
+
+    @Query(value = "SELECT u FROM UserEntity u WHERE u.deletedAt IS NULL " +
+           "AND (:roleCode IS NULL OR :roleCode = '' OR UPPER(:roleCode) = 'ALL' OR UPPER(u.role.code) = UPPER(:roleCode)) " +
+           "AND (:isActive IS NULL OR u.isActive = :isActive) " +
+           "AND (:search IS NULL OR :search = '' OR " +
+           "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     (u.phone IS NOT NULL AND u.phone LIKE CONCAT('%', :search, '%')))",
+           countQuery = "SELECT count(u) FROM UserEntity u WHERE u.deletedAt IS NULL " +
+           "AND (:roleCode IS NULL OR :roleCode = '' OR UPPER(:roleCode) = 'ALL' OR UPPER(u.role.code) = UPPER(:roleCode)) " +
+           "AND (:isActive IS NULL OR u.isActive = :isActive) " +
+           "AND (:search IS NULL OR :search = '' OR " +
+           "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     (u.phone IS NOT NULL AND u.phone LIKE CONCAT('%', :search, '%')))")
+    Page<UserEntity> searchUsersPaged(
+            @Param("roleCode") String roleCode,
+            @Param("search") String search,
+            @Param("isActive") Boolean isActive,
+            Pageable pageable);
 }

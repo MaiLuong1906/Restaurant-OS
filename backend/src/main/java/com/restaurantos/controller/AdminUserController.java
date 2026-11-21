@@ -1,6 +1,7 @@
 package com.restaurantos.controller;
 
 import com.restaurantos.common.dto.ApiResponse;
+import com.restaurantos.common.dto.PageResponse;
 import com.restaurantos.common.dto.user.CreateUserRequest;
 import com.restaurantos.common.dto.user.UpdatePinRequest;
 import com.restaurantos.common.dto.user.UpdateUserRequest;
@@ -30,12 +31,14 @@ public class AdminUserController {
     }
 
     @GetMapping
-    @Operation(summary = "Lấy danh sách tài khoản nhân sự", description = "Trả về toàn bộ danh sách nhân viên chưa bị xóa mềm, hỗ trợ lọc theo roleCode, trạng thái isActive và tìm kiếm theo tên, username, mã nhân viên")
-    public ResponseEntity<ApiResponse<List<UserResponseDto>>> getAllUsers(
+    @Operation(summary = "Lấy danh sách tài khoản nhân sự có phân trang", description = "Trả về danh sách nhân viên có phân trang, hỗ trợ lọc theo roleCode, trạng thái isActive và tìm kiếm theo tên, username, mã nhân viên")
+    public ResponseEntity<ApiResponse<PageResponse<UserResponseDto>>> getAllUsers(
             @Parameter(description = "Lọc theo mã vai trò (OWNER, MANAGER, CASHIER, CHEF, WAITER, STAFF) hoặc ALL") @RequestParam(required = false) String role,
             @Parameter(description = "Từ khóa tìm kiếm theo họ tên, username hoặc mã nhân viên (e.g. TN001)") @RequestParam(required = false) String search,
-            @Parameter(description = "Lọc theo trạng thái hoạt động: true (đang hoạt động), false (đang bị tạm khóa)") @RequestParam(required = false) Boolean isActive) {
-        List<UserResponseDto> users = userService.getAllUsers(role, search, isActive);
+            @Parameter(description = "Lọc theo trạng thái hoạt động: true (đang hoạt động), false (đang bị tạm khóa)") @RequestParam(required = false) Boolean isActive,
+            @Parameter(description = "Số trang (bắt đầu từ 0)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang (mặc định 10)") @RequestParam(defaultValue = "10") int size) {
+        PageResponse<UserResponseDto> users = userService.getUsersPaged(role, search, isActive, page, size);
         return ResponseEntity.ok(ApiResponse.success(users, "Lấy danh sách nhân sự thành công"));
     }
 

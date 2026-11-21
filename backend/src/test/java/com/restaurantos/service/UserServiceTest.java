@@ -1,5 +1,6 @@
 package com.restaurantos.service;
 
+import com.restaurantos.common.dto.PageResponse;
 import com.restaurantos.common.dto.user.CreateUserRequest;
 import com.restaurantos.common.dto.user.UpdatePinRequest;
 import com.restaurantos.common.dto.user.UpdateUserRequest;
@@ -16,6 +17,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -86,6 +90,26 @@ class UserServiceTest {
         assertThat(result.get(0).getRoleCode()).isEqualTo("MANAGER");
         assertThat(result.get(0).getDiscountCeiling()).isEqualTo(20);
         assertThat(result.get(0).isHasPin()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Lấy danh sách nhân sự có phân trang chuẩn Enterprise")
+    void testGetUsersPaged_Success() {
+        PageImpl<UserEntity> page = new PageImpl<>(List.of(sampleUser), PageRequest.of(0, 10), 1);
+        when(userRepository.searchUsersPaged(eq("MANAGER"), eq("mai"), eq(true), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<UserResponseDto> result = userService.getUsersPaged("MANAGER", "mai", true, 0, 10);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getItems()).hasSize(1);
+        assertThat(result.getPage()).isEqualTo(0);
+        assertThat(result.getSize()).isEqualTo(10);
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getTotalPages()).isEqualTo(1);
+        assertThat(result.isFirst()).isTrue();
+        assertThat(result.isLast()).isTrue();
+        assertThat(result.getItems().get(0).getEmployeeCode()).isEqualTo("QL001");
     }
 
     @Test

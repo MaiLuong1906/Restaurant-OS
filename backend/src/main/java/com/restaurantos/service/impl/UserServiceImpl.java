@@ -1,5 +1,6 @@
 package com.restaurantos.service.impl;
 
+import com.restaurantos.common.dto.PageResponse;
 import com.restaurantos.common.dto.user.CreateUserRequest;
 import com.restaurantos.common.dto.user.UpdatePinRequest;
 import com.restaurantos.common.dto.user.UpdateUserRequest;
@@ -11,6 +12,10 @@ import com.restaurantos.repository.RoleRepository;
 import com.restaurantos.repository.UserRepository;
 import com.restaurantos.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -44,6 +49,16 @@ public class UserServiceImpl implements UserService {
     public List<UserResponseDto> getAllUsers(String roleCode, String search, Boolean isActive) {
         List<UserEntity> users = userRepository.searchUsers(roleCode, search, isActive);
         return users.stream().map(UserResponseDto::fromEntity).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponseDto> getUsersPaged(String roleCode, String search, Boolean isActive, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by("createdAt").descending());
+        Page<UserEntity> userPage = userRepository.searchUsersPaged(roleCode, search, isActive, pageable);
+        return PageResponse.from(userPage, UserResponseDto::fromEntity);
     }
 
     @Override

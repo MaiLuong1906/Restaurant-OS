@@ -1,5 +1,6 @@
 package com.restaurantos.service;
 
+import com.restaurantos.common.dto.PageResponse;
 import com.restaurantos.common.dto.user.CreateUserRequest;
 import com.restaurantos.common.dto.user.UpdatePinRequest;
 import com.restaurantos.common.dto.user.UpdateUserRequest;
@@ -11,6 +12,8 @@ import java.util.UUID;
 public interface UserService {
 
     List<UserResponseDto> getAllUsers(String roleCode, String search, Boolean isActive);
+
+    PageResponse<UserResponseDto> getUsersPaged(String roleCode, String search, Boolean isActive, int page, int size);
 
     default List<UserResponseDto> getAllUsers(String roleCode, String search) {
         return getAllUsers(roleCode, search, null);
