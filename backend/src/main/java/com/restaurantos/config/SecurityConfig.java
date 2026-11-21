@@ -49,6 +49,13 @@ public class SecurityConfig {
                 // 5. Xác thực người dùng (Auth endpoints)
                 .requestMatchers("/api/v1/auth/**").permitAll()
 
+                // 6. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
+
+                // 7. Danh sách bàn (Waiter FloorPlan)
+                .requestMatchers(HttpMethod.GET, "/api/v1/tables/**").permitAll()
+
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
                 .anyRequest().authenticated()
             );
