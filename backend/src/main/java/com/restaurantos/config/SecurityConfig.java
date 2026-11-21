@@ -34,8 +34,8 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // 1. Hạ tầng kiểm tra trạng thái sống/chết (Health checks)
-                .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info").permitAll()
+                // 1. Hạ tầng kiểm tra trạng thái sống/chết (Health checks) & Xử lý lỗi (Error dispatch)
+                .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info", "/error", "/error/**").permitAll()
 
                 // 2. Tài liệu Swagger / OpenAPI 3 UI
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
@@ -48,6 +48,13 @@ public class SecurityConfig {
 
                 // 5. Xác thực người dùng (Auth endpoints)
                 .requestMatchers("/api/v1/auth/**").permitAll()
+
+                // 6. Quản trị nhân sự nội bộ (Admin User Management)
+                // NOTE: Tạm thời permitAll trong Sprint 0 để phục vụ kiểm thử tích hợp Frontend & Postman
+                // do Auth Service (JWT Token Filter) đang được phát triển song song ở nhánh khác.
+                // Controller đã được cấu hình sẵn @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')").
+                // TODO (Follow-up): Khóa lại .hasAnyRole("OWNER", "MANAGER") ngay sau khi Auth PR được merge lên dev.
+                .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").permitAll()
 
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
                 .anyRequest().authenticated()
