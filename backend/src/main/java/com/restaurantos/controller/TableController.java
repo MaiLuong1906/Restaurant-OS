@@ -2,9 +2,9 @@ package com.restaurantos.controller;
 
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.dto.OrderDtos;
-import com.restaurantos.entity.RestaurantTableEntity;
-import com.restaurantos.repository.TableRepository;
+import com.restaurantos.service.TableService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,16 +16,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TableController {
 
-    private final TableRepository tableRepository;
+    private final TableService tableService;
 
     /**
      * GET /api/v1/tables — Lấy danh sách tất cả bàn.
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<OrderDtos.TableResponse>>> getAllTables() {
-        List<OrderDtos.TableResponse> tables = tableRepository.findAll().stream()
-                .map(this::toTableResponse)
-                .toList();
+        List<OrderDtos.TableResponse> tables = tableService.getAllTables();
         return ResponseEntity.ok(ApiResponse.success(tables));
     }
 
@@ -42,20 +40,10 @@ public class TableController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("BAD_REQUEST", "Table ID không hợp lệ: " + id, null));
         }
-        return tableRepository.findById(tableId)
-                .map(t -> ResponseEntity.ok(ApiResponse.success(toTableResponse(t))))
-                .orElse(ResponseEntity.notFound().build());
-    }
 
-    // ─── Helper ───────────────────────────────────────────────────────────────
-
-    private OrderDtos.TableResponse toTableResponse(RestaurantTableEntity t) {
-        return new OrderDtos.TableResponse(
-                t.getId(),
-                t.getTableNumber(),
-                t.getCapacity(),
-                t.getStatus(),
-                t.getCurrentOrderId()
-        );
+        return tableService.getTableById(tableId)
+                .map(t -> ResponseEntity.ok(ApiResponse.success(t)))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy bàn: " + id, null)));
     }
 }

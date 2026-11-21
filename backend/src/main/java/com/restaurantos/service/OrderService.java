@@ -119,7 +119,16 @@ public class OrderService {
         if (!activeOrdersForTable.isEmpty()) {
             // Trường hợp: Bàn đang phục vụ gọi thêm món mới
             order = activeOrdersForTable.get(0);
+
+            // Kiểm tra Idempotency cho lượt gọi thêm món: nếu trùng key lượt trước -> trả về luôn tránh nhân đôi món
+            if (req.idempotencyKey() != null && !req.idempotencyKey().isBlank()
+                    && req.idempotencyKey().equals(order.getIdempotencyKey())) {
+                List<OrderItemEntity> existingItems = orderItemRepository.findByOrderId(order.getId());
+                return toOrderResponse(order, existingItems);
+            }
+
             order.setTotalAmount(order.getTotalAmount() + totalAmount);
+            order.setIdempotencyKey(req.idempotencyKey()); // Lưu idempotency key của lượt gọi thêm này
             order.setUpdatedAt(now);
             if (req.customerNotes() != null && !req.customerNotes().isBlank()) {
                 String existingNotes = order.getCustomerNotes() != null ? order.getCustomerNotes() + " | " : "";
@@ -170,12 +179,22 @@ public class OrderService {
 
     /**
      * Lấy danh sách tất cả các order đang hoạt động (chưa hoàn tất hoặc hủy).
+     * Khắc phục N+1 query: Dùng findByOrderIdIn() gom 1 câu query duy nhất cho toàn bộ items.
      */
     @Transactional(readOnly = true)
     public List<OrderDtos.OrderResponse> getActiveOrders() {
         List<OrderEntity> orders = orderRepository.findByStatusIn(List.of("PLACED", "CONFIRMED", "SERVED"));
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> orderIds = orders.stream().map(OrderEntity::getId).toList();
+        java.util.Map<UUID, List<OrderItemEntity>> itemsByOrderId = orderItemRepository.findByOrderIdIn(orderIds)
+                .stream()
+                .collect(java.util.stream.Collectors.groupingBy(OrderItemEntity::getOrderId));
+
         return orders.stream()
-                .map(order -> toOrderResponse(order, orderItemRepository.findByOrderId(order.getId())))
+                .map(order -> toOrderResponse(order, itemsByOrderId.getOrDefault(order.getId(), List.of())))
                 .toList();
     }
 
