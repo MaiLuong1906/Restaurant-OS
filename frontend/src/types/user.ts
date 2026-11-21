@@ -38,3 +38,15 @@ export interface UpdateUserRequest {
 export interface UpdatePinRequest {
   pinCode: string;
 }
+
+export interface PageResponse<T> {
+  items: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  isFirst: boolean;
+  isLast: boolean;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}

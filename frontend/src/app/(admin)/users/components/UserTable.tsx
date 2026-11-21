@@ -9,12 +9,22 @@ import {
   KeyRound,
   ArrowUpRight,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { UserResponseDto } from '@/types/user';
 
 interface UserTableProps {
   users: UserResponseDto[];
   isLoading: boolean;
+  currentPage: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  onPageChange: (newPage: number) => void;
+  onPageSizeChange: (newSize: number) => void;
   onPromoteClick: (u: UserResponseDto) => void;
   onResetPinClick: (u: UserResponseDto) => void;
   onToggleStatusClick: (u: UserResponseDto) => void;
@@ -24,6 +34,12 @@ interface UserTableProps {
 export function UserTable({
   users,
   isLoading,
+  currentPage,
+  pageSize,
+  totalElements,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
   onPromoteClick,
   onResetPinClick,
   onToggleStatusClick,
@@ -194,6 +210,72 @@ export function UserTable({
           )}
         </tbody>
       </table>
+
+      {/* Footer Phân Trang Chuẩn Enterprise */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-stone-50 border-t border-stone-200 text-xs text-stone-600 font-mono">
+        <div className="flex items-center gap-2">
+          <span>Hiển thị</span>
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="px-2 py-1 bg-white border border-stone-300 rounded text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-ops-brand cursor-pointer"
+          >
+            <option value={5}>5 / trang</option>
+            <option value={10}>10 / trang</option>
+            <option value={20}>20 / trang</option>
+            <option value={50}>50 / trang</option>
+          </select>
+          <span className="text-stone-500">
+            ({totalElements > 0 ? currentPage * pageSize + 1 : 0} - {Math.min((currentPage + 1) * pageSize, totalElements)} trên {totalElements} nhân viên)
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onPageChange(0)}
+            disabled={currentPage === 0 || isLoading}
+            className="p-1.5 rounded border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="Trang đầu"
+            aria-label="Trang đầu"
+          >
+            <ChevronsLeft className="w-4 h-4 text-stone-600" />
+          </button>
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 0 || isLoading}
+            className="px-2.5 py-1 rounded border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1 font-semibold"
+            title="Trang trước"
+            aria-label="Trang trước"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Trước</span>
+          </button>
+
+          <span className="px-3 py-1 font-semibold text-stone-800 bg-white border border-stone-200 rounded">
+            {currentPage + 1} / {Math.max(totalPages, 1)}
+          </span>
+
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages - 1 || isLoading}
+            className="px-2.5 py-1 rounded border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1 font-semibold"
+            title="Trang sau"
+            aria-label="Trang sau"
+          >
+            <span>Sau</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onPageChange(totalPages - 1)}
+            disabled={currentPage >= totalPages - 1 || isLoading}
+            className="p-1.5 rounded border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="Trang cuối"
+            aria-label="Trang cuối"
+          >
+            <ChevronsRight className="w-4 h-4 text-stone-600" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

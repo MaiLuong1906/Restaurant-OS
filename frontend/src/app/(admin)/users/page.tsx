@@ -30,6 +30,12 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = React.useState<string>('ALL');
   const [activeStatusFilter, setActiveStatusFilter] = React.useState<'ALL' | 'ACTIVE' | 'LOCKED'>('ALL');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(0);
+  const [pageSize, setPageSize] = React.useState(10);
+  const [totalElements, setTotalElements] = React.useState(0);
+  const [totalPages, setTotalPages] = React.useState(1);
+
   // Modals state
   const [showCreateModal, setShowCreateModal] = React.useState(false);
   const [resetPinUser, setResetPinUser] = React.useState<UserResponseDto | null>(null);
@@ -72,12 +78,16 @@ export default function AdminUsersPage() {
       const isActiveParam =
         activeStatusFilter === 'ACTIVE' ? true : activeStatusFilter === 'LOCKED' ? false : undefined;
 
-      const data = await userService.getAllUsers({
+      const pageData = await userService.getAllUsers({
         role: roleFilter,
         search: searchQuery,
         isActive: isActiveParam,
+        page: currentPage,
+        size: pageSize,
       });
-      setUsers(data || []);
+      setUsers(pageData.items || []);
+      setTotalElements(pageData.totalElements ?? (pageData.items ? pageData.items.length : 0));
+      setTotalPages(pageData.totalPages ?? 1);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Không thể kết nối máy chủ Backend';
       setApiError(msg);
@@ -85,7 +95,7 @@ export default function AdminUsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [roleFilter, searchQuery, activeStatusFilter, showToast]);
+  }, [roleFilter, searchQuery, activeStatusFilter, currentPage, pageSize, showToast]);
 
   React.useEffect(() => {
     loadUsers();
@@ -228,11 +238,20 @@ export default function AdminUsersPage() {
           <div className="bg-white rounded-xl shadow-2xs border border-stone-200 overflow-hidden space-y-4">
             <UserFilterBar
               searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
+              onSearchChange={(query) => {
+                setSearchQuery(query);
+                setCurrentPage(0);
+              }}
               roleFilter={roleFilter}
-              onRoleChange={setRoleFilter}
+              onRoleChange={(role) => {
+                setRoleFilter(role);
+                setCurrentPage(0);
+              }}
               statusFilter={activeStatusFilter}
-              onStatusChange={setActiveStatusFilter}
+              onStatusChange={(status) => {
+                setActiveStatusFilter(status);
+                setCurrentPage(0);
+              }}
             />
 
             {apiError && (
@@ -253,6 +272,15 @@ export default function AdminUsersPage() {
             <UserTable
               users={users}
               isLoading={isLoading}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalElements={totalElements}
+              totalPages={totalPages}
+              onPageChange={(p) => setCurrentPage(p)}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setCurrentPage(0);
+              }}
               onPromoteClick={(u) => setPromoteUser(u)}
               onResetPinClick={(u) => setResetPinUser(u)}
               onToggleStatusClick={handleToggleUserStatus}

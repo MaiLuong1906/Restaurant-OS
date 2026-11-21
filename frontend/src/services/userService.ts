@@ -1,15 +1,17 @@
 import { fetchApi } from '../lib/api-client';
-import { CreateUserRequest, UpdatePinRequest, UpdateUserRequest, UserResponseDto } from '../types/user';
+import { CreateUserRequest, PageResponse, UpdatePinRequest, UpdateUserRequest, UserResponseDto } from '../types/user';
 
 export const userService = {
   /**
-   * Lấy danh sách nhân sự (hỗ trợ lọc theo role, search keyword, và trạng thái isActive)
+   * Lấy danh sách nhân sự có phân trang (hỗ trợ lọc theo role, search keyword, isActive, page, size)
    */
   async getAllUsers(params?: {
     role?: string;
     search?: string;
     isActive?: boolean;
-  }): Promise<UserResponseDto[]> {
+    page?: number;
+    size?: number;
+  }): Promise<PageResponse<UserResponseDto>> {
     const query = new URLSearchParams();
     if (params?.role && params.role !== 'ALL') {
       query.set('role', params.role);
@@ -20,10 +22,34 @@ export const userService = {
     if (params?.isActive !== undefined) {
       query.set('isActive', String(params.isActive));
     }
+    if (params?.page !== undefined) {
+      query.set('page', String(params.page));
+    }
+    if (params?.size !== undefined) {
+      query.set('size', String(params.size));
+    }
 
     const qs = query.toString();
     const endpoint = `/admin/users${qs ? `?${qs}` : ''}`;
-    return fetchApi<UserResponseDto[]>(endpoint);
+    const raw = await fetchApi<PageResponse<UserResponseDto> | UserResponseDto[]>(endpoint);
+
+    // Chuẩn hóa: hỗ trợ cả PageResponse chuẩn từ Backend và Mock Array fallback
+    if (Array.isArray(raw)) {
+      const page = params?.page ?? 0;
+      const size = params?.size ?? 10;
+      return {
+        items: raw,
+        page,
+        size,
+        totalElements: raw.length,
+        totalPages: Math.ceil(raw.length / size) || 1,
+        isFirst: page === 0,
+        isLast: true,
+        hasNext: false,
+        hasPrevious: false,
+      };
+    }
+    return raw;
   },
 
   /**
