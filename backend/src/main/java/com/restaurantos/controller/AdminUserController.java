@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @Tag(name = "Admin User Management", description = "Quản trị danh sách nhân sự, phân quyền RBAC & mã PIN trạm")
+@PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
 public class AdminUserController {
 
     private final UserService userService;
@@ -84,6 +86,7 @@ public class AdminUserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('OWNER')")
     @Operation(summary = "Xóa mềm tài khoản nhân sự", description = "Đánh dấu thời điểm deleted_at và vô hiệu hóa tài khoản theo UUID hoặc Mã nhân viên")
     public ResponseEntity<ApiResponse<UserResponseDto>> deleteUser(
             @Parameter(description = "Mã UUID, Mã nhân viên hoặc Username") @PathVariable String id) {

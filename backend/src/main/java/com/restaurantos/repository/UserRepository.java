@@ -17,6 +17,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     Optional<UserEntity> findByEmailAndDeletedAtIsNull(String email);
 
+    Optional<UserEntity> findByPhoneAndDeletedAtIsNull(String phone);
+
     Optional<UserEntity> findByEmployeeCodeIgnoreCaseAndDeletedAtIsNull(String employeeCode);
 
     boolean existsByUsernameAndDeletedAtIsNull(String username);
@@ -26,6 +28,10 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     boolean existsByEmailAndDeletedAtIsNull(String email);
 
     boolean existsByEmail(String email);
+
+    boolean existsByPhoneAndDeletedAtIsNull(String phone);
+
+    boolean existsByPhone(String phone);
 
     List<UserEntity> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
 
@@ -41,7 +47,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
            "AND (:search IS NULL OR :search = '' OR " +
            "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "     LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "     LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     (u.phone IS NOT NULL AND u.phone LIKE CONCAT('%', :search, '%'))) " +
            "ORDER BY u.createdAt DESC")
     List<UserEntity> searchUsers(
             @Param("roleCode") String roleCode,

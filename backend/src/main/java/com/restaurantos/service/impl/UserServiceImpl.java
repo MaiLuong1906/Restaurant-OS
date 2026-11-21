@@ -56,13 +56,33 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponseDto createUser(CreateUserRequest request) {
-        // Kiểm tra username trùng lặp trong toàn hệ thống (tránh lỗi 500 do vi phạm Unique constraint)
-        if (userRepository.existsByUsername(request.getUsername())) {
+        // 1. Kiểm tra số điện thoại bắt buộc và duy nhất (đáp ứng hợp đồng đăng nhập B1 trên Mobile)
+        String phone = request.getPhone() != null ? request.getPhone().trim() : null;
+        if (phone == null || phone.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số điện thoại không được để trống");
+        }
+        if (userRepository.existsByPhone(phone)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Tên đăng nhập '" + request.getUsername() + "' đã tồn tại");
+                    "Số điện thoại '" + phone + "' đã được đăng ký trên hệ thống");
         }
 
-        // Kiểm tra email trùng lặp nếu có
+        // 2. Xử lý username linh hoạt: Nếu admin không nhập, tự động lấy SĐT làm username mặc định
+        String finalUsername;
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            finalUsername = request.getUsername().trim();
+            if (userRepository.existsByUsername(finalUsername)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Tên đăng nhập '" + finalUsername + "' đã tồn tại");
+            }
+        } else {
+            finalUsername = phone;
+            if (userRepository.existsByUsername(finalUsername)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Tên đăng nhập tự động theo SĐT '" + finalUsername + "' đã tồn tại");
+            }
+        }
+
+        // 3. Kiểm tra email trùng lặp nếu có
         if (request.getEmail() != null && !request.getEmail().isBlank()) {
             if (userRepository.existsByEmail(request.getEmail())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -70,22 +90,22 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        // Kiểm tra mã vai trò hợp lệ qua Enum
+        // 4. Kiểm tra mã vai trò hợp lệ qua Enum (Bao gồm cả STAFF từ V3)
         UserRole userRole = UserRole.fromCode(request.getRoleCode())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
                         "Vai trò '" + request.getRoleCode() + "' không hợp lệ. Cho phép: "
                                 + Arrays.toString(UserRole.values())));
 
-        // Tìm role trong DB
+        // 5. Tìm role trong DB
         RoleEntity role = roleRepository.findByCode(userRole.name())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy vai trò trong DB: " + userRole.name()));
 
-        // Tự động sinh mã nhân sự theo tiền tố vai trò (Cách B: TN001, PV001, QL001...)
+        // 6. Tự động sinh mã nhân sự theo tiền tố vai trò (TN001, PV001, QL001, NV001...)
         String generatedEmployeeCode = generateEmployeeCode(userRole);
 
-        // Hash password và PIN
+        // 7. Hash password và PIN
         String passwordHash = passwordEncoder.encode(request.getPassword());
         String pinCodeHash = null;
         if (request.getPinCode() != null && !request.getPinCode().isBlank()) {
@@ -94,19 +114,19 @@ public class UserServiceImpl implements UserService {
 
         UserEntity newUser = UserEntity.builder()
                 .employeeCode(generatedEmployeeCode)
-                .username(request.getUsername())
+                .username(finalUsername)
                 .passwordHash(passwordHash)
                 .pinCodeHash(pinCodeHash)
                 .fullName(request.getFullName())
                 .email(request.getEmail() != null && !request.getEmail().isBlank() ? request.getEmail().trim() : null)
-                .phone(request.getPhone() != null && !request.getPhone().isBlank() ? request.getPhone().trim() : null)
+                .phone(phone)
                 .role(role)
                 .isActive(true)
                 .build();
 
         UserEntity saved = userRepository.save(newUser);
-        log.info("Tạo tài khoản nhân sự thành công: employeeCode={}, username={}, role={}",
-                saved.getEmployeeCode(), saved.getUsername(), role.getCode());
+        log.info("Tạo tài khoản nhân sự thành công: employeeCode={}, username={}, phone={}, role={}",
+                saved.getEmployeeCode(), saved.getUsername(), saved.getPhone(), role.getCode());
         return UserResponseDto.fromEntity(saved);
     }
 
@@ -116,10 +136,17 @@ public class UserServiceImpl implements UserService {
         UserEntity user = findUserOrThrow(identifier);
 
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
-            user.setFullName(request.getFullName());
+            user.setFullName(request.getFullName().trim());
         }
-        if (request.getPhone() != null) {
-            user.setPhone(request.getPhone().isBlank() ? null : request.getPhone().trim());
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            String newPhone = request.getPhone().trim();
+            if (!newPhone.equals(user.getPhone())) {
+                if (userRepository.existsByPhone(newPhone)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Số điện thoại '" + newPhone + "' đã được sử dụng bởi nhân sự khác");
+                }
+                user.setPhone(newPhone);
+            }
         }
         if (request.getEmail() != null) {
             String email = request.getEmail().isBlank() ? null : request.getEmail().trim();
@@ -227,11 +254,12 @@ public class UserServiceImpl implements UserService {
                     .filter(u -> u.getDeletedAt() == null)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy tài khoản nhân sự với ID: " + id));
         } catch (IllegalArgumentException e) {
-            // 2. Không phải UUID -> Tìm kiếm linh hoạt theo Mã nhân viên (employeeCode: e.g. TN001) hoặc Username
+            // 2. Không phải UUID -> Tìm kiếm linh hoạt theo Mã nhân viên (employeeCode), Username hoặc Số điện thoại (B1)
             return userRepository.findByEmployeeCodeIgnoreCaseAndDeletedAtIsNull(trimmed)
                     .or(() -> userRepository.findByUsernameAndDeletedAtIsNull(trimmed))
+                    .or(() -> userRepository.findByPhoneAndDeletedAtIsNull(trimmed))
                     .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.NOT_FOUND, "Không tìm thấy tài khoản nhân sự với mã hoặc username: " + trimmed));
+                            HttpStatus.NOT_FOUND, "Không tìm thấy tài khoản nhân sự với mã, username hoặc SĐT: " + trimmed));
         }
     }
 }

@@ -102,6 +102,23 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("Xem chi tiết nhân sự linh hoạt bằng Số điện thoại (e.g. 0901234567)")
+    void testGetUserByIdentifier_ByPhone() {
+        when(userRepository.findByEmployeeCodeIgnoreCaseAndDeletedAtIsNull("0901234567"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByUsernameAndDeletedAtIsNull("0901234567"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByPhoneAndDeletedAtIsNull("0901234567"))
+                .thenReturn(Optional.of(sampleUser));
+
+        UserResponseDto result = userService.getUserByIdentifier("0901234567");
+
+        assertThat(result).isNotNull();
+        assertThat(result.getPhone()).isEqualTo("0901234567");
+        assertThat(result.getUsername()).isEqualTo("mai.manager");
+    }
+
+    @Test
     @DisplayName("Tạo nhân sự mới thành công với enum UserRole chuẩn")
     void testCreateUser_Success() {
         CreateUserRequest req = CreateUserRequest.builder()
@@ -114,6 +131,7 @@ class UserServiceTest {
                 .phone("0987654321")
                 .build();
 
+        when(userRepository.existsByPhone("0987654321")).thenReturn(false);
         when(userRepository.existsByUsername("linh.cashier")).thenReturn(false);
         when(userRepository.existsByEmail("linh@restaurant.vn")).thenReturn(false);
         when(roleRepository.findByCode("MANAGER")).thenReturn(Optional.of(roleManager));
@@ -138,15 +156,71 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("Tạo nhân sự mới thành công với vai trò STAFF (tự sinh mã NV001)")
+    void testCreateUser_StaffRole_Success() {
+        RoleEntity roleStaff = RoleEntity.builder()
+                .id(UUID.randomUUID())
+                .code("STAFF")
+                .name("Nhân viên tổng hợp")
+                .description("Nhân viên phục vụ chung")
+                .build();
+
+        CreateUserRequest req = CreateUserRequest.builder()
+                .fullName("Nguyễn Thử Việc")
+                .password("password123")
+                .roleCode("STAFF")
+                .phone("0911223344")
+                .build();
+
+        when(userRepository.existsByPhone("0911223344")).thenReturn(false);
+        when(userRepository.existsByUsername("0911223344")).thenReturn(false);
+        when(roleRepository.findByCode("STAFF")).thenReturn(Optional.of(roleStaff));
+        when(userRepository.findEmployeeCodesByPrefix("NV")).thenReturn(List.of());
+        when(passwordEncoder.encode("password123")).thenReturn("encoded_pass");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> {
+            UserEntity u = invocation.getArgument(0);
+            u.setId(UUID.randomUUID());
+            return u;
+        });
+
+        UserResponseDto created = userService.createUser(req);
+
+        assertThat(created).isNotNull();
+        assertThat(created.getEmployeeCode()).isEqualTo("NV001");
+        assertThat(created.getUsername()).isEqualTo("0911223344"); // Tự động fallback lấy phone làm username
+        assertThat(created.getRoleCode()).isEqualTo("STAFF");
+        assertThat(created.getDiscountCeiling()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Ném lỗi Conflict khi số điện thoại đã được đăng ký")
+    void testCreateUser_ConflictPhone() {
+        CreateUserRequest req = CreateUserRequest.builder()
+                .fullName("Trùng Phone")
+                .phone("0901234567")
+                .password("password123")
+                .roleCode("MANAGER")
+                .build();
+
+        when(userRepository.existsByPhone("0901234567")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.createUser(req))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Số điện thoại '0901234567' đã được đăng ký");
+    }
+
+    @Test
     @DisplayName("Ném lỗi khi vai trò không nằm trong enum UserRole")
     void testCreateUser_InvalidRoleEnum() {
         CreateUserRequest req = CreateUserRequest.builder()
                 .fullName("Người lạ")
                 .username("nguoi.la")
+                .phone("0912345678")
                 .password("password123")
                 .roleCode("SUPER_ADMIN_INVALID")
                 .build();
 
+        when(userRepository.existsByPhone("0912345678")).thenReturn(false);
         when(userRepository.existsByUsername("nguoi.la")).thenReturn(false);
 
         assertThatThrownBy(() -> userService.createUser(req))
@@ -160,10 +234,12 @@ class UserServiceTest {
         CreateUserRequest req = CreateUserRequest.builder()
                 .fullName("Trùng tên")
                 .username("mai.manager")
+                .phone("0912345678")
                 .password("password123")
                 .roleCode("MANAGER")
                 .build();
 
+        when(userRepository.existsByPhone("0912345678")).thenReturn(false);
         when(userRepository.existsByUsername("mai.manager")).thenReturn(true);
 
         assertThatThrownBy(() -> userService.createUser(req))

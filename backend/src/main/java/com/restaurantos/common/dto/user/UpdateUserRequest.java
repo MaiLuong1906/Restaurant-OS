@@ -23,8 +23,8 @@ public class UpdateUserRequest {
     private String email;
 
     @Pattern(
-        regexp = "^(0|\\+84)[35789][0-9]{8}$|^$",
-        message = "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 03, 05, 07, 08, 09 hoặc +84)"
+        regexp = "^(0|\\+84)[35789][0-9]{8}$|^0[0-9]{9}$|^$",
+        message = "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0 hoặc +84)"
     )
     private String phone;
 
