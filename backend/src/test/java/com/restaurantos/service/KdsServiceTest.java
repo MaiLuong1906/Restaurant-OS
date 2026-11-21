@@ -84,7 +84,7 @@ class KdsServiceTest {
         OrderItemEntity item2 = createItem("READY", null, now.plus(Duration.ofMinutes(5)));
 
         when(orderRepository.findActiveOrdersByPriority()).thenReturn(List.of(order));
-        when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of(item1, item2));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(item1, item2));
 
         List<KdsTicketDto> tickets = kdsService.getTickets();
 
@@ -99,7 +99,7 @@ class KdsServiceTest {
         OrderItemEntity item2 = createItem("SERVED", null, now.plus(Duration.ofMinutes(5)));
 
         when(orderRepository.findActiveOrdersByPriority()).thenReturn(List.of(order));
-        when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of(item1, item2));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(item1, item2));
 
         List<KdsTicketDto> tickets = kdsService.getTickets();
 
@@ -114,7 +114,7 @@ class KdsServiceTest {
         OrderItemEntity item2 = createItem("SERVED", null, now.plus(Duration.ofMinutes(5)));
 
         when(orderRepository.findActiveOrdersByPriority()).thenReturn(List.of(order));
-        when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of(item1, item2));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(item1, item2));
 
         List<KdsTicketDto> tickets = kdsService.getTickets();
 
@@ -129,7 +129,7 @@ class KdsServiceTest {
         OrderItemEntity item2 = createItem("SERVED", null, now.plus(Duration.ofMinutes(5)));
 
         when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of(item1, item2));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1, item2));
 
         Optional<KdsTicketDto> ticket = kdsService.getTicketById(order.getId());
 
@@ -147,7 +147,7 @@ class KdsServiceTest {
         OrderItemEntity itemRejected = createItem("REJECTED", null, slaRejectedEarlier);
 
         when(orderRepository.findActiveOrdersByPriority()).thenReturn(List.of(order));
-        when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of(itemWaiting, itemRejected));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(itemWaiting, itemRejected));
 
         List<KdsTicketDto> tickets = kdsService.getTickets();
 
@@ -160,7 +160,7 @@ class KdsServiceTest {
         OrderItemEntity itemWaiting = createItem("WAITING", null, null);
 
         when(orderRepository.findActiveOrdersByPriority()).thenReturn(List.of(order));
-        when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of(itemWaiting));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(itemWaiting));
 
         List<KdsTicketDto> tickets = kdsService.getTickets();
 
@@ -174,7 +174,7 @@ class KdsServiceTest {
         OrderItemEntity itemNoAllergy = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
 
         when(orderRepository.findActiveOrdersByPriority()).thenReturn(List.of(order));
-        when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of(itemWithAllergy, itemNoAllergy));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(itemWithAllergy, itemNoAllergy));
 
         List<KdsTicketDto> tickets = kdsService.getTickets();
 
@@ -217,6 +217,9 @@ class KdsServiceTest {
                 .orderId(order.getId())
                 .order(order)
                 .dishId(dish.getId())
+                .portionId(UUID.randomUUID())
+                .dishNameSnapshot("Phở Bò Đặc Biệt")
+                .portionNameSnapshot("Tô Lớn")
                 .dish(dish)
                 .quantity(1)
                 .unitPrice(75000L)

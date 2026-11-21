@@ -13,6 +13,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
 
     @Query("""
         SELECT o FROM OrderEntity o
+        LEFT JOIN FETCH o.table
         WHERE EXISTS (
             SELECT 1 FROM OrderItemEntity oi
             WHERE oi.orderId = o.id

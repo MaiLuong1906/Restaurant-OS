@@ -12,11 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,8 +36,20 @@ public class KdsService {
      */
     public List<KdsTicketDto> getTickets() {
         List<OrderEntity> activeOrders = orderRepository.findActiveOrdersByPriority();
+        if (activeOrders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> orderIds = activeOrders.stream()
+                .map(OrderEntity::getId)
+                .toList();
+
+        List<OrderItemEntity> allItems = orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(orderIds);
+        Map<UUID, List<OrderItemEntity>> itemsByOrderId = allItems.stream()
+                .collect(Collectors.groupingBy(OrderItemEntity::getOrderId));
+
         return activeOrders.stream()
-                .map(this::mapToTicketDto)
+                .map(order -> mapToTicketDto(order, itemsByOrderId.getOrDefault(order.getId(), Collections.emptyList())))
                 .toList();
     }
 
@@ -43,7 +58,10 @@ public class KdsService {
      */
     public Optional<KdsTicketDto> getTicketById(UUID ticketId) {
         return orderRepository.findById(ticketId)
-                .map(this::mapToTicketDto);
+                .map(order -> {
+                    List<OrderItemEntity> items = orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
+                    return mapToTicketDto(order, items);
+                });
     }
 
     /**
@@ -55,8 +73,7 @@ public class KdsService {
                 .toList();
     }
 
-    private KdsTicketDto mapToTicketDto(OrderEntity order) {
-        List<OrderItemEntity> itemEntities = orderItemRepository.findByOrderId(order.getId());
+    private KdsTicketDto mapToTicketDto(OrderEntity order, List<OrderItemEntity> itemEntities) {
         List<KdsItemDto> items = itemEntities.stream()
                 .map(this::mapToItemDto)
                 .toList();
@@ -77,7 +94,11 @@ public class KdsService {
     }
 
     private KdsItemDto mapToItemDto(OrderItemEntity entity) {
-        String dishName = entity.getDish() != null ? entity.getDish().getName() : "Món ăn";
+        String dishName = entity.getDishNameSnapshot();
+        if (dishName == null || dishName.isBlank()) {
+            var dish = entity.getDish();
+            dishName = dish != null ? dish.getName() : "Món ăn";
+        }
         return new KdsItemDto(
                 entity.getId(),
                 entity.getDishId(),
