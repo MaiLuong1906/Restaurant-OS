@@ -117,8 +117,8 @@ export default function AdminUsersPage() {
     }
   };
 
-  // 3. Ma trận RBAC Mock
-  const [matrix, setMatrix] = React.useState<RbacRow[]>([
+  // 3. Ma trận RBAC Tham Chiếu (Read-only Reference)
+  const [matrix] = React.useState<RbacRow[]>([
     { id: '1', feature: 'Xem Tổng Quan KPI & Doanh Thu Realtime', owner: true, manager: true, chef: true, staff: false },
     { id: '2', feature: 'Hủy Món / Sửa Đơn sau khi Gửi Bếp (Void Item)', owner: true, manager: true, chef: false, staff: false },
     { id: '3', feature: 'Áp Dụng Chiết Khấu / Giảm Giá Hóa Đơn', owner: true, manager: true, chef: false, staff: false },
@@ -130,17 +130,6 @@ export default function AdminUsersPage() {
     { id: '9', feature: 'Nghiệm Thu Đơn Nhập Kho (Inbound PO)', owner: true, manager: true, chef: true, staff: false },
     { id: '10', feature: 'Cấp Quyền & Đổi Mã PIN Hệ Thống RBAC', owner: true, manager: false, chef: false, staff: false },
   ]);
-
-  const handleTogglePermission = (rowId: string, roleKey: 'owner' | 'manager' | 'chef' | 'staff') => {
-    if (roleKey === 'owner') {
-      showToast('Quyền hạn của Chủ Nhà Hàng là bất biến (toàn quyền)!', 'error');
-      return;
-    }
-    setMatrix((prev) =>
-      prev.map((row) => (row.id === rowId ? { ...row, [roleKey]: !row[roleKey] } : row))
-    );
-    showToast('Đã cập nhật ma trận phân quyền thành công!');
-  };
 
   // Tính toán KPI động
   const activeCount = users.filter((u) => u.isActive).length;
@@ -200,7 +189,7 @@ export default function AdminUsersPage() {
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                Danh Sách ({users.length})
+                Danh Sách ({totalElements})
               </button>
               <button
                 onClick={() => setActiveTab('matrix')}
@@ -226,7 +215,7 @@ export default function AdminUsersPage() {
 
         {/* 4 Core RBAC KPI Cards */}
         <UserKpiCards
-          totalCount={users.length}
+          totalCount={totalElements}
           activeCount={activeCount}
           lockedCount={lockedCount}
           pinCount={pinCount}
@@ -291,7 +280,7 @@ export default function AdminUsersPage() {
 
         {/* Tab 2: Ma trận phân quyền RBAC */}
         {activeTab === 'matrix' && (
-          <RbacMatrixTable matrix={matrix} onTogglePermission={handleTogglePermission} />
+          <RbacMatrixTable matrix={matrix} />
         )}
       </div>
 

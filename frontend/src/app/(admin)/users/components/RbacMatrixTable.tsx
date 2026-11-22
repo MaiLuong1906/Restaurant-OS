@@ -6,22 +6,24 @@ import { RbacRow } from '../types';
 
 interface RbacMatrixTableProps {
   matrix: RbacRow[];
-  onTogglePermission: (rowId: string, roleKey: 'owner' | 'manager' | 'chef' | 'staff') => void;
 }
 
-export function RbacMatrixTable({ matrix, onTogglePermission }: RbacMatrixTableProps) {
+export function RbacMatrixTable({ matrix }: RbacMatrixTableProps) {
   return (
     <div className="bg-white rounded-xl shadow-2xs border border-stone-200 overflow-hidden space-y-4">
-      <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between">
+      <div className="p-4 sm:p-5 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="font-ops text-base font-bold text-stone-900 flex items-center gap-2">
             <Shield className="w-4 h-4 text-ops-brand" />
             <span>Ma Trận Quyền Hạn RBAC (Role-Based Access Control)</span>
           </h3>
           <p className="text-xs text-stone-600 mt-0.5">
-            Quy định phân quyền chi tiết cho từng vai trò vận hành trong nhà hàng. Bấm vào icon để bật/tắt quyền.
+            Quy định phân quyền hệ thống chuẩn theo từng vai trò vận hành trong nhà hàng (Chế độ xem tham chiếu).
           </p>
         </div>
+        <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-stone-100 text-stone-700 border border-stone-200 uppercase tracking-wider">
+          Hệ Thống Mặc Định (Chỉ Xem)
+        </span>
       </div>
 
       <div className="overflow-x-auto">
@@ -37,22 +39,21 @@ export function RbacMatrixTable({ matrix, onTogglePermission }: RbacMatrixTableP
           </thead>
           <tbody className="divide-y divide-ops-border">
             {matrix.map((row) => (
-              <tr key={row.id} className="hover:bg-ops-bg transition-colors">
+              <tr key={row.id} className="hover:bg-ops-bg/60 transition-colors">
                 <td className="py-3 px-4 font-medium text-stone-900">{row.feature}</td>
 
                 {/* Owner */}
                 <td
-                  onClick={() => onTogglePermission(row.id, 'owner')}
-                  className="py-3 px-3 text-center cursor-not-allowed bg-amber-50/30"
-                  title="Quyền của Chủ quán là cố định"
+                  className="py-3 px-3 text-center bg-amber-50/20 cursor-default"
+                  title="Quyền hạn của Chủ quán là toàn quyền cố định"
                 >
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
                 </td>
 
                 {/* Manager */}
                 <td
-                  onClick={() => onTogglePermission(row.id, 'manager')}
-                  className="py-3 px-3 text-center cursor-pointer hover:bg-stone-200/50 bg-indigo-50/30"
+                  className="py-3 px-3 text-center bg-indigo-50/20 cursor-default"
+                  title={row.manager ? 'Được phép thực hiện' : 'Không có quyền'}
                 >
                   {row.manager ? (
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
@@ -63,8 +64,8 @@ export function RbacMatrixTable({ matrix, onTogglePermission }: RbacMatrixTableP
 
                 {/* Chef */}
                 <td
-                  onClick={() => onTogglePermission(row.id, 'chef')}
-                  className="py-3 px-3 text-center cursor-pointer hover:bg-stone-200/50 bg-orange-50/30"
+                  className="py-3 px-3 text-center bg-orange-50/20 cursor-default"
+                  title={row.chef ? 'Được phép thực hiện' : 'Không có quyền'}
                 >
                   {row.chef ? (
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
@@ -75,8 +76,8 @@ export function RbacMatrixTable({ matrix, onTogglePermission }: RbacMatrixTableP
 
                 {/* Staff */}
                 <td
-                  onClick={() => onTogglePermission(row.id, 'staff')}
-                  className="py-3 px-3 text-center cursor-pointer hover:bg-stone-200/50"
+                  className="py-3 px-3 text-center cursor-default"
+                  title={row.staff ? 'Được phép thực hiện' : 'Không có quyền'}
                 >
                   {row.staff ? (
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />

@@ -30,7 +30,7 @@ export function UserKpiCards({
             <div className="flex items-baseline gap-2 pt-1">
               <span className="font-ops text-3xl font-extrabold text-stone-900">{totalCount}</span>
               <span className="font-mono text-xs uppercase text-emerald-700 font-bold">
-                {activeCount} Hoạt Động
+                {activeCount} Hoạt Động (Trang Này)
               </span>
             </div>
           </div>
@@ -39,7 +39,7 @@ export function UserKpiCards({
           </div>
         </div>
         <div className="pt-3 mt-2 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium">
-          <span>Đang bị tạm khóa:</span>
+          <span>Đang bị tạm khóa (trang này):</span>
           <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
             {lockedCount < 10 ? `0${lockedCount}` : lockedCount} Tài khoản
           </span>
@@ -51,7 +51,7 @@ export function UserKpiCards({
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <span className="font-mono text-xs uppercase tracking-wider text-stone-700 font-bold">
-              Nhân Sự Có Mã PIN
+              Nhân Sự Có Mã PIN (Trang Này)
             </span>
             <div className="flex items-baseline gap-2 pt-1">
               <span className="font-ops text-3xl font-extrabold text-ops-brand">
@@ -77,11 +77,11 @@ export function UserKpiCards({
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <span className="font-mono text-xs uppercase tracking-wider text-stone-700 font-bold">
-              Hạn Mức Chiết Khấu Cao Nhất
+              Hạn Mức Chiết Khấu (Trang Này)
             </span>
             <div className="flex items-baseline gap-2 pt-1">
               <span className="font-ops text-3xl font-extrabold text-stone-900">{maxCeiling}%</span>
-              <span className="font-mono text-xs uppercase text-stone-500 font-bold">Cấp Toàn Quyền</span>
+              <span className="font-mono text-xs uppercase text-stone-500 font-bold">Cao Nhất</span>
             </div>
           </div>
           <div className="w-10 h-10 rounded-lg bg-stone-100 flex items-center justify-center text-stone-800">
