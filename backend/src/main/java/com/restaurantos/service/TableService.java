@@ -1,7 +1,7 @@
 package com.restaurantos.service;
 
 import com.restaurantos.dto.OrderDtos;
-import com.restaurantos.entity.RestaurantTableEntity;
+import com.restaurantos.entity.TableEntity;
 import com.restaurantos.repository.TableRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,13 +35,13 @@ public class TableService {
         return tableRepository.findById(id).map(this::toTableResponse);
     }
 
-    private OrderDtos.TableResponse toTableResponse(RestaurantTableEntity t) {
+    private OrderDtos.TableResponse toTableResponse(TableEntity t) {
         return new OrderDtos.TableResponse(
                 t.getId(),
                 t.getTableNumber(),
                 t.getCapacity(),
                 t.getStatus(),
-                t.getCurrentOrderId()
+                null
         );
     }
 }

@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -18,25 +17,20 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RestaurantTableEntity {
+public class TableEntity {
 
     @Id
     private UUID id;
 
-    @Column(name = "table_number", nullable = false, length = 20)
+    @Column(name = "table_number", nullable = false, length = 50)
     private String tableNumber;
 
+    @Column(nullable = false)
     private Integer capacity;
 
-    @Column(nullable = false, length = 50)
-    private String status; // VACANT, SERVING, BILLING, CLEANING, RESERVED
+    @Column(nullable = false, length = 30)
+    private String status;
 
-    @Column(name = "zone_id")
+    @Column(name = "zone_id", nullable = false)
     private UUID zoneId;
-
-    @Column(name = "current_order_id")
-    private UUID currentOrderId;
-
-    @Column(name = "occupied_at")
-    private Instant occupiedAt;
 }

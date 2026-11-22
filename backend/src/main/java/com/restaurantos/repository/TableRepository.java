@@ -1,11 +1,11 @@
 package com.restaurantos.repository;
 
-import com.restaurantos.entity.RestaurantTableEntity;
+import com.restaurantos.entity.TableEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
 
 @Repository
-public interface TableRepository extends JpaRepository<RestaurantTableEntity, UUID> {
+public interface TableRepository extends JpaRepository<TableEntity, UUID> {
 }

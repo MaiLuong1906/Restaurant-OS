@@ -1,9 +1,6 @@
 package com.restaurantos.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,8 +25,16 @@ public class OrderItemEntity {
     @Column(name = "order_id", nullable = false)
     private UUID orderId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", insertable = false, updatable = false)
+    private OrderEntity order;
+
     @Column(name = "dish_id", nullable = false)
     private UUID dishId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dish_id", insertable = false, updatable = false)
+    private DishEntity dish;
 
     @Column(nullable = false)
     private Integer quantity;
@@ -38,7 +43,7 @@ public class OrderItemEntity {
     private Long unitPrice;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "modifiers", columnDefinition = "jsonb")
+    @Column(columnDefinition = "jsonb")
     private String modifiers; // JSON array string, default "[]"
 
     @Column(nullable = false, length = 50)
@@ -59,12 +64,18 @@ public class OrderItemEntity {
     @Column(name = "portion_name_snapshot", nullable = false, length = 100)
     private String portionNameSnapshot;
 
-    @Column(name = "is_expedited")
+    @Column(name = "sla_deadline")
+    private Instant slaDeadline;
+
+    @Column(name = "is_expedited", nullable = false)
     private Boolean isExpedited;
 
-    @Column(name = "created_at")
+    @Column(name = "expedited_at")
+    private Instant expeditedAt;
+
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 }
