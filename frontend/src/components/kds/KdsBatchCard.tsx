@@ -4,15 +4,16 @@ import * as React from 'react';
 import { Batch } from '@/types';
 import { SlaTimer } from './SlaTimer';
 import { AllergyBanner } from './AllergyBanner';
-import { Check } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 
 interface KdsBatchCardProps {
   batch: Batch;
   onComplete: (batchId: string) => void;
   isCompleting?: boolean;
+  disabledComplete?: boolean;
 }
 
-export function KdsBatchCard({ batch, onComplete, isCompleting }: KdsBatchCardProps) {
+export function KdsBatchCard({ batch, onComplete, isCompleting, disabledComplete }: KdsBatchCardProps) {
   const isDone = batch.status === 'READY' || batch.status === 'SERVED';
 
   return (
@@ -54,12 +55,28 @@ export function KdsBatchCard({ batch, onComplete, isCompleting }: KdsBatchCardPr
 
       <button
         type="button"
-        disabled={isCompleting || isDone}
-        onClick={() => onComplete(batch.id)}
-        className="w-full h-12 rounded-lg bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isCompleting || isDone || disabledComplete}
+        onClick={() => {
+          if (disabledComplete) return;
+          onComplete(batch.id);
+        }}
+        className={`w-full h-12 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all ${
+          disabledComplete
+            ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed border border-neutral-300'
+            : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50 disabled:cursor-not-allowed'
+        }`}
       >
-        <Check className="h-5 w-5" />
-        <span>{isDone ? 'Đã hoàn tất mẻ' : 'Hoàn tất mẻ nấu'}</span>
+        {disabledComplete ? (
+          <>
+            <Lock className="h-5 w-5" />
+            <span>Hoàn tất mẻ (TODO UC19)</span>
+          </>
+        ) : (
+          <>
+            <Check className="h-5 w-5" />
+            <span>{isDone ? 'Đã hoàn tất mẻ' : 'Hoàn tất mẻ nấu'}</span>
+          </>
+        )}
       </button>
     </div>
   );
