@@ -108,8 +108,8 @@ export function usePosQuickActions(): QuickActionItem[] {
       },
       {
         icon: GitMerge,
-        label: 'Gộp / tách bàn',
-        sub: 'Chia đều / Theo món / Gộp',
+        label: 'Tách / Gộp bàn',
+        sub: 'Gộp nhiều bàn / Tách bàn đã gộp',
         onClick: () => {
           setPendingSplitMerge(true);
           setPosIntent('splitmerge');

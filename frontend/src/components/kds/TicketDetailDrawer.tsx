@@ -12,6 +12,7 @@ interface TicketDetailDrawerProps {
   onComplete: (ticketId: string) => void;
   onReportIncident?: (ticketId: string) => void;
   hasPendingAlert?: boolean;
+  disabledComplete?: boolean;
 }
 
 export function TicketDetailDrawer({
@@ -21,6 +22,7 @@ export function TicketDetailDrawer({
   onComplete,
   onReportIncident,
   hasPendingAlert,
+  disabledComplete,
 }: TicketDetailDrawerProps) {
   const [allergyExpanded, setAllergyExpanded] = React.useState<boolean>(false);
   const [incidentReported, setIncidentReported] = React.useState<boolean>(false);
@@ -65,7 +67,7 @@ export function TicketDetailDrawer({
   const totalPortions = ticket.items.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCompleteClick = () => {
-    if (isCompleting || hasPendingAlert) return;
+    if (isCompleting || hasPendingAlert || disabledComplete) return;
     setIsCompleting(true);
     onComplete(ticket.id);
     onClose();
@@ -215,16 +217,22 @@ export function TicketDetailDrawer({
         <div className="p-6 border-t border-ops-border bg-white space-y-3">
           <button
             type="button"
-            disabled={isCompleting || hasPendingAlert}
+            disabled={isCompleting || hasPendingAlert || disabledComplete}
             onClick={handleCompleteClick}
             className={`w-full h-12 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all ${
-              hasPendingAlert
+              hasPendingAlert || disabledComplete
                 ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed border border-neutral-300'
                 : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50'
             }`}
           >
             <Check className="h-5 w-5" />
-            <span>{hasPendingAlert ? 'Khóa (Có thay đổi chưa xác nhận)' : '✓ Hoàn tất ticket'}</span>
+            <span>
+              {disabledComplete
+                ? 'Hoàn tất ticket (TODO UC19)'
+                : hasPendingAlert
+                ? 'Khóa (Có thay đổi chưa xác nhận)'
+                : '✓ Hoàn tất ticket'}
+            </span>
           </button>
 
           <button

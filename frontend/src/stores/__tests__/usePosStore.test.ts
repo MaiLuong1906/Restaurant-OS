@@ -63,17 +63,55 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
     expect(table1Occupied?.depositAmount).toBe(300000);
   });
 
-  it('UC3: phải tách hóa đơn chia đều theo số nguyên VND không phát sinh số lẻ', () => {
-    usePosStore.getState().splitInvoiceEqual('t4', 3);
-    const table4 = usePosStore.getState().tables.find((t) => t.id === 't4');
-    expect(table4?.splits?.length).toBe(3);
+  it('UC3: phải gộp nhiều bàn (giữ trạng thái Đang phục vụ) và tách các bàn đã gộp chuẩn số nguyên VND', () => {
+    const store = usePosStore.getState();
+    const t4Before = store.tables.find((t) => t.id === 't4')!;
+    const t6Before = store.tables.find((t) => t.id === 't6')!;
+    const t8Before = store.tables.find((t) => t.id === 't8')!;
+    const t4TotalBefore = computeTableSubtotal(t4Before);
+    const t6TotalBefore = computeTableSubtotal(t6Before);
+    const t4GuestsBefore = t4Before.guests;
+    const t6GuestsBefore = t6Before.guests;
 
-    const sumParts = (table4?.splits ?? []).reduce((acc, s) => acc + s.amount, 0);
-    expect(sumParts).toBe(computeTablePayable(table4!));
-    for (const part of table4?.splits ?? []) {
-      expect(Number.isInteger(part.amount)).toBe(true);
-    }
-    usePosStore.getState().clearSplitInvoice('t4');
+    // Gộp 3 bàn: t6 (OCCUPIED) + t8 (IDLE) vào t4 (OVERDUE)
+    store.mergeTables(['t6', 't8'], 't4');
+
+    const t4AfterMerge = usePosStore.getState().tables.find((t) => t.id === 't4')!;
+    const t6AfterMerge = usePosStore.getState().tables.find((t) => t.id === 't6')!;
+    const t8AfterMerge = usePosStore.getState().tables.find((t) => t.id === 't8')!;
+
+    // Các bàn được gộp vẫn giữ trạng thái Đang phục vụ (OCCUPIED)
+    expect(t6AfterMerge.status).toBe('OCCUPIED');
+    expect(t6AfterMerge.mergedIntoTableId).toBe('t4');
+    expect(t8AfterMerge.status).toBe('OCCUPIED');
+    expect(t8AfterMerge.mergedIntoTableId).toBe('t4');
+    expect(t4AfterMerge.guests).toBe(t4GuestsBefore + t6GuestsBefore + t8Before.guests);
+    expect(t4AfterMerge.mergedMemberTables).toHaveLength(2);
+    expect(computeTableSubtotal(t4AfterMerge)).toBe(t4TotalBefore + t6TotalBefore);
+
+    // Tách bàn t6 bị gộp nhầm ra khỏi nhóm t4
+    usePosStore.getState().splitMergedTables('t4', ['t6']);
+
+    const t4AfterSplitOne = usePosStore.getState().tables.find((t) => t.id === 't4')!;
+    const t6AfterSplit = usePosStore.getState().tables.find((t) => t.id === 't6')!;
+    const t8StillMerged = usePosStore.getState().tables.find((t) => t.id === 't8')!;
+
+    expect(t6AfterSplit.status).toBe('OCCUPIED');
+    expect(t6AfterSplit.guests).toBe(t6GuestsBefore);
+    expect(t6AfterSplit.mergedIntoTableId).toBeUndefined();
+    expect(computeTableSubtotal(t6AfterSplit)).toBe(t6TotalBefore);
+    expect(computeTableSubtotal(t4AfterSplitOne)).toBe(t4TotalBefore);
+    expect(t4AfterSplitOne.mergedMemberTables).toHaveLength(1);
+    expect(t8StillMerged.status).toBe('OCCUPIED');
+
+    // Tách nốt t8 ra khỏi nhóm (gọi từ id của chính t8)
+    usePosStore.getState().splitMergedTables('t8', ['t8']);
+    const t4AfterSplitAll = usePosStore.getState().tables.find((t) => t.id === 't4')!;
+    const t8AfterSplit = usePosStore.getState().tables.find((t) => t.id === 't8')!;
+    expect(t8AfterSplit.status).toBe('IDLE');
+    expect(t8AfterSplit.mergedIntoTableId).toBeUndefined();
+    expect(t4AfterSplitAll.mergedMemberTables).toBeUndefined();
+    expect(computeTableSubtotal(t4AfterSplitAll)).toBe(t4TotalBefore);
   });
 
   it('UC4 & UC5: phải khóa bàn, áp dụng giảm giá, mở két và đối soát kết ca chuẩn xác', () => {
