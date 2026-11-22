@@ -36,6 +36,15 @@ public class OrderItemEntity {
     @Column(name = "dish_id", nullable = false)
     private UUID dishId;
 
+    @Column(name = "portion_id", nullable = false)
+    private UUID portionId;
+
+    @Column(name = "dish_name_snapshot", nullable = false)
+    private String dishNameSnapshot;
+
+    @Column(name = "portion_name_snapshot", nullable = false)
+    private String portionNameSnapshot;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dish_id", insertable = false, updatable = false)
     private DishEntity dish;
@@ -63,6 +72,9 @@ public class OrderItemEntity {
 
     @Column(name = "is_expedited", nullable = false)
     private Boolean isExpedited;
+
+    @Column(name = "expedited_at")
+    private Instant expeditedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
