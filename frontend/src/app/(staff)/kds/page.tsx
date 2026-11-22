@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Ticket, Batch, OrderChangeAlertData } from '@/types';
 import { kdsService as mockKdsService } from '@/services/mock';
-import { ApiKdsService, KdsService } from '@/services/kds';
+import { ApiKdsService, KdsService, filterActiveTickets, sortKdsTickets } from '@/services/kds';
 import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
 import { KdsBatchCard } from '@/components/kds/KdsBatchCard';
 import { TicketDetailDrawer } from '@/components/kds/TicketDetailDrawer';
@@ -33,9 +33,11 @@ export default function KitchenDisplayScreen() {
   } | null>(null);
   const undoTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  const fetchTickets = React.useCallback(async () => {
+  const fetchTickets = React.useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       const [ticketsData, alertsData] = await Promise.all([
         kdsService.getTickets(),
@@ -49,7 +51,9 @@ export default function KitchenDisplayScreen() {
     } catch (err) {
       setError((err as Error).message || 'Không thể tải danh sách đơn bếp');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -59,7 +63,7 @@ export default function KitchenDisplayScreen() {
     let intervalId: NodeJS.Timeout | null = null;
     if (isLiveMode) {
       intervalId = setInterval(() => {
-        fetchTickets();
+        fetchTickets(true);
       }, 10000);
     }
     return () => {
@@ -216,19 +220,7 @@ export default function KitchenDisplayScreen() {
 
   // Lọc các ticket còn việc cần làm (chưa bưng xong hết) và sắp xếp: dị ứng lên đầu, quá hạn/gần SLA lên trước
   const activeTickets = React.useMemo(() => {
-    return tickets
-      .filter((t) => t.items.some((i) => i.status === 'WAITING' || i.status === 'READY'))
-      .sort((a, b) => {
-        const aHasAllergy = a.items.some((i) => Boolean(i.allergy && i.allergy.trim().length > 0));
-        const bHasAllergy = b.items.some((i) => Boolean(i.allergy && i.allergy.trim().length > 0));
-
-        if (aHasAllergy && !bHasAllergy) return -1;
-        if (!aHasAllergy && bHasAllergy) return 1;
-
-        const aTime = a.slaDeadline ? new Date(a.slaDeadline).getTime() : Infinity;
-        const bTime = b.slaDeadline ? new Date(b.slaDeadline).getTime() : Infinity;
-        return aTime - bTime;
-      });
+    return sortKdsTickets(filterActiveTickets(tickets));
   }, [tickets]);
 
   const pendingAlert = alerts.find((a) => a.id === activeAlertId) || null;
@@ -266,7 +258,7 @@ export default function KitchenDisplayScreen() {
           {/* Nút Refresh tay */}
           <button
             type="button"
-            onClick={fetchTickets}
+            onClick={() => fetchTickets()}
             className="min-h-[48px] h-12 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
             aria-label="Làm mới danh sách ticket"
           >
@@ -335,7 +327,7 @@ export default function KitchenDisplayScreen() {
             <h2 className="font-bold text-lg mb-1">Đã xảy ra sự cố</h2>
             <p className="text-sm mb-4">{error}</p>
             <button
-              onClick={fetchTickets}
+              onClick={() => fetchTickets()}
               className="px-4 py-2 bg-ops-brand text-white font-bold rounded-lg text-sm"
             >
               Thử lại
@@ -372,6 +364,7 @@ export default function KitchenDisplayScreen() {
               <KdsBatchCard
                 key={batch.id}
                 batch={batch}
+                disabledComplete={isLiveMode}
                 onComplete={handleCompleteBatch}
               />
             ))}

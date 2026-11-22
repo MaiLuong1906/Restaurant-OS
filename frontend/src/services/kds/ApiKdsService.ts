@@ -17,7 +17,7 @@ export class ApiKdsService implements KdsService {
   }
 
   async getTicketById(ticketId: string): Promise<Ticket> {
-    return fetchApi<Ticket[]>(`/kds/tickets/${ticketId}`) as unknown as Promise<Ticket>;
+    return fetchApi<Ticket>(`/kds/tickets/${ticketId}`);
   }
 
   async updateTicketStatus(

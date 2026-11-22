@@ -1,26 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Ticket } from '@/types';
-
-// Helper: Lọc active tickets và sắp xếp theo SLA
-function filterActiveTickets(tickets: Ticket[]): Ticket[] {
-  return tickets.filter((t) =>
-    t.items.some((i) => i.status === 'WAITING' || i.status === 'READY')
-  );
-}
-
-function sortTickets(tickets: Ticket[]): Ticket[] {
-  return [...tickets].sort((a, b) => {
-    const aHasAllergy = a.items.some((i) => Boolean(i.allergy && i.allergy.trim().length > 0));
-    const bHasAllergy = b.items.some((i) => Boolean(i.allergy && i.allergy.trim().length > 0));
-
-    if (aHasAllergy && !bHasAllergy) return -1;
-    if (!aHasAllergy && bHasAllergy) return 1;
-
-    const aTime = a.slaDeadline ? new Date(a.slaDeadline).getTime() : Infinity;
-    const bTime = b.slaDeadline ? new Date(b.slaDeadline).getTime() : Infinity;
-    return aTime - bTime;
-  });
-}
+import { Ticket } from '../../../../types';
+import { filterActiveTickets, sortKdsTickets } from '../../../../services/kds';
 
 describe('KDS Ticket Ordering & Active Filter', () => {
   it('lọc bỏ các ticket có tất cả món đã SERVED hoặc REJECTED', () => {
@@ -69,6 +49,7 @@ describe('KDS Ticket Ordering & Active Filter', () => {
     expect(active.length).toBe(1);
     expect(active[0].id).toBe('t-active');
   });
+
   it('sắp xếp ưu tiên ticket có cảnh báo dị ứng lên đầu tiên', () => {
     const tickets: Ticket[] = [
       {
@@ -114,10 +95,11 @@ describe('KDS Ticket Ordering & Active Filter', () => {
       },
     ];
 
-    const sorted = sortTickets(tickets);
+    const sorted = sortKdsTickets(tickets);
     expect(sorted[0].id).toBe('t-allergy');
     expect(sorted[1].id).toBe('t-normal');
   });
+
   it('sắp xếp quá SLA hoặc sắp đến hạn lên trước trong nhóm cùng dị ứng', () => {
     const tickets: Ticket[] = [
       {
@@ -138,9 +120,32 @@ describe('KDS Ticket Ordering & Active Filter', () => {
       },
     ];
 
-    const sorted = sortTickets(tickets);
+    const sorted = sortKdsTickets(tickets);
     expect(sorted[0].id).toBe('t-overdue');
     expect(sorted[1].id).toBe('t-due-later');
+  });
+
+  it('fallback sắp xếp theo createdAt (FIFO) khi cùng không có slaDeadline tránh NaN', () => {
+    const tickets: Ticket[] = [
+      {
+        id: 't-later-created',
+        tableId: 'tbl-1',
+        tableNo: 'Bàn 01',
+        createdAt: '2026-11-20T10:15:00Z',
+        items: [{ id: 'i-1', orderId: 'o-1', dishId: 'd-1', dishName: 'Món A', quantity: 1, unitPrice: 30000, modifiers: [], status: 'WAITING', createdAt: '2026-11-20T10:15:00Z' }],
+      },
+      {
+        id: 't-earlier-created',
+        tableId: 'tbl-2',
+        tableNo: 'Bàn 02',
+        createdAt: '2026-11-20T10:05:00Z',
+        items: [{ id: 'i-2', orderId: 'o-2', dishId: 'd-2', dishName: 'Món B', quantity: 1, unitPrice: 40000, modifiers: [], status: 'WAITING', createdAt: '2026-11-20T10:05:00Z' }],
+      },
+    ];
+
+    const sorted = sortKdsTickets(tickets);
+    expect(sorted[0].id).toBe('t-earlier-created');
+    expect(sorted[1].id).toBe('t-later-created');
   });
 
   it('drawer mở xem được dữ liệu ticket chi tiết', () => {
