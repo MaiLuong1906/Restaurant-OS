@@ -23,6 +23,7 @@ public record ApiResponse<T>(
         return new ApiResponse<>(false, message, null, new ErrorDetails(code, message, details), Instant.now());
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ErrorDetails(
         String code,
         String message,
