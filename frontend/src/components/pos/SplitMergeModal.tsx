@@ -1,9 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { Check, GitMerge, Scissors, Users, X } from 'lucide-react';
-import { CashierTable, PaymentMethodType } from '@/types';
-import { computeTablePayable, computeTableSubtotal } from '@/stores/usePosStore';
+import {
+  AlertCircle,
+  Check,
+  GitMerge,
+  Split,
+  Users,
+  X,
+} from 'lucide-react';
+import { CashierTable, CashierTableStatus } from '@/types';
+import { computeTablePayable } from '@/stores/usePosStore';
 import { formatVND } from '@/lib/utils';
 
 interface SplitMergeModalProps {
@@ -11,59 +18,129 @@ interface SplitMergeModalProps {
   onClose: () => void;
   sourceTable: CashierTable;
   allTables: CashierTable[];
-  onSplitEqual: (tableId: string, numParts: number) => void;
-  onSplitByItems: (tableId: string, itemIdsGroupA: string[]) => void;
-  onMarkSplitPaid: (tableId: string, partId: string, method: PaymentMethodType) => void;
-  onClearSplit: (tableId: string) => void;
-  onMergeTables: (sourceTableId: string, targetTableId: string) => void;
+  onMergeTables: (sourceTableIds: string[], targetTableId: string) => void;
+  onSplitMergedTables: (masterTableId: string, memberTableIds: string[]) => void;
 }
+
+const ORIGINAL_STATUS_LABEL: Record<CashierTableStatus, string> = {
+  IDLE: 'Bàn trống',
+  RESERVED: 'Đã đặt trước',
+  OCCUPIED: 'Đang phục vụ',
+  LOCKED: 'Đang khóa bill',
+  OVERDUE: 'Quá SLA',
+  CLEANING: 'Cần dọn',
+};
 
 export function SplitMergeModal({
   open,
   onClose,
   sourceTable,
   allTables,
-  onSplitEqual,
-  onSplitByItems,
-  onMarkSplitPaid,
-  onClearSplit,
   onMergeTables,
+  onSplitMergedTables,
 }: SplitMergeModalProps) {
-  const [mode, setMode] = React.useState<'split' | 'merge'>('split');
-  const [splitMethod, setSplitMethod] = React.useState<'equal' | 'items'>('equal');
-  const [numParts, setNumParts] = React.useState<number>(2);
-  const [selectedItemIds, setSelectedItemIds] = React.useState<string[]>([]);
-  const [targetTableId, setTargetTableId] = React.useState<string>('');
+  const masterTable = React.useMemo(() => {
+    if (sourceTable.mergedIntoTableId) {
+      return allTables.find((t) => t.id === sourceTable.mergedIntoTableId) ?? sourceTable;
+    }
+    return sourceTable;
+  }, [allTables, sourceTable]);
 
+  const mergedMembers = React.useMemo(
+    () => masterTable.mergedMemberTables ?? [],
+    [masterTable.mergedMemberTables]
+  );
+  const hasMergedGroup = mergedMembers.length > 0;
+
+  const [mode, setMode] = React.useState<'merge' | 'split'>(hasMergedGroup ? 'split' : 'merge');
+  const [selectedMergeIds, setSelectedMergeIds] = React.useState<string[]>([]);
+  const [preferredMasterId, setPreferredMasterId] = React.useState<string>(masterTable.id);
+  const [selectedSplitIds, setSelectedSplitIds] = React.useState<string[]>([]);
+
+  // Các bàn có thể chọn để gộp thêm vào nhóm (bàn đang phục vụ, quá SLA hoặc bàn trống, chưa thuộc nhóm gộp khác)
   const mergeCandidates = React.useMemo(
     () =>
       allTables.filter(
         (t) =>
-          t.id !== sourceTable.id &&
+          t.id !== masterTable.id &&
+          !t.mergedIntoTableId &&
+          !(t.mergedMemberTables && t.mergedMemberTables.length > 0) &&
           (t.status === 'OCCUPIED' || t.status === 'OVERDUE' || t.status === 'IDLE')
       ),
-    [allTables, sourceTable.id]
+    [allTables, masterTable.id]
   );
 
   React.useEffect(() => {
-    if (mergeCandidates.length > 0 && !mergeCandidates.some((t) => t.id === targetTableId)) {
-      const occupiedCandidate = mergeCandidates.find((t) => t.status !== 'IDLE');
-      setTargetTableId((occupiedCandidate ?? mergeCandidates[0]).id);
+    if (!open) return;
+    setMode(hasMergedGroup ? 'split' : 'merge');
+    setSelectedMergeIds([]);
+    setPreferredMasterId(masterTable.id);
+    if (sourceTable.mergedIntoTableId) {
+      setSelectedSplitIds([sourceTable.id]);
+    } else {
+      setSelectedSplitIds([]);
     }
-  }, [mergeCandidates, targetTableId]);
+  }, [open, sourceTable.id, sourceTable.mergedIntoTableId, masterTable.id, hasMergedGroup]);
+
+  // Nếu bàn đang giữ bill chính bị bỏ tick thì tự động quay về masterTable.id
+  React.useEffect(() => {
+    if (
+      preferredMasterId !== masterTable.id &&
+      !selectedMergeIds.includes(preferredMasterId)
+    ) {
+      setPreferredMasterId(masterTable.id);
+    }
+  }, [preferredMasterId, masterTable.id, selectedMergeIds]);
 
   if (!open) return null;
 
-  const sourcePayable = computeTablePayable(sourceTable);
-  const targetTable = allTables.find((t) => t.id === targetTableId);
-  const targetPayable = targetTable ? computeTablePayable(targetTable) : 0;
-  const combinedPreviewTotal = sourcePayable + targetPayable;
-
-  const toggleItemSelect = (id: string) => {
-    setSelectedItemIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  const toggleMergeCandidate = (tableId: string) => {
+    setSelectedMergeIds((prev) =>
+      prev.includes(tableId) ? prev.filter((id) => id !== tableId) : [...prev, tableId]
     );
   };
+
+  const toggleSplitMember = (tableId: string) => {
+    setSelectedSplitIds((prev) =>
+      prev.includes(tableId) ? prev.filter((id) => id !== tableId) : [...prev, tableId]
+    );
+  };
+
+  const selectedMergeTables = mergeCandidates.filter((t) => selectedMergeIds.includes(t.id));
+  const masterSelectionPool = hasMergedGroup
+    ? [masterTable]
+    : [masterTable, ...selectedMergeTables];
+
+  const effectiveTargetTable =
+    masterSelectionPool.find((t) => t.id === preferredMasterId) ?? masterTable;
+
+  const effectiveSourceIds = hasMergedGroup
+    ? selectedMergeIds
+    : [masterTable.id, ...selectedMergeIds].filter((id) => id !== effectiveTargetTable.id);
+
+  const previewMergeTables = [masterTable, ...selectedMergeTables];
+  const previewMergeGuests = previewMergeTables.reduce((sum, t) => sum + t.guests, 0);
+  const previewMergePayable = previewMergeTables.reduce(
+    (sum, t) => sum + computeTablePayable(t),
+    0
+  );
+
+  // Tính xem trước cho tab Tách Bàn
+  const selectedSnapshots = mergedMembers.filter((m) => selectedSplitIds.includes(m.tableId));
+  const detachedSubtotal = selectedSnapshots.reduce(
+    (sum, snap) =>
+      sum + snap.items.reduce((itemSum, it) => itemSum + it.qty * it.unitPrice, 0),
+    0
+  );
+  const masterCurrentSubtotal = masterTable.items.reduce(
+    (sum, it) => sum + it.qty * it.unitPrice,
+    0
+  );
+  const remainingMasterSubtotal = Math.max(0, masterCurrentSubtotal - detachedSubtotal);
+
+  const activeOccupiedCandidates = mergeCandidates.filter(
+    (t) => t.status === 'OCCUPIED' || t.status === 'OVERDUE'
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
@@ -72,10 +149,11 @@ export function SplitMergeModal({
         <div className="flex items-center justify-between border-b border-sand-200 bg-cream px-6 py-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-muted">
-              Use Case • Split / Merge Invoices
+              Nghiệp vụ Thu ngân • Gộp / Tách Bàn
             </p>
             <h2 className="text-xl font-extrabold text-ink">
-              Tách / Gộp Hóa Đơn — {sourceTable.label}
+              Tách / Gộp Bàn — {masterTable.label}
+              {sourceTable.id !== masterTable.id ? ` (đang chọn ${sourceTable.label})` : ''}
             </h2>
           </div>
           <button
@@ -92,18 +170,6 @@ export function SplitMergeModal({
         <div className="grid grid-cols-2 gap-2 border-b border-sand-200 bg-white px-6 py-3">
           <button
             type="button"
-            onClick={() => setMode('split')}
-            className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors ${
-              mode === 'split'
-                ? 'border-primary-500 bg-primary-500 text-white'
-                : 'border-sand-300 bg-cream/60 text-ink hover:bg-cream-dark'
-            }`}
-          >
-            <Scissors className="h-4 w-4" />
-            <span>Tách Hóa Đơn (Split Invoice)</span>
-          </button>
-          <button
-            type="button"
             onClick={() => setMode('merge')}
             className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors ${
               mode === 'merge'
@@ -112,260 +178,383 @@ export function SplitMergeModal({
             }`}
           >
             <GitMerge className="h-4 w-4" />
-            <span>Gộp Hóa Đơn & Bàn (Merge)</span>
+            <span>Gộp Bàn (2+ bàn)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('split')}
+            className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors ${
+              mode === 'split'
+                ? 'border-primary-500 bg-primary-500 text-white'
+                : 'border-sand-300 bg-cream/60 text-ink hover:bg-cream-dark'
+            }`}
+          >
+            <Split className="h-4 w-4" />
+            <span>
+              Tách Bàn {hasMergedGroup ? `(${mergedMembers.length})` : ''}
+            </span>
           </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
-          {mode === 'split' ? (
+          {mode === 'merge' ? (
             <div className="flex flex-col gap-5">
-              {/* Tổng cần thu */}
-              <div className="flex items-center justify-between rounded-xl border border-sand-200 bg-cream p-4">
-                <div>
-                  <p className="text-xs font-medium text-muted">
-                    Tổng cần thanh toán của {sourceTable.label} (đã tính VAT 8%, trừ cọc/KM)
-                  </p>
-                  <p className="ops-nums mt-0.5 text-2xl font-extrabold text-primary-500">
-                    {formatVND(sourcePayable)}
-                  </p>
-                </div>
-                {sourceTable.splits ? (
-                  <button
-                    type="button"
-                    onClick={() => onClearSplit(sourceTable.id)}
-                    className="cursor-pointer rounded-lg border border-sand-300 bg-white px-3 py-2 text-xs font-bold text-ink hover:bg-cream-dark"
-                  >
-                    Hủy tách • Về 1 bill
-                  </button>
-                ) : null}
+              {/* Giải thích nghiệp vụ gộp nhiều bàn */}
+              <div className="rounded-xl border border-sand-200 bg-cream p-4 text-xs text-ink">
+                <p className="font-bold text-ink">
+                  Gộp 2 hoặc nhiều bàn phục vụ cùng nhóm khách
+                </p>
+                <p className="mt-1 leading-relaxed text-muted">
+                  Tất cả bàn sau khi gộp{' '}
+                  <strong className="text-ink">vẫn giữ trạng thái Đang phục vụ</strong> trên
+                  sơ đồ bàn. Nếu gộp nhầm bàn, bạn có thể mở lại tab{' '}
+                  <strong className="text-ink">Tách Bàn</strong> để tách riêng từng bàn ra bất kỳ lúc nào.
+                </p>
               </div>
 
-              {/* Chọn kiểu tách */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSplitMethod('equal')}
-                  className={`flex-1 cursor-pointer rounded-xl border py-2.5 text-xs font-bold ${
-                    splitMethod === 'equal'
-                      ? 'border-ink bg-ink text-white'
-                      : 'border-sand-300 bg-white text-ink'
-                  }`}
-                >
-                  Chia đều theo đầu người
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSplitMethod('items')}
-                  className={`flex-1 cursor-pointer rounded-xl border py-2.5 text-xs font-bold ${
-                    splitMethod === 'items'
-                      ? 'border-ink bg-ink text-white'
-                      : 'border-sand-300 bg-white text-ink'
-                  }`}
-                >
-                  Tách riêng theo món (Ai gọi nấy trả)
-                </button>
+              {/* Thông tin bàn hiện tại / nhóm hiện tại */}
+              <div className="rounded-xl border border-primary-200 bg-primary-50/40 px-4 py-3 text-xs">
+                <span className="font-bold uppercase tracking-wider text-primary-600">
+                  {hasMergedGroup ? 'Nhóm đang gộp hiện tại' : 'Bàn đang chọn làm gốc'}
+                </span>
+                <p className="mt-1 text-sm font-extrabold text-ink">
+                  {masterTable.label}
+                  {hasMergedGroup
+                    ? ` + ${mergedMembers.map((m) => m.label).join(' + ')}`
+                    : ''}
+                </p>
+                <p className="mt-0.5 text-muted">
+                  {masterTable.area} • {masterTable.guests} khách • Cần thu hiện tại:{' '}
+                  <strong className="ops-nums text-ink">
+                    {formatVND(computeTablePayable(masterTable))}
+                  </strong>
+                </p>
               </div>
 
-              {splitMethod === 'equal' ? (
-                <div className="rounded-xl border border-sand-200 bg-cream/40 p-4">
-                  <p className="mb-2.5 text-xs font-bold text-ink">
-                    Chọn số phần muốn chia đều (Số nguyên VND chuẩn xác):
+              {/* Danh sách chọn nhiều bàn để gộp */}
+              <div>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-ink">
+                    Chọn 1 hoặc nhiều bàn cần gộp cùng {masterTable.label}:
                   </p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[2, 3, 4, 5].map((n) => (
+                  <div className="flex gap-1.5">
+                    {activeOccupiedCandidates.length > 0 ? (
                       <button
-                        key={n}
                         type="button"
-                        onClick={() => setNumParts(n)}
-                        className={`ops-nums min-h-12 cursor-pointer rounded-xl border text-sm font-bold ${
-                          numParts === n
-                            ? 'border-primary-500 bg-primary-500 text-white'
-                            : 'border-sand-300 bg-white text-ink hover:bg-cream'
-                        }`}
+                        onClick={() =>
+                          setSelectedMergeIds(activeOccupiedCandidates.map((t) => t.id))
+                        }
+                        className="min-h-8 cursor-pointer rounded-lg border border-sand-300 bg-white px-2.5 text-[11px] font-bold text-ink hover:bg-cream-dark"
                       >
-                        Chia {n} phần
+                        Chọn bàn đang phục vụ ({activeOccupiedCandidates.length})
                       </button>
-                    ))}
+                    ) : null}
+                    {selectedMergeIds.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMergeIds([])}
+                        className="min-h-8 cursor-pointer rounded-lg border border-sand-300 bg-white px-2.5 text-[11px] font-semibold text-muted hover:text-ink"
+                      >
+                        Bỏ chọn
+                      </button>
+                    ) : null}
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-muted">
-                    <span>Mỗi phần dự kiến:</span>
-                    <strong className="ops-nums text-sm text-ink">
-                      ~ {formatVND(Math.floor(sourcePayable / numParts))} / phần
-                    </strong>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onSplitEqual(sourceTable.id, numParts)}
-                    className="mt-3 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-ink px-4 text-xs font-bold text-white hover:opacity-90"
-                  >
-                    <Users className="h-4 w-4" />
-                    <span>Áp dụng tách {numParts} phần bằng nhau</span>
-                  </button>
                 </div>
-              ) : (
-                <div className="rounded-xl border border-sand-200 bg-cream/40 p-4">
-                  <p className="mb-2.5 text-xs font-bold text-ink">
-                    Tick chọn các món muốn tách sang Hóa đơn phụ A:
-                  </p>
-                  <div className="max-h-48 space-y-2 overflow-y-auto">
-                    {sourceTable.items.map((item) => {
-                      const checked = selectedItemIds.includes(item.id);
+
+                {mergeCandidates.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-sand-300 bg-cream/40 p-5 text-center text-xs text-muted">
+                    Không còn bàn hợp lệ nào để gộp thêm.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {mergeCandidates.map((t) => {
+                      const isChecked = selectedMergeIds.includes(t.id);
+                      const tablePayable = computeTablePayable(t);
                       return (
-                        <label
-                          key={item.id}
-                          className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 text-xs ${
-                            checked
-                              ? 'border-primary-500 bg-primary-50/40'
-                              : 'border-sand-200 bg-white'
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => toggleMergeCandidate(t.id)}
+                          className={`flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-xl border p-3.5 text-left transition-colors ${
+                            isChecked
+                              ? 'border-primary-500 bg-primary-50/70 ring-1 ring-primary-300'
+                              : 'border-sand-200 bg-white hover:bg-cream/60'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleItemSelect(item.id)}
-                              className="h-4 w-4 accent-[#8C1D2C]"
-                            />
-                            <span className="font-bold text-ink">
-                              {item.name} ×{item.qty}
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                                isChecked
+                                  ? 'border-primary-500 bg-primary-500 text-white'
+                                  : 'border-sand-400 bg-white'
+                              }`}
+                            >
+                              {isChecked ? <Check className="h-3.5 w-3.5" /> : null}
                             </span>
+                            <div>
+                              <p className="text-sm font-extrabold text-ink">{t.label}</p>
+                              <p className="text-[11px] text-muted">
+                                {ORIGINAL_STATUS_LABEL[t.status]} •{' '}
+                                {t.guests > 0 ? `${t.guests} khách` : `${t.seats} ghế`}
+                              </p>
+                            </div>
                           </div>
-                          <span className="ops-nums font-bold text-ink">
-                            {formatVND(item.qty * item.unitPrice)}
-                          </span>
-                        </label>
+                          <div className="text-right">
+                            <p className="ops-nums text-xs font-extrabold text-primary-500">
+                              {t.items.length > 0 ? formatVND(tablePayable) : '0 ₫'}
+                            </p>
+                            <p className="text-[11px] text-muted">
+                              {t.items.length > 0 ? `${t.items.length} món` : 'Ghép thêm chỗ'}
+                            </p>
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
-                  <button
-                    type="button"
-                    disabled={selectedItemIds.length === 0}
-                    onClick={() => onSplitByItems(sourceTable.id, selectedItemIds)}
-                    className="mt-3 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-ink px-4 text-xs font-bold text-white disabled:opacity-40"
-                  >
-                    <Scissors className="h-4 w-4" />
-                    <span>Tách các món đã chọn thành 2 phiếu thu</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Danh sách các phần đã tách (UNPAID / PAID) */}
-              {sourceTable.splits && sourceTable.splits.length > 0 ? (
-                <div className="space-y-2.5">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                    Trạng thái thu từng phần (Bill chỉ đóng khi tất cả phần đều PAID)
-                  </p>
-                  {sourceTable.splits.map((part) => (
-                    <div
-                      key={part.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sand-200 bg-white p-3.5"
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-ink">{part.label}</p>
-                        <p className="ops-nums text-base font-extrabold text-primary-500">
-                          {formatVND(part.amount)}
-                        </p>
-                      </div>
-                      {part.status === 'PAID' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-sage-100 px-3 py-1.5 text-xs font-bold text-sage-700">
-                          <Check className="h-4 w-4" />
-                          <span>ĐÃ THU (PAID)</span>
-                        </span>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => onMarkSplitPaid(sourceTable.id, part.id, 'CASH')}
-                            className="min-h-10 cursor-pointer rounded-lg border border-sand-300 bg-cream px-3 text-xs font-bold text-ink hover:bg-cream-dark"
-                          >
-                            Thu Tiền mặt
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onMarkSplitPaid(sourceTable.id, part.id, 'VIETQR')}
-                            className="min-h-10 cursor-pointer rounded-lg bg-primary-500 px-3 text-xs font-bold text-white hover:bg-primary-600"
-                          >
-                            Thu VietQR
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            /* Tab 2: Merge Invoices */
-            <div className="flex flex-col gap-5">
-              <div>
-                <p className="mb-2 text-xs font-bold text-ink">
-                  Chọn bàn đích để gộp hóa đơn từ <strong>{sourceTable.label}</strong> sang:
-                </p>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                  {mergeCandidates.map((cand) => {
-                    const isPicked = cand.id === targetTableId;
-                    const candSub = computeTableSubtotal(cand);
-                    return (
-                      <button
-                        key={cand.id}
-                        type="button"
-                        onClick={() => setTargetTableId(cand.id)}
-                        className={`flex min-h-20 cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${
-                          isPicked
-                            ? 'border-2 border-primary-500 bg-cream shadow-warm'
-                            : 'border-sand-200 bg-white hover:border-ink'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="ops-nums text-sm font-extrabold text-ink">
-                            {cand.label}
-                          </span>
-                          <span className="rounded bg-sand-100 px-1.5 py-0.5 text-[10px] font-bold text-brown-700">
-                            {cand.status === 'IDLE' ? 'Trống' : `${cand.items.length} món`}
-                          </span>
-                        </div>
-                        <span className="ops-nums text-xs font-semibold text-muted">
-                          {candSub > 0 ? formatVND(candSub) : '0 ₫'} • {cand.area}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                )}
               </div>
 
-              {/* Bước xem trước (Preview) theo chuẩn Deep-Dive */}
-              {targetTable ? (
-                <div className="rounded-2xl border border-primary-200 bg-primary-50/40 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-primary-600">
-                    Xem trước giao dịch Gộp Hóa Đơn (@Transactional)
+              {/* Chọn bàn chính giữ bill nếu đang tạo nhóm mới */}
+              {!hasMergedGroup && selectedMergeIds.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-xs font-bold text-ink">
+                    Bàn chính đại diện giữ hóa đơn gộp:
                   </p>
-                  <p className="ops-nums mt-1.5 text-base font-extrabold text-ink">
-                    Gộp {sourceTable.label} ({formatVND(sourcePayable)}) + {targetTable.label} (
-                    {formatVND(targetPayable)}) &rarr; Tổng bill mới:{' '}
-                    <span className="text-primary-500">{formatVND(combinedPreviewTotal)}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {masterSelectionPool.map((t) => {
+                      const isPrimary = effectiveTargetTable.id === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setPreferredMasterId(t.id)}
+                          className={`min-h-10 cursor-pointer rounded-xl border px-3.5 text-xs font-bold transition-colors ${
+                            isPrimary
+                              ? 'border-ink bg-ink text-white'
+                              : 'border-sand-300 bg-white text-ink hover:bg-cream-dark'
+                          }`}
+                        >
+                          {t.label}
+                          {isPrimary ? ' (Bàn chính)' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Preview sau khi gộp */}
+              {selectedMergeIds.length > 0 ? (
+                <div className="rounded-xl border border-sand-200 bg-cream p-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-ink">
+                      Nhóm sau khi gộp ({1 + mergedMembers.length + selectedMergeIds.length} bàn)
+                    </span>
+                    <span className="rounded-md bg-sage-100 px-2 py-0.5 text-[11px] font-bold text-sage-700">
+                      Đang phục vụ
+                    </span>
+                  </div>
+                  <p className="mt-1.5 font-extrabold text-ink">
+                    Bàn chính: {effectiveTargetTable.label} • Gộp cùng:{' '}
+                    {previewMergeTables
+                      .filter((t) => t.id !== effectiveTargetTable.id)
+                      .map((t) => t.label)
+                      .concat(mergedMembers.map((m) => m.label))
+                      .join(', ')}
                   </p>
-                  <p className="mt-1 text-xs text-muted">
-                    • Tổng số khách sau gộp: {sourceTable.guests + targetTable.guests} khách •{' '}
-                    {sourceTable.label} sẽ chuyển sang trạng thái Cần dọn.
+                  <p className="mt-1 text-muted">
+                    <Users className="mr-1 inline h-3.5 w-3.5" />
+                    Tổng {previewMergeGuests} khách • Hóa đơn dự kiến:{' '}
+                    <strong className="ops-nums text-primary-500">
+                      {formatVND(previewMergePayable)}
+                    </strong>
                   </p>
                 </div>
               ) : null}
 
               <button
                 type="button"
-                disabled={!targetTableId}
+                disabled={effectiveSourceIds.length === 0}
                 onClick={() => {
-                  onMergeTables(sourceTable.id, targetTableId);
+                  onMergeTables(effectiveSourceIds, effectiveTargetTable.id);
                   onClose();
                 }}
-                className="flex min-h-13 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 py-3.5 text-base font-bold text-white shadow-warm transition-colors hover:bg-primary-600 disabled:opacity-40"
+                className="min-h-13 w-full cursor-pointer rounded-xl bg-primary-500 text-sm font-bold text-white shadow-warm hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <GitMerge className="h-5 w-5" />
-                <span>
-                  Xác nhận Gộp {sourceTable.label} vào {targetTable?.label ?? ''}
-                </span>
+                {selectedMergeIds.length > 0
+                  ? `Xác nhận Gộp ${1 + selectedMergeIds.length} bàn vào ${effectiveTargetTable.label}`
+                  : 'Chọn ít nhất 1 bàn khác để gộp'}
               </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5">
+              {!hasMergedGroup ? (
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-sand-300 bg-cream/50 p-8 text-center">
+                  <AlertCircle className="h-8 w-8 text-muted" />
+                  <div>
+                    <p className="text-sm font-extrabold text-ink">
+                      {masterTable.label} hiện chưa gộp với bàn nào
+                    </p>
+                    <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
+                      Chức năng <strong>Tách Bàn</strong> dùng để tách một hoặc nhiều bàn ra
+                      khỏi nhóm các bàn đã được gộp (tránh trường hợp gộp nhầm bàn). Hãy
+                      chuyển sang tab <strong>Gộp Bàn</strong> để gộp bàn trước.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMode('merge')}
+                    className="mt-1 min-h-11 cursor-pointer rounded-xl bg-primary-500 px-5 text-xs font-bold text-white shadow-warm-sm hover:bg-primary-600"
+                  >
+                    Chuyển sang tab Gộp Bàn
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl border border-sand-200 bg-cream p-4 text-xs">
+                    <p className="font-bold text-ink">
+                      Tách bàn khỏi nhóm đang gộp ({masterTable.label})
+                    </p>
+                    <p className="mt-1 leading-relaxed text-muted">
+                      Chọn 1 hoặc nhiều bàn bên dưới để tách ra thành bàn độc lập (khôi phục
+                      nguyên trạng món gọi, số khách và trạng thái trước khi gộp).
+                    </p>
+                  </div>
+
+                  {/* Thẻ bàn chính giữ lại */}
+                  <div className="flex items-center justify-between rounded-xl border border-sand-300 bg-sand-100/70 px-4 py-3 text-xs">
+                    <div>
+                      <span className="font-extrabold text-ink">{masterTable.label}</span>
+                      <span className="ml-2 rounded-md bg-ink px-2 py-0.5 text-[10px] font-bold text-white">
+                        Bàn chính giữ hóa đơn nhóm
+                      </span>
+                    </div>
+                    <span className="ops-nums font-bold text-ink">
+                      Tạm tính nhóm: {formatVND(masterCurrentSubtotal)}
+                    </span>
+                  </div>
+
+                  {/* Danh sách các bàn đã được gộp để tick chọn tách */}
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-bold text-ink">
+                        Các bàn đang gộp chung ({mergedMembers.length} bàn):
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedSplitIds(
+                            selectedSplitIds.length === mergedMembers.length
+                              ? []
+                              : mergedMembers.map((m) => m.tableId)
+                          )
+                        }
+                        className="min-h-8 cursor-pointer rounded-lg border border-sand-300 bg-white px-2.5 text-[11px] font-bold text-ink hover:bg-cream-dark"
+                      >
+                        {selectedSplitIds.length === mergedMembers.length
+                          ? 'Bỏ chọn tất cả'
+                          : `Chọn tách tất cả (${mergedMembers.length})`}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      {mergedMembers.map((snap) => {
+                        const isChecked = selectedSplitIds.includes(snap.tableId);
+                        const snapSubtotal = snap.items.reduce(
+                          (sum, it) => sum + it.qty * it.unitPrice,
+                          0
+                        );
+                        return (
+                          <button
+                            key={snap.tableId}
+                            type="button"
+                            onClick={() => toggleSplitMember(snap.tableId)}
+                            className={`flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-xl border p-3.5 text-left transition-colors ${
+                              isChecked
+                                ? 'border-primary-500 bg-primary-50/70 ring-1 ring-primary-300'
+                                : 'border-sand-200 bg-white hover:bg-cream/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span
+                                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                                  isChecked
+                                    ? 'border-primary-500 bg-primary-500 text-white'
+                                    : 'border-sand-400 bg-white'
+                                }`}
+                              >
+                                {isChecked ? <Check className="h-3.5 w-3.5" /> : null}
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-extrabold text-ink">
+                                    {snap.label}
+                                  </span>
+                                  <span className="rounded-md border border-sand-300 bg-cream px-2 py-0.5 text-[10px] font-bold text-brown-800">
+                                    Đang phục vụ (đã gộp)
+                                  </span>
+                                </div>
+                                <p className="mt-0.5 text-[11px] text-muted">
+                                  Khôi phục về: {ORIGINAL_STATUS_LABEL[snap.originalStatus]} •{' '}
+                                  {snap.guests} khách • {snap.items.length} món
+                                </p>
+                              </div>
+                            </div>
+                            <span className="ops-nums shrink-0 text-sm font-extrabold text-primary-500">
+                              {formatVND(snapSubtotal)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Xem trước kết quả tách */}
+                  {selectedSnapshots.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 rounded-xl border border-sand-200 bg-cream p-4 text-xs sm:grid-cols-2">
+                      <div>
+                        <p className="font-bold text-muted">
+                          {masterTable.label} còn lại:
+                        </p>
+                        <p className="ops-nums mt-0.5 text-base font-extrabold text-ink">
+                          {formatVND(remainingMasterSubtotal)}
+                        </p>
+                        <p className="text-[11px] text-muted">
+                          {mergedMembers.length - selectedSnapshots.length > 0
+                            ? `Vẫn còn gộp ${mergedMembers.length - selectedSnapshots.length} bàn`
+                            : 'Trở về bàn đơn bình thường'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-bold text-primary-600">
+                          Tách ra ({selectedSnapshots.map((s) => s.label).join(', ')}):
+                        </p>
+                        <p className="ops-nums mt-0.5 text-base font-extrabold text-primary-500">
+                          {formatVND(detachedSubtotal)}
+                        </p>
+                        <p className="text-[11px] text-muted">
+                          Khôi phục món &amp; khách về đúng bàn gốc
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    disabled={selectedSplitIds.length === 0}
+                    onClick={() => {
+                      onSplitMergedTables(masterTable.id, selectedSplitIds);
+                      onClose();
+                    }}
+                    className="min-h-13 w-full cursor-pointer rounded-xl bg-primary-500 text-sm font-bold text-white shadow-warm hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {selectedSplitIds.length > 0
+                      ? `Xác nhận Tách ${selectedSplitIds.length} bàn khỏi ${masterTable.label}`
+                      : 'Chọn ít nhất 1 bàn đã gộp để tách ra'}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -373,4 +562,3 @@ export function SplitMergeModal({
     </div>
   );
 }
-

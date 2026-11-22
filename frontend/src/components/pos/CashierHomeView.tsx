@@ -194,8 +194,8 @@ export function CashierHomeView({
             },
             {
               icon: GitMerge,
-              label: 'Tách / Gộp Hóa đơn',
-              sub: 'Chia đều / Theo món / Gộp',
+              label: 'Tách / Gộp Bàn',
+              sub: 'Gộp nhiều bàn / Tách bàn đã gộp',
               onClick: () => {
                 if (selectedTableId) {
                   onOpenSplitMerge(selectedTableId);
@@ -247,10 +247,12 @@ export function CashierHomeView({
           {tables
             .filter((t) => t.status === 'OVERDUE' || t.status === 'OCCUPIED')
             .map((table) => {
-              const summaryText = table.items
-                .slice(0, 2)
-                .map((it) => `${it.name} ×${it.qty}`)
-                .join(', ');
+              const summaryText = table.mergedIntoTableId
+                ? `Đã gộp vào ${table.mergedIntoTableLabel}`
+                : table.items
+                    .slice(0, 2)
+                    .map((it) => `${it.name} ×${it.qty}`)
+                    .join(', ');
               const payable = computeTablePayable(table);
               const subtotal = computeTableSubtotal(table);
               const isOverdue = table.status === 'OVERDUE';
@@ -267,11 +269,20 @@ export function CashierHomeView({
                       {table.label} • {summaryText || 'Đang phục vụ'}
                     </p>
                     <p className="mt-1 text-xs text-muted">
-                      Ngồi {table.seatedMin} phút • Tạm tính: {formatVND(subtotal)} • Cần thu:{' '}
-                      <strong className="ops-nums text-ink">{formatVND(payable)}</strong>
-                      {table.depositAmount > 0
-                        ? ` (Đã trừ cọc ${formatVND(table.depositAmount)})`
-                        : ''}
+                      {table.mergedIntoTableId ? (
+                        <>
+                          Đang phục vụ gộp hóa đơn chung với{' '}
+                          <strong className="text-ink">{table.mergedIntoTableLabel}</strong>
+                        </>
+                      ) : (
+                        <>
+                          Ngồi {table.seatedMin} phút • Tạm tính: {formatVND(subtotal)} • Cần thu:{' '}
+                          <strong className="ops-nums text-ink">{formatVND(payable)}</strong>
+                          {table.depositAmount > 0
+                            ? ` (Đã trừ cọc ${formatVND(table.depositAmount)})`
+                            : ''}
+                        </>
+                      )}
                     </p>
                     {table.allergyAlert ? (
                       <p className="mt-1 text-xs font-semibold text-danger-600">
@@ -287,7 +298,7 @@ export function CashierHomeView({
                         : 'border-sand-200 bg-sand-100 text-brown-700'
                     }`}
                   >
-                    {isOverdue ? 'Quá SLA' : 'Chờ thu'}
+                    {isOverdue ? 'Quá SLA' : table.mergedIntoTableId ? 'Đã gộp' : 'Chờ thu'}
                   </span>
                 </button>
               );
