@@ -5,6 +5,7 @@ import {
   getOrCreateSessionId,
   getAiChatService,
   liveAiChatService,
+  parseSseBlock,
 } from '../../../lib/ai-chat-client';
 import { mockAiChatService } from '../../../lib/ai-chat-mock';
 import { ChatStreamEvent } from '../../../lib/ai-chat-contract';
@@ -296,6 +297,74 @@ describe('AiChatWidget & AI Client Tests', () => {
       );
       expect(cardEvents.length).toBe(0);
     }, 15000);
+
+    it('parses live SSE blocks for dish, booking, voucher, and done correctly', () => {
+      // Dish card SSE block
+      const dishBlock =
+        'event: dish_card\ndata: {"dish_id":"DISH-001","name":"Chả Cá Lã Vọng","price":180000,"available":true}';
+      const dishEvent = parseSseBlock(dishBlock);
+      expect(dishEvent).toEqual({
+        type: 'dish_card',
+        dish: {
+          id: 'DISH-001',
+          name: 'Chả Cá Lã Vọng',
+          price: 180000,
+          description: 'Đang phục vụ sẵn sàng',
+          imageUrl: expect.any(String),
+          badge: 'Bán chạy',
+        },
+      });
+
+      // Booking card SSE block
+      const bookingBlock =
+        'event: booking_card\ndata: {"booking_code":"PC-123456","name":"Nguyen Van A","phone_masked":"090***123","date":"2026-11-25","time":"19:00","party_size":4,"table_id":"TB-02","status":"CONFIRMED"}';
+      const bookingEvent = parseSseBlock(bookingBlock);
+      expect(bookingEvent).toEqual({
+        type: 'booking_card',
+        booking: {
+          bookingCode: 'PC-123456',
+          tableId: 'TB-02',
+          guestName: 'Nguyen Van A',
+          phone: '090***123',
+          date: '2026-11-25',
+          time: '19:00',
+          partySize: 4,
+          status: 'CONFIRMED',
+          note: undefined,
+          isSample: false,
+        },
+      });
+
+      // Voucher card SSE block
+      const voucherBlock =
+        'event: voucher_card\ndata: {"code":"PHOCO10","discount_vnd":50000,"min_order_vnd":200000,"expiry":"2026-12-31"}';
+      const voucherEvent = parseSseBlock(voucherBlock);
+      expect(voucherEvent).toEqual({
+        type: 'voucher_card',
+        voucher: {
+          code: 'PHOCO10',
+          title: 'PHOCO10',
+          discountText: expect.stringContaining('50.000'),
+          conditions: expect.stringContaining('200.000'),
+          validUntil: '2026-12-31',
+          isSample: false,
+        },
+      });
+
+      // Done block
+      const doneBlock = 'event: done\ndata: {"status":"completed"}';
+      expect(parseSseBlock(doneBlock)).toEqual({ type: 'done' });
+
+      // Plain data: [DONE]
+      expect(parseSseBlock('data: [DONE]')).toEqual({ type: 'done' });
+
+      // Error block
+      const errorBlock = 'event: error\ndata: Lỗi hệ thống';
+      expect(parseSseBlock(errorBlock)).toEqual({
+        type: 'error',
+        message: 'Lỗi hệ thống',
+      });
+    });
   });
 
   describe('Group B: Source-inspection assertions on AiChatWidget.tsx', () => {
