@@ -25,7 +25,9 @@ CREATE TABLE open_shifts (
     posted_by_id UUID NOT NULL,
     note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT chk_slots_limit CHECK (slots_taken <= slots_total),
+    CONSTRAINT fk_open_shifts_posted_by FOREIGN KEY (posted_by_id) REFERENCES users(id)
 );
 
 -- Index for fast lookup by date
@@ -41,13 +43,15 @@ CREATE TABLE shift_registrations (
     note TEXT,
     idempotency_key VARCHAR(255) UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_shift_registrations_staff FOREIGN KEY (staff_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT uq_staff_open_shift UNIQUE (staff_id, open_shift_id)
 );
 
 -- Composite index for staff daily lookup
 CREATE INDEX idx_shift_registrations_staff_date ON shift_registrations(staff_id, date_key);
 
--- Trigger to auto‑update updated_at
+-- Trigger to auto-update updated_at
 CREATE OR REPLACE FUNCTION update_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN

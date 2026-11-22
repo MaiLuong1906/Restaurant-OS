@@ -7,8 +7,10 @@ import com.restaurantos.entity.ShiftRegistrationEntity;
 import com.restaurantos.repository.OpenShiftRepository;
 import com.restaurantos.repository.ShiftRegistrationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -33,36 +35,42 @@ public class StaffScheduleService {
     }
 
     /**
-     * Đăng ký một ca cho nhân viên. Kiểm tra idempotencyKey, slot còn trống và không đăng ký trùng ngày.
+     * Đăng ký một ca cho nhân viên.
+     * Kiểm tra idempotencyKey, khóa ghi Pessimistic Lock chống overselling, và chống đăng ký trùng ca.
      */
     @Transactional
     public ShiftRegistrationDto registerShift(ShiftRegistrationDto request) {
-        // Idempotency check
-        if (request.getIdempotencyKey() != null) {
+        if (request.getStaffId() == null) {
+            throw new IllegalArgumentException("staffId không được để trống");
+        }
+
+        // 1. Kiểm tra Idempotency
+        if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
             var existing = shiftRegistrationRepository.findByIdempotencyKey(request.getIdempotencyKey());
             if (existing.isPresent()) {
                 return toDto(existing.get());
             }
         }
 
-        // Kiểm tra ca tồn tại (với pessimistic lock)
+        // 2. Khóa ghi ca mở chống overselling (Pessimistic Write Lock)
         OpenShiftEntity openShift = openShiftRepository.findByIdWithLock(request.getOpenShiftId())
-                .orElseThrow(() -> new IllegalArgumentException("Open shift not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Ca làm việc không tồn tại"));
 
-        // Kiểm tra slot còn khả dụng
+        // 3. Kiểm tra slot còn khả dụng
         if (openShift.getSlotsTaken() >= openShift.getSlotsTotal()) {
-            throw new IllegalStateException("No available slots for this shift");
+            throw new IllegalArgumentException("Ca làm việc đã hết chỗ khả dụng");
         }
 
-        // Kiểm tra nhân viên chưa đăng ký trùng ngày
-        boolean already = shiftRegistrationRepository.findByStaffIdAndDateKey(request.getStaffId(), request.getDateKey())
+        // 4. Kiểm tra nhân viên chưa đăng ký trùng ca làm việc này
+        boolean alreadyRegistered = shiftRegistrationRepository
+                .findByStaffIdAndDateKey(request.getStaffId(), request.getDateKey())
                 .stream()
                 .anyMatch(reg -> reg.getOpenShift().getId().equals(openShift.getId()));
-        if (already) {
-            throw new IllegalStateException("Staff already registered for a shift on this date");
+        if (alreadyRegistered) {
+            throw new IllegalArgumentException("Nhân viên đã đăng ký ca làm việc này");
         }
 
-        // Tạo entity
+        // 5. Tạo bản ghi đăng ký và cập nhật slot an toàn
         ShiftRegistrationEntity entity = new ShiftRegistrationEntity();
         entity.setStaffId(request.getStaffId());
         entity.setOpenShift(openShift);
@@ -72,7 +80,6 @@ public class StaffScheduleService {
         entity.setIdempotencyKey(request.getIdempotencyKey());
         shiftRegistrationRepository.save(entity);
 
-        // Cập nhật slot
         openShift.setSlotsTaken(openShift.getSlotsTaken() + 1);
         openShiftRepository.save(openShift);
 
@@ -80,18 +87,28 @@ public class StaffScheduleService {
     }
 
     /**
-     * Huỷ đăng ký.
+     * Huỷ đăng ký ca làm việc (hỗ trợ kiểm tra quyền sở hữu chống IDOR và khóa ghi Pessimistic Lock).
      */
     @Transactional
-    public void cancelRegistration(UUID registrationId) {
+    public void cancelRegistration(UUID registrationId, UUID currentUserId, boolean isManagerOrOwner) {
         ShiftRegistrationEntity entity = shiftRegistrationRepository.findById(registrationId)
-                .orElseThrow(() -> new IllegalArgumentException("Registration not found"));
-        // Giảm slot
-        OpenShiftEntity openShift = entity.getOpenShift();
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bản ghi đăng ký ca"));
+
+        if (currentUserId != null && !isManagerOrOwner && !currentUserId.equals(entity.getStaffId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền hủy ca của nhân viên khác");
+        }
+
+        OpenShiftEntity openShift = openShiftRepository.findByIdWithLock(entity.getOpenShift().getId())
+                .orElse(entity.getOpenShift());
         openShift.setSlotsTaken(Math.max(0, openShift.getSlotsTaken() - 1));
         openShiftRepository.save(openShift);
-        // Xóa đăng ký
+
         shiftRegistrationRepository.delete(entity);
+    }
+
+    @Transactional
+    public void cancelRegistration(UUID registrationId) {
+        cancelRegistration(registrationId, null, false);
     }
 
     private OpenShiftDto toDto(OpenShiftEntity e) {
