@@ -3,10 +3,161 @@ import {
   SendMessageParams,
   ChatStreamEvent,
   AiChatMode,
+  DishCardData,
+  BookingCardData,
+  VoucherCardData,
 } from './ai-chat-contract';
 import { mockAiChatService } from './ai-chat-mock';
 
 const SESSION_STORAGE_KEY = 'phoco_ai_session_id';
+
+const FALLBACK_DISH_IMAGE =
+  'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600&auto=format&fit=crop&q=80';
+
+function formatVnd(amount: number): string {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function mapDishPayload(raw: Record<string, unknown>): DishCardData {
+  return {
+    id: String(raw.dish_id || raw.id || 'dish-unknown'),
+    name: String(raw.name || 'Món ăn đặc sản'),
+    price: typeof raw.price === 'number' ? Math.round(raw.price) : 0,
+    description:
+      String(raw.description || (raw.available ? 'Đang phục vụ sẵn sàng' : 'Món ngon nổi bật')),
+    imageUrl: String(raw.imageUrl || raw.image_url || FALLBACK_DISH_IMAGE),
+    badge: raw.badge ? String(raw.badge) : raw.available ? 'Bán chạy' : undefined,
+  };
+}
+
+function mapBookingPayload(raw: Record<string, unknown>): BookingCardData {
+  return {
+    bookingCode: raw.booking_code ? String(raw.booking_code) : undefined,
+    tableId: raw.table_id ? String(raw.table_id) : undefined,
+    guestName: raw.name || raw.guestName ? String(raw.name || raw.guestName) : undefined,
+    phone: raw.phone_masked || raw.phone ? String(raw.phone_masked || raw.phone) : undefined,
+    date: String(raw.date || 'Hôm nay'),
+    time: String(raw.time || '19:00'),
+    partySize: Number(raw.party_size || raw.partySize || 2),
+    status: String(raw.status || 'CONFIRMED'),
+    note: raw.note ? String(raw.note) : undefined,
+    isSample: false,
+  };
+}
+
+function mapVoucherPayload(raw: Record<string, unknown>): VoucherCardData {
+  const discountVnd = typeof raw.discount_vnd === 'number' ? raw.discount_vnd : 0;
+  const minOrderVnd = typeof raw.min_order_vnd === 'number' ? raw.min_order_vnd : 0;
+
+  return {
+    code: String(raw.code || 'PHOCO'),
+    title: String(raw.title || raw.code || 'Ưu đãi ẩm thực Phố Cổ'),
+    discountText: raw.discountText
+      ? String(raw.discountText)
+      : discountVnd > 0
+        ? `Giảm ${formatVnd(discountVnd)}`
+        : 'Ưu đãi đặc biệt',
+    conditions: raw.conditions
+      ? String(raw.conditions)
+      : raw.description
+        ? String(raw.description)
+        : minOrderVnd > 0
+          ? `Áp dụng cho đơn từ ${formatVnd(minOrderVnd)}`
+          : 'Áp dụng khi dùng bữa tại nhà hàng',
+    validUntil: String(raw.expiry || raw.validUntil || '31/12/2026'),
+    isSample: false,
+  };
+}
+
+/**
+ * Phân tích và chuyển đổi một SSE block (event + data) thành ChatStreamEvent
+ */
+export function parseSseBlock(block: string): ChatStreamEvent | null {
+  const lines = block.split('\n');
+  let eventType = '';
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('event:')) {
+      eventType = trimmed.slice(6).trim();
+    } else if (trimmed.startsWith('data:')) {
+      dataLines.push(trimmed.slice(5).trim());
+    }
+  }
+
+  const rawData = dataLines.join('\n');
+  if (!eventType && !rawData) {
+    return null;
+  }
+
+  if (rawData === '[DONE]' || eventType === 'done') {
+    return { type: 'done' };
+  }
+
+  if (eventType === 'text') {
+    return { type: 'text', text: rawData };
+  }
+
+  if (eventType === 'error') {
+    return { type: 'error', message: rawData || 'Đã có lỗi xảy ra' };
+  }
+
+  if (eventType === 'dish_card') {
+    try {
+      const parsedJson = JSON.parse(rawData);
+      return { type: 'dish_card', dish: mapDishPayload(parsedJson) };
+    } catch {
+      return null;
+    }
+  }
+
+  if (eventType === 'booking_card') {
+    try {
+      const parsedJson = JSON.parse(rawData);
+      return { type: 'booking_card', booking: mapBookingPayload(parsedJson) };
+    } catch {
+      return null;
+    }
+  }
+
+  if (eventType === 'voucher_card') {
+    try {
+      const parsedJson = JSON.parse(rawData);
+      return { type: 'voucher_card', voucher: mapVoucherPayload(parsedJson) };
+    } catch {
+      return null;
+    }
+  }
+
+  // Fallback nếu không có event header rõ ràng nhưng data có JSON type
+  try {
+    const parsed = JSON.parse(rawData);
+    if (parsed.type === 'dish_card' && parsed.dish) {
+      return { type: 'dish_card', dish: mapDishPayload(parsed.dish) };
+    }
+    if (parsed.type === 'booking_card' && parsed.booking) {
+      return { type: 'booking_card', booking: mapBookingPayload(parsed.booking) };
+    }
+    if (parsed.type === 'voucher_card' && parsed.voucher) {
+      return { type: 'voucher_card', voucher: mapVoucherPayload(parsed.voucher) };
+    }
+    if (parsed.type === 'done') {
+      return { type: 'done' };
+    }
+    if (parsed.type === 'text' && typeof parsed.text === 'string') {
+      return { type: 'text', text: parsed.text };
+    }
+  } catch {
+    // Không phải JSON
+  }
+
+  return null;
+}
 
 /**
  * Lấy hoặc sinh mới UUID cho session của khách hàng
@@ -79,29 +230,25 @@ export const liveAiChatService: AiChatService = {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop() || '';
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data:')) {
-            const dataStr = trimmed.slice(5).trim();
-            if (dataStr === '[DONE]') {
-              onEvent({ type: 'done' });
+        for (const block of blocks) {
+          const event = parseSseBlock(block);
+          if (event) {
+            onEvent(event);
+            if (event.type === 'done') {
               onDone();
               return;
             }
-            try {
-              const parsed = JSON.parse(dataStr) as ChatStreamEvent;
-              onEvent(parsed);
-              if (parsed.type === 'done') {
-                onDone();
-                return;
-              }
-            } catch {
-              // Ignore non-json chunk
-            }
           }
+        }
+      }
+
+      if (buffer.trim()) {
+        const event = parseSseBlock(buffer);
+        if (event) {
+          onEvent(event);
         }
       }
 

@@ -67,7 +67,9 @@ function BookingBubbleCard({ booking }: { booking: BookingCardData }) {
   return (
     <div className="mt-2 p-3 bg-white rounded-lg border border-[#E9E4DC] shadow-xs space-y-2">
       <div className="flex items-center justify-between border-b border-[#E9E4DC]/60 pb-1.5">
-        <span className="text-xs font-bold text-[#8C1D2C]">Thông Tin Đặt Bàn</span>
+        <span className="text-xs font-bold text-[#8C1D2C]">
+          {booking.bookingCode ? `Mã Đặt Bàn: ${booking.bookingCode}` : 'Thông Tin Đặt Bàn'}
+        </span>
         {booking.isSample && (
           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#E9E4DC]/60 text-[#7A6A58]">
             Dữ liệu mẫu demo
@@ -90,6 +92,7 @@ function BookingBubbleCard({ booking }: { booking: BookingCardData }) {
       </div>
       <div className="pt-1 text-[11px] text-[#7A6A58] flex items-center justify-between">
         <span>Trạng thái: {booking.status}</span>
+        {booking.tableId && <span>Bàn: {booking.tableId}</span>}
         {booking.note && <span className="italic">{booking.note}</span>}
       </div>
     </div>

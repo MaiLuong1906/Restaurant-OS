@@ -26,6 +26,8 @@ export interface DishCardData {
 }
 
 export interface BookingCardData {
+  bookingCode?: string;
+  tableId?: string;
   guestName?: string;
   phone?: string;
   date: string;
