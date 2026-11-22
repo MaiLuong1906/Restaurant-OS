@@ -9,7 +9,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +21,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/staff/schedule")
 @RequiredArgsConstructor
 @Tag(name = "Staff Schedule", description = "Quản lý ca làm việc, đăng ký và huỷ đăng ký")
+@Validated
 public class StaffScheduleController {
 
     private final StaffScheduleService staffScheduleService;
@@ -32,7 +36,11 @@ public class StaffScheduleController {
 
     @PostMapping("/registrations")
     @Operation(summary = "Đăng ký ca làm việc", description = "Tạo một đăng ký mới cho nhân viên (idempotent)")
-    public ResponseEntity<ApiResponse<ShiftRegistrationDto>> registerShift(@RequestBody ShiftRegistrationDto request) {
+    public ResponseEntity<ApiResponse<ShiftRegistrationDto>> registerShift(
+            @Valid @RequestBody ShiftRegistrationDto request,
+            @AuthenticationPrincipal(expression = "id") UUID currentUserId) {
+        // Override staffId with the authenticated user ID to prevent IDOR
+        request.setStaffId(currentUserId);
         ShiftRegistrationDto result = staffScheduleService.registerShift(request);
         return ResponseEntity.ok(ApiResponse.success(result, "Đăng ký ca thành công"));
     }

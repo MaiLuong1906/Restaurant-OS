@@ -33,8 +33,7 @@ public class StaffScheduleService {
     }
 
     /**
-     * Đăng ký một ca cho nhân viên.
-     * Kiểm tra idempotencyKey, slot còn trống và không đăng ký trùng ngày.
+     * Đăng ký một ca cho nhân viên. Kiểm tra idempotencyKey, slot còn trống và không đăng ký trùng ngày.
      */
     @Transactional
     public ShiftRegistrationDto registerShift(ShiftRegistrationDto request) {
@@ -46,8 +45,8 @@ public class StaffScheduleService {
             }
         }
 
-        // Kiểm tra ca tồn tại
-        OpenShiftEntity openShift = openShiftRepository.findById(request.getOpenShiftId())
+        // Kiểm tra ca tồn tại (với pessimistic lock)
+        OpenShiftEntity openShift = openShiftRepository.findByIdWithLock(request.getOpenShiftId())
                 .orElseThrow(() -> new IllegalArgumentException("Open shift not found"));
 
         // Kiểm tra slot còn khả dụng
