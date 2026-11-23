@@ -36,6 +36,9 @@ public record UpdateDishRequest(
         Boolean isCombo,
 
         @Schema(description = "Lý do hết món nếu tạm ngưng phục vụ", example = "Hết nguyên liệu thịt Wagyu")
-        String soldOutReason
+        String soldOutReason,
+
+        @Schema(description = "Danh sách món con cấu thành nếu là món Combo")
+        java.util.List<ComboItemRequest> comboItems
 ) {
 }

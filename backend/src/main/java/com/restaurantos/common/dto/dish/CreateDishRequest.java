@@ -33,6 +33,9 @@ public record CreateDishRequest(
         Boolean isAvailable,
 
         @Schema(description = "Đánh dấu là món Combo", example = "false")
-        Boolean isCombo
+        Boolean isCombo,
+
+        @Schema(description = "Danh sách món con cấu thành nếu là món Combo")
+        java.util.List<ComboItemRequest> comboItems
 ) {
 }

@@ -20,8 +20,11 @@ public record DishResponseDto(
         @Schema(description = "Giá niêm yết VND (số nguyên)", example = "480000")
         Long price,
 
-        @Schema(description = "Phân loại danh mục", example = "MON_CHINH")
+        @Schema(description = "Phân loại danh mục", example = "MAIN")
         String category,
+
+        @Schema(description = "UUID danh mục trong hệ thống", example = "00000000-0000-0000-0000-000000000052")
+        UUID categoryId,
 
         @Schema(description = "URL ảnh đại diện", example = "https://images.unsplash.com/photo-1544025162-d76694265947")
         String imageUrl,
@@ -39,9 +42,16 @@ public record DishResponseDto(
         Instant createdAt,
 
         @Schema(description = "Thời gian cập nhật gần nhất")
-        Instant updatedAt
+        Instant updatedAt,
+
+        @Schema(description = "Danh sách món con cấu thành nếu là món Combo")
+        java.util.List<ComboItemResponse> comboItems
 ) {
     public static DishResponseDto fromEntity(DishEntity entity) {
+        return fromEntity(entity, null);
+    }
+
+    public static DishResponseDto fromEntity(DishEntity entity, java.util.List<ComboItemResponse> comboItems) {
         if (entity == null) {
             return null;
         }
@@ -51,12 +61,14 @@ public record DishResponseDto(
                 entity.getDescription(),
                 entity.getPrice(),
                 entity.getCategory(),
+                entity.getCategoryId(),
                 entity.getImageUrl(),
                 entity.getIsAvailable() != null ? entity.getIsAvailable() : true,
                 entity.getIsCombo() != null ? entity.getIsCombo() : false,
                 entity.getSoldOutReason(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                comboItems != null ? comboItems : java.util.Collections.emptyList()
         );
     }
 }

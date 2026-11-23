@@ -65,7 +65,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         log.warn("Vi phạm toàn vẹn dữ liệu DB: {}", ex.getMessage());
         String msg = "Dữ liệu bị trùng lặp hoặc vi phạm ràng buộc hệ thống";
-        if (ex.getMessage() != null && ex.getMessage().contains("users_username_key")) {
+        String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        if (detail != null && detail.contains("category_id")) {
+            msg = "Thiếu danh mục hoặc danh mục không tồn tại trong hệ thống (category_id)";
+        } else if (ex.getMessage() != null && ex.getMessage().contains("users_username_key")) {
             msg = "Tên đăng nhập đã tồn tại trong hệ thống";
         } else if (ex.getMessage() != null && ex.getMessage().contains("users_email_key")) {
             msg = "Email đã tồn tại trong hệ thống";
@@ -73,7 +76,7 @@ public class GlobalExceptionHandler {
             msg = "Mã nhân viên đã tồn tại trong hệ thống";
         }
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("CONFLICT", msg, null));
+                .body(ApiResponse.error("CONFLICT", msg, detail));
     }
 
     /**

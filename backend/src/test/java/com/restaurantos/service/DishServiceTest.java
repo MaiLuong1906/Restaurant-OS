@@ -1,11 +1,14 @@
 package com.restaurantos.service;
 
 import com.restaurantos.common.dto.PageResponse;
+import com.restaurantos.common.dto.dish.ComboItemRequest;
 import com.restaurantos.common.dto.dish.CreateDishRequest;
 import com.restaurantos.common.dto.dish.DishResponseDto;
 import com.restaurantos.common.dto.dish.UpdateDishAvailabilityRequest;
 import com.restaurantos.common.dto.dish.UpdateDishRequest;
+import com.restaurantos.entity.DishComboEntity;
 import com.restaurantos.entity.DishEntity;
+import com.restaurantos.repository.DishComboRepository;
 import com.restaurantos.repository.DishRepository;
 import com.restaurantos.service.impl.DishServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +40,9 @@ class DishServiceTest {
     @Mock
     private DishRepository dishRepository;
 
+    @Mock
+    private DishComboRepository dishComboRepository;
+
     @InjectMocks
     private DishServiceImpl dishService;
 
@@ -51,7 +57,8 @@ class DishServiceTest {
                 .name("Bò Lúc Lắc Wagyu A4")
                 .description("Thịt bò Wagyu áp chảo sốt tiêu đen")
                 .price(480000L)
-                .category("MON_CHINH")
+                .category("MAIN")
+                .categoryId(UUID.fromString("00000000-0000-0000-0000-000000000052"))
                 .imageUrl("https://example.com/dish.jpg")
                 .isAvailable(true)
                 .isCombo(false)
@@ -65,10 +72,10 @@ class DishServiceTest {
     @DisplayName("Lấy danh sách món có phân trang thành công")
     void getDishesPaged_Success() {
         PageImpl<DishEntity> page = new PageImpl<>(List.of(sampleDish));
-        when(dishRepository.findDishesPaged(eq("MON_CHINH"), eq("bò"), eq(true), any(Pageable.class)))
+        when(dishRepository.findDishesPaged(eq("MAIN"), eq("bò"), eq(true), any(Pageable.class)))
                 .thenReturn(page);
 
-        PageResponse<DishResponseDto> result = dishService.getDishesPaged("MON_CHINH", "bò", true, 0, 10);
+        PageResponse<DishResponseDto> result = dishService.getDishesPaged("MAIN", "bò", true, 0, 10);
 
         assertThat(result).isNotNull();
         assertThat(result.getContent()).hasSize(1);
@@ -79,13 +86,13 @@ class DishServiceTest {
     @Test
     @DisplayName("Lấy danh sách món không phân trang thành công")
     void getDishes_Success() {
-        when(dishRepository.findDishes(eq("MON_CHINH"), isNull(), eq(true)))
+        when(dishRepository.findDishes(eq("MAIN"), isNull(), eq(true)))
                 .thenReturn(List.of(sampleDish));
 
-        List<DishResponseDto> result = dishService.getDishes("MON_CHINH", null, true);
+        List<DishResponseDto> result = dishService.getDishes("MAIN", null, true);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).category()).isEqualTo("MON_CHINH");
+        assertThat(result.get(0).category()).isEqualTo("MAIN");
     }
 
     @Test
@@ -124,7 +131,8 @@ class DishServiceTest {
                 "MON_CHINH",
                 "https://example.com/pho.jpg",
                 true,
-                false
+                false,
+                null
         );
 
         when(dishRepository.existsByNameIgnoreCase("Phở Bò Tái Lăn")).thenReturn(false);
@@ -135,7 +143,7 @@ class DishServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.name()).isEqualTo("Phở Bò Tái Lăn");
         assertThat(result.price()).isEqualTo(65000L);
-        assertThat(result.category()).isEqualTo("MON_CHINH");
+        assertThat(result.category()).isEqualTo("MAIN");
         assertThat(result.isAvailable()).isTrue();
         assertThat(result.id()).isNotNull();
 
@@ -152,7 +160,8 @@ class DishServiceTest {
                 "MON_CHINH",
                 null,
                 true,
-                false
+                false,
+                null
         );
 
         when(dishRepository.existsByNameIgnoreCase("Bò Lúc Lắc Wagyu A4")).thenReturn(true);
@@ -178,6 +187,7 @@ class DishServiceTest {
                 "https://example.com/new.jpg",
                 true,
                 false,
+                null,
                 null
         );
 
@@ -204,6 +214,7 @@ class DishServiceTest {
                 null,
                 true,
                 false,
+                null,
                 null
         );
 
@@ -258,6 +269,53 @@ class DishServiceTest {
 
         dishService.deleteDish(sampleId);
 
+        verify(dishComboRepository, times(1)).deleteByComboDishId(sampleId);
         verify(dishRepository, times(1)).delete(sampleDish);
+    }
+
+    @Test
+    @DisplayName("Tạo món Combo với danh sách món con thành công")
+    void createDish_ComboWithItems_Success() {
+        UUID subDishId = UUID.randomUUID();
+        DishEntity subDish = DishEntity.builder()
+                .id(subDishId)
+                .name("Trà Đào Cam Sả")
+                .price(30000L)
+                .category("DRINK")
+                .isCombo(false)
+                .build();
+
+        CreateDishRequest request = new CreateDishRequest(
+                "Combo 1 Người",
+                "Combo cơm và nước",
+                79000L,
+                "COMBO",
+                null,
+                true,
+                true,
+                List.of(new ComboItemRequest(subDishId, 1))
+        );
+
+        when(dishRepository.existsByNameIgnoreCase("Combo 1 Người")).thenReturn(false);
+        when(dishRepository.save(any(DishEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dishRepository.findById(subDishId)).thenReturn(Optional.of(subDish));
+        when(dishComboRepository.findByComboDishId(any(UUID.class))).thenReturn(List.of(
+                DishComboEntity.builder()
+                        .id(UUID.randomUUID())
+                        .comboDishId(UUID.randomUUID())
+                        .itemDishId(subDishId)
+                        .quantity(1)
+                        .createdAt(Instant.now())
+                        .build()
+        ));
+        when(dishRepository.findAllById(List.of(subDishId))).thenReturn(List.of(subDish));
+
+        DishResponseDto result = dishService.createDish(request);
+
+        assertThat(result).isNotNull();
+        assertThat(result.isCombo()).isTrue();
+        assertThat(result.comboItems()).hasSize(1);
+        assertThat(result.comboItems().get(0).dishName()).isEqualTo("Trà Đào Cam Sả");
+        verify(dishComboRepository, times(1)).saveAll(any());
     }
 }
