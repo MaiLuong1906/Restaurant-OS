@@ -60,6 +60,12 @@ public class SecurityConfig {
                 // 8. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
                 // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
                 .requestMatchers("/api/v1/reservations/**").permitAll()
+                // 8. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
+
+                // 9. Danh sách bàn (Waiter FloorPlan & Reservation)
+                .requestMatchers(HttpMethod.GET, "/api/v1/tables/**").permitAll()
 
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
                 .anyRequest().authenticated()
