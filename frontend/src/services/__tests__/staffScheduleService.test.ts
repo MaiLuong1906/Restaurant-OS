@@ -1,27 +1,34 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StaffScheduleService } from '../staffScheduleService';
-import * as apiClient from '@/lib/api-client';
-import { ApiError } from '@/lib/api-client';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { StaffScheduleService, ApiFetcher } from '../staffScheduleService';
+import { ApiError } from '../../lib/api-client';
 
-vi.mock('@/lib/api-client', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
-  return {
-    ...actual,
-    fetchApi: vi.fn(),
-  };
-});
+interface RecordedCall {
+  endpoint: string;
+  options?: RequestInit;
+}
 
 describe('StaffScheduleService', () => {
+  let calls: RecordedCall[];
+  let nextResolver: (endpoint: string, options?: RequestInit) => Promise<unknown>;
   let service: StaffScheduleService;
-  const mockedFetchApi = vi.mocked(apiClient.fetchApi);
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    service = new StaffScheduleService();
+    calls = [];
+    nextResolver = async () => undefined;
+
+    const mockFetcher: ApiFetcher = async <T>(
+      endpoint: string,
+      options?: RequestInit
+    ): Promise<T> => {
+      calls.push({ endpoint, options });
+      return (await nextResolver(endpoint, options)) as T;
+    };
+
+    service = new StaffScheduleService(mockFetcher);
   });
 
   it('listOpenShifts gọi REST API /staff/schedule/open-shifts và chuẩn hóa dữ liệu trả về', async () => {
-    mockedFetchApi.mockResolvedValueOnce([
+    nextResolver = async () => [
       {
         id: '11111111-1111-4111-8111-111111111111',
         dateKey: '2026-11-06',
@@ -34,11 +41,12 @@ describe('StaffScheduleService', () => {
         slotsTaken: 1,
         postedById: '22222222-2222-4222-8222-222222222222',
       },
-    ]);
+    ];
 
     const result = await service.listOpenShifts('2026-11-06');
 
-    expect(mockedFetchApi).toHaveBeenCalledWith('/staff/schedule/open-shifts?dateKey=2026-11-06');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].endpoint).toBe('/staff/schedule/open-shifts?dateKey=2026-11-06');
     expect(result).toHaveLength(1);
     expect(result[0].startTime).toBe('08:00');
     expect(result[0].endTime).toBe('14:00');
@@ -46,7 +54,9 @@ describe('StaffScheduleService', () => {
   });
 
   it('listOpenShifts tự động fallback sang mock khi gặp NETWORK_ERROR (backend chưa bật)', async () => {
-    mockedFetchApi.mockRejectedValueOnce(new ApiError('NETWORK_ERROR', 'Failed to fetch', 0));
+    nextResolver = async () => {
+      throw new ApiError('NETWORK_ERROR', 'Failed to fetch', 0);
+    };
 
     const result = await service.listOpenShifts('2026-11-06');
 
@@ -55,7 +65,7 @@ describe('StaffScheduleService', () => {
   });
 
   it('registerShift gửi POST kèm Idempotency-Key và đồng bộ trạng thái PENDING vào lịch tuần', async () => {
-    mockedFetchApi.mockResolvedValueOnce({
+    nextResolver = async () => ({
       id: '33333333-3333-4333-8333-333333333333',
       staffId: '00000000-0000-4000-8000-000000000001',
       openShiftId: '11111111-1111-4111-8111-111111111111',
@@ -72,13 +82,10 @@ describe('StaffScheduleService', () => {
       idempotencyKey: 'idem-reg-999',
     });
 
-    expect(mockedFetchApi).toHaveBeenCalledWith(
-      '/staff/schedule/registrations',
-      expect.objectContaining({
-        method: 'POST',
-        headers: { 'Idempotency-Key': 'idem-reg-999' },
-      })
-    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0].endpoint).toBe('/staff/schedule/registrations');
+    expect(calls[0].options?.method).toBe('POST');
+    expect(calls[0].options?.headers).toEqual({ 'Idempotency-Key': 'idem-reg-999' });
     expect(reg.status).toBe('PENDING');
     expect(reg.idempotencyKey).toBe('idem-reg-999');
 
@@ -88,9 +95,9 @@ describe('StaffScheduleService', () => {
   });
 
   it('registerShift giữ nguyên lỗi nghiệp vụ từ backend (400 INVALID_ARGUMENT khi hết chỗ)', async () => {
-    mockedFetchApi.mockRejectedValueOnce(
-      new ApiError('INVALID_ARGUMENT', 'Ca làm việc đã hết chỗ khả dụng', 400)
-    );
+    nextResolver = async () => {
+      throw new ApiError('INVALID_ARGUMENT', 'Ca làm việc đã hết chỗ khả dụng', 400);
+    };
 
     await expect(
       service.registerShift({
@@ -102,16 +109,17 @@ describe('StaffScheduleService', () => {
   });
 
   it('cancelRegistration gọi DELETE /staff/schedule/registrations/{id} và xóa bản ghi chờ duyệt', async () => {
-    mockedFetchApi.mockResolvedValueOnce(undefined);
+    nextResolver = async () => undefined;
 
     const res = await service.cancelRegistration({
       registrationId: '33333333-3333-4333-8333-333333333333',
     });
 
-    expect(mockedFetchApi).toHaveBeenCalledWith(
-      '/staff/schedule/registrations/33333333-3333-4333-8333-333333333333',
-      { method: 'DELETE' }
+    expect(calls).toHaveLength(1);
+    expect(calls[0].endpoint).toBe(
+      '/staff/schedule/registrations/33333333-3333-4333-8333-333333333333'
     );
+    expect(calls[0].options?.method).toBe('DELETE');
     expect(res.ok).toBe(true);
   });
 

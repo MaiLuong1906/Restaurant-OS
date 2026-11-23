@@ -2,6 +2,7 @@ import {
   OpenShift,
   Shift,
   ShiftRegistration,
+  ShiftRegistrationStatus,
   ShiftSwapRequest,
   SwapPeerCandidate,
   RegisterShiftRequest,
@@ -9,14 +10,16 @@ import {
   CreateShiftSwapRequest,
   WeekSchedule,
   ScheduleSummary,
-} from '@/types';
-import { fetchApi, ApiError } from '@/lib/api-client';
-import { generateIdempotencyKey } from '@/lib/utils';
-import { useAuthStore } from '@/stores/useAuthStore';
-import { staffService as mockStaffService } from '@/services/mock/mockStaffService';
+} from '../types';
+import { fetchApi, ApiError } from '../lib/api-client';
+import { generateIdempotencyKey } from '../lib/utils';
+import { useAuthStore } from '../stores/useAuthStore';
+import { staffService as mockStaffService } from './mock/mockStaffService';
 
 const DEFAULT_LOCAL_STAFF_UUID = '00000000-0000-4000-8000-000000000001';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type ApiFetcher = <T>(endpoint: string, options?: RequestInit) => Promise<T>;
 
 function resolveCurrentStaffUuid(): string {
   const userId = useAuthStore.getState().staffUser?.id;
@@ -48,7 +51,7 @@ function normalizeRegistration(
   fallbackIdempotencyKey: string
 ): ShiftRegistration {
   const rawStatus = String(raw.status || 'PENDING').toUpperCase();
-  const normalizedStatus =
+  const normalizedStatus: ShiftRegistrationStatus =
     rawStatus === 'REGISTERED' || rawStatus === 'PENDING'
       ? 'PENDING'
       : rawStatus === 'APPROVED'
@@ -71,6 +74,11 @@ function normalizeRegistration(
 
 export class StaffScheduleService {
   private localBackendRegistrations = new Map<string, ShiftRegistration>();
+  private fetcher: ApiFetcher;
+
+  constructor(fetcher: ApiFetcher = fetchApi) {
+    this.fetcher = fetcher;
+  }
 
   async getWeekSchedule(weekStartKey?: string): Promise<WeekSchedule> {
     const baseSchedule = await mockStaffService.getWeekSchedule(weekStartKey);
@@ -118,7 +126,7 @@ export class StaffScheduleService {
     }
 
     try {
-      const data = await fetchApi<OpenShift[]>(
+      const data = await this.fetcher<OpenShift[]>(
         `/staff/schedule/open-shifts?dateKey=${encodeURIComponent(dateKey)}`
       );
       if (Array.isArray(data) && data.length > 0) {
@@ -139,7 +147,7 @@ export class StaffScheduleService {
     const staffId = resolveCurrentStaffUuid();
 
     try {
-      const data = await fetchApi<ShiftRegistration>('/staff/schedule/registrations', {
+      const data = await this.fetcher<ShiftRegistration>('/staff/schedule/registrations', {
         method: 'POST',
         headers: {
           'Idempotency-Key': idempotencyKey,
@@ -170,7 +178,7 @@ export class StaffScheduleService {
 
   async cancelRegistration(req: CancelRegistrationRequest): Promise<{ ok: boolean }> {
     try {
-      await fetchApi<void>(
+      await this.fetcher<void>(
         `/staff/schedule/registrations/${encodeURIComponent(req.registrationId)}`,
         {
           method: 'DELETE',
