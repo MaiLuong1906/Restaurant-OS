@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { History, Plus, RefreshCw } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { AdminToast, useAdminToast } from '@/components/admin/AdminToast';
 import { ApiError } from '@/lib/api-client';
 import { dishService } from '@/services/dishService';
@@ -44,7 +44,6 @@ export default function AdminMenuBomPage() {
   // State: loading / error
   // =========================================================================
   const [isLoading, setIsLoading] = React.useState(true);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [apiError, setApiError] = React.useState<string | null>(null);
 
   // =========================================================================
@@ -69,9 +68,8 @@ export default function AdminMenuBomPage() {
   // Fetch danh sách món ăn
   // =========================================================================
   const fetchDishes = React.useCallback(
-    async (page = 0, silent = false) => {
-      if (!silent) setIsLoading(true);
-      else setIsRefreshing(true);
+    async (page = 0) => {
+      setIsLoading(true);
       setApiError(null);
 
       try {
@@ -99,7 +97,6 @@ export default function AdminMenuBomPage() {
         setApiError(msg);
       } finally {
         setIsLoading(false);
-        setIsRefreshing(false);
       }
     },
     [selectedCategory, searchQuery, availabilityFilter]
@@ -175,7 +172,7 @@ export default function AdminMenuBomPage() {
       setShowCreateModal(false);
       showToast(`✅ Đã tạo món "${created.name}" thành công!`);
       // Refresh để lấy danh sách mới (có thể thay đổi phân trang)
-      await fetchDishes(0, true);
+      await fetchDishes(0);
       // Refresh non-combo list nếu tạo món lẻ mới
       if (!created.isCombo) {
         dishService.getNonComboDishes().then(setAvailableDishes).catch(() => {});
@@ -268,22 +265,7 @@ export default function AdminMenuBomPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 flex-wrap">
-            <button
-              onClick={() => fetchDishes(currentPage, true)}
-              disabled={isRefreshing}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 rounded-lg shadow-2xs text-xs font-mono uppercase tracking-wider font-bold cursor-pointer transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 text-stone-500 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Làm Mới</span>
-            </button>
-            <button
-              onClick={() => showToast('Lịch sử sửa đổi thực đơn — Coming Soon')}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 rounded-lg shadow-2xs text-xs font-mono uppercase tracking-wider font-bold cursor-pointer transition-colors"
-            >
-              <History className="h-4 w-4 text-stone-500" />
-              <span>Lịch Sử</span>
-            </button>
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-ops-brand hover:bg-ops-brand-dark text-white rounded-lg shadow-xs text-xs font-mono uppercase tracking-wider font-bold cursor-pointer transition-colors"

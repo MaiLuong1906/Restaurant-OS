@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Plus, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Plus, Trash2, UtensilsCrossed, Upload, X } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 import {
   DISH_CATEGORY_LABELS,
@@ -82,13 +82,76 @@ export function DishFormModal({
   onClose,
 }: DishFormModalProps) {
   const [form, setForm] = React.useState<FormState>(() => getInitialState(dish));
-  const [errors, setErrors] = React.useState<Partial<Record<keyof FormState | 'combo', string>>>({});
+  const [errors, setErrors] = React.useState<Partial<Record<keyof FormState | 'combo' | 'image', string>>>({});
+  const [isDragging, setIsDragging] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Khi edit và dish thay đổi — reset form
   React.useEffect(() => {
     setForm(getInitialState(dish));
     setErrors({});
   }, [dish]);
+
+  // Xử lý upload file hình ảnh và nén nếu kích thước lớn
+  const handleProcessFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setErrors((prev) => ({ ...prev, image: 'Vui lòng chọn file hình ảnh (PNG, JPG, WEBP)' }));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, image: 'Kích thước file vượt quá 5MB' }));
+      return;
+    }
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.image;
+      return next;
+    });
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const optimized = canvas.toDataURL('image/jpeg', 0.85);
+          setForm((p) => ({ ...p, imageUrl: optimized }));
+        } else {
+          setForm((p) => ({ ...p, imageUrl: dataUrl }));
+        }
+      };
+      img.onerror = () => {
+        setForm((p) => ({ ...p, imageUrl: dataUrl }));
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleProcessFile(file);
+    }
+  };
 
   // Khi chuyển isCombo = false → xóa comboItems
   const handleIsComboChange = (checked: boolean) => {
@@ -288,18 +351,84 @@ export function DishFormModal({
           </div>
         </div>
 
-        {/* URL ảnh */}
+        {/* Hình Ảnh Món Ăn (File Upload) */}
         <div>
           <label className="font-mono text-[10px] uppercase font-bold text-stone-500 block mb-1">
-            URL Ảnh (tùy chọn)
+            Hình Ảnh Món Ăn
           </label>
           <input
-            type="url"
-            placeholder="https://..."
-            value={form.imageUrl}
-            onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))}
-            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:border-ops-brand font-medium transition-colors"
+            type="file"
+            ref={fileInputRef}
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={handleFileInputChange}
           />
+
+          {form.imageUrl ? (
+            <div className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={form.imageUrl}
+                alt="Preview"
+                className="w-16 h-16 rounded-lg object-cover border border-stone-200 shadow-2xs shrink-0 bg-stone-100"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-stone-900 truncate">Ảnh món ăn đã chọn</p>
+                <p className="text-[10px] text-stone-500 mt-0.5">Định dạng PNG, JPG, WEBP</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200 rounded-md font-mono text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <Upload className="w-3 h-3 text-ops-brand" />
+                    Đổi ảnh khác
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, imageUrl: '' }))}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 border border-stone-200 hover:border-rose-200 rounded-md font-mono text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <X className="w-3 h-3" />
+                    Xóa ảnh
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleProcessFile(file);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+                isDragging
+                  ? 'border-ops-brand bg-amber-50/50'
+                  : 'border-stone-200 hover:border-stone-300 bg-stone-50/60 hover:bg-stone-50'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-500 shadow-2xs mb-1.5">
+                <Upload className="w-5 h-5 text-ops-brand" />
+              </div>
+              <p className="text-xs font-bold text-stone-800">
+                Nhấn để chọn ảnh hoặc kéo thả vào đây
+              </p>
+              <p className="text-[10px] text-stone-500 mt-0.5">
+                Hỗ trợ PNG, JPG, WEBP (Tối đa 5MB • Tự động tối ưu dung lượng)
+              </p>
+            </div>
+          )}
+          {errors.image && (
+            <p className="text-rose-500 text-[10px] mt-1 font-semibold">{errors.image}</p>
+          )}
         </div>
 
         {/* Toggles */}
