@@ -58,7 +58,12 @@ public class SecurityConfig {
                 // TODO (Follow-up): Khóa lại .hasAnyRole("OWNER", "MANAGER") ngay sau khi Auth PR được merge lên dev.
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").permitAll()
 
-                // 7. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
+                // 7. Quản trị thực đơn món ăn (Admin Dish/Menu Management - UC_OWN_02)
+                // NOTE: Tạm thời permitAll trong môi trường dev/local để phục vụ kiểm thử tích hợp Frontend & Postman.
+                // Controller đã được cấu hình sẵn @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')").
+                .requestMatchers("/api/v1/admin/dishes", "/api/v1/admin/dishes/**").permitAll()
+
+                // 8. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
                 // NOTE: Tạm thời permitAll trong môi trường dev/local để phục vụ kiểm thử tích hợp Frontend & Postman.
                 // TODO (Follow-up): Khóa lại .authenticated() ngay sau khi Auth PR được merge lên dev.
                 .requestMatchers("/api/v1/staff/schedule/**").permitAll()

@@ -41,6 +41,12 @@ public class DishEntity {
     @Column(name = "is_available", nullable = false)
     private Boolean isAvailable;
 
+    @Column(name = "is_combo")
+    private Boolean isCombo;
+
+    @Column(name = "sold_out_reason")
+    private String soldOutReason;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
