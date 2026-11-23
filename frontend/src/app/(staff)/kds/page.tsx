@@ -3,12 +3,16 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Ticket, Batch, OrderChangeAlertData } from '@/types';
-import { kdsService } from '@/services/mock';
+import { kdsService as mockKdsService } from '@/services/mock';
+import { ApiKdsService, KdsService, filterActiveTickets, sortKdsTickets } from '@/services/kds';
 import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
 import { KdsBatchCard } from '@/components/kds/KdsBatchCard';
 import { TicketDetailDrawer } from '@/components/kds/TicketDetailDrawer';
 import { OrderChangeAlert } from '@/components/kds/OrderChangeAlert';
 import { RotateCcw, AlertCircle, RefreshCw, Bell } from 'lucide-react';
+
+const isLiveMode = process.env.NEXT_PUBLIC_KDS_MODE === 'live';
+const kdsService: KdsService = isLiveMode ? new ApiKdsService() : mockKdsService;
 
 export default function KitchenDisplayScreen() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
@@ -29,9 +33,11 @@ export default function KitchenDisplayScreen() {
   } | null>(null);
   const undoTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  const fetchTickets = React.useCallback(async () => {
+  const fetchTickets = React.useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       const [ticketsData, alertsData] = await Promise.all([
         kdsService.getTickets(),
@@ -45,12 +51,24 @@ export default function KitchenDisplayScreen() {
     } catch (err) {
       setError((err as Error).message || 'Không thể tải danh sách đơn bếp');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
   React.useEffect(() => {
     fetchTickets();
+    // Poll REST K1 mỗi 10s ở live mode (TODO: thống nhất useKdsStore WS ở sprint sau)
+    let intervalId: NodeJS.Timeout | null = null;
+    if (isLiveMode) {
+      intervalId = setInterval(() => {
+        fetchTickets(true);
+      }, 10000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [fetchTickets]);
 
   // Thuật toán gom món thành mẻ (Batch Cooking)
@@ -99,6 +117,10 @@ export default function KitchenDisplayScreen() {
 
   // Hoàn tất 1 ticket kèm Hoàn tác 5s
   const handleCompleteTicket = (ticketId: string) => {
+    if (isLiveMode) {
+      // TODO: UC19 - Hoàn tất ticket ở live mode khi kết nối BE PATCH/POST
+      return;
+    }
     const snapshot = structuredClone(tickets);
 
     // Optimistic Update
@@ -137,6 +159,10 @@ export default function KitchenDisplayScreen() {
 
   // Hoàn tất 1 mẻ kèm Hoàn tác 5s
   const handleCompleteBatch = (batchId: string) => {
+    if (isLiveMode) {
+      // TODO: UC19 - Hoàn tất mẻ ở live mode
+      return;
+    }
     const batch = batches.find((b) => b.id === batchId);
     if (!batch) return;
 
@@ -192,10 +218,10 @@ export default function KitchenDisplayScreen() {
     }
   };
 
-  // Lọc các ticket còn việc cần làm (chưa bưng xong hết)
-  const activeTickets = tickets.filter((t) =>
-    t.items.some((i) => i.status === 'WAITING' || i.status === 'READY')
-  );
+  // Lọc các ticket còn việc cần làm (chưa bưng xong hết) và sắp xếp: dị ứng lên đầu, quá hạn/gần SLA lên trước
+  const activeTickets = React.useMemo(() => {
+    return sortKdsTickets(filterActiveTickets(tickets));
+  }, [tickets]);
 
   const pendingAlert = alerts.find((a) => a.id === activeAlertId) || null;
 
@@ -227,6 +253,17 @@ export default function KitchenDisplayScreen() {
                 {alerts.length}
               </span>
             )}
+          </button>
+
+          {/* Nút Refresh tay */}
+          <button
+            type="button"
+            onClick={() => fetchTickets()}
+            className="min-h-[48px] h-12 px-3 rounded-lg border border-ops-border bg-white hover:bg-neutral-100 text-[#2B2118] flex items-center gap-1.5 text-xs font-bold transition-colors"
+            aria-label="Làm mới danh sách ticket"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Làm mới</span>
           </button>
 
           {/* Đường vào K1 Kho bếp */}
@@ -290,7 +327,7 @@ export default function KitchenDisplayScreen() {
             <h2 className="font-bold text-lg mb-1">Đã xảy ra sự cố</h2>
             <p className="text-sm mb-4">{error}</p>
             <button
-              onClick={fetchTickets}
+              onClick={() => fetchTickets()}
               className="px-4 py-2 bg-ops-brand text-white font-bold rounded-lg text-sm"
             >
               Thử lại
@@ -310,6 +347,7 @@ export default function KitchenDisplayScreen() {
                   key={ticket.id}
                   ticket={ticket}
                   hasPendingAlert={hasAlert}
+                  disabledComplete={isLiveMode}
                   onViewAlert={(tId) => {
                     const alert = alerts.find((a) => a.ticketId === tId && !a.acknowledged);
                     if (alert) setActiveAlertId(alert.id);
@@ -326,6 +364,7 @@ export default function KitchenDisplayScreen() {
               <KdsBatchCard
                 key={batch.id}
                 batch={batch}
+                disabledComplete={isLiveMode}
                 onComplete={handleCompleteBatch}
               />
             ))}
@@ -353,6 +392,7 @@ export default function KitchenDisplayScreen() {
         ticket={tickets.find((t) => t.id === selectedTicketId) || null}
         open={Boolean(selectedTicketId)}
         hasPendingAlert={alerts.some((a) => a.ticketId === selectedTicketId && !a.acknowledged)}
+        disabledComplete={isLiveMode}
         onClose={() => setSelectedTicketId(null)}
         onComplete={(ticketId) => {
           handleCompleteTicket(ticketId);

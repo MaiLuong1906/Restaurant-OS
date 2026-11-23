@@ -1,5 +1,6 @@
 package com.restaurantos.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -34,8 +35,9 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // 1. Hạ tầng kiểm tra trạng thái sống/chết (Health checks)
-                .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info").permitAll()
+                // 1. Hạ tầng kiểm tra trạng thái sống/chết (Health checks) & Xử lý lỗi (Error dispatch)
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info", "/error", "/error/**").permitAll()
 
                 // 2. Tài liệu Swagger / OpenAPI 3 UI
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
@@ -49,7 +51,13 @@ public class SecurityConfig {
                 // 5. Xác thực người dùng (Auth endpoints)
                 .requestMatchers("/api/v1/auth/**").permitAll()
 
-                // 6. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
+                // 6. Quản trị nhân sự nội bộ (Admin User Management)
+                .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").permitAll()
+
+                // 7. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
+                .requestMatchers("/api/v1/staff/schedule/**").permitAll()
+
+                // 8. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
                 // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
                 .requestMatchers("/api/v1/reservations/**").permitAll()
 
@@ -60,4 +68,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-

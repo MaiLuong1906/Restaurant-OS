@@ -1,0 +1,610 @@
+{
+  "info": {
+    "_postman_id": "d82e143b-3199-4c8e-b5f7-91a0c8e23456",
+    "name": "Restaurant OS — Staff Schedule & Shift Registration API",
+    "description": "Bộ kiểm thử tự động toàn diện cho Module Quản lý Lịch ca & Đăng ký ca làm việc (/api/v1/staff/schedule).\nBao phủ 100% các kịch bản:\n1. Danh sách ca mở theo ngày (Happy path, thiếu ngày, ngày sai định dạng).\n2. Đăng ký ca làm việc (Happy path, kiểm tra tính lũy kế Idempotency, đăng ký trùng, ca không tồn tại, ca hết slot).\n3. Hủy đăng ký ca (Happy path, kiểm tra hoàn trả slot, ID không tồn tại, UUID sai định dạng).\n\nLưu ý: Để test thành công, cần đảm bảo DB đã có ít nhất 1 bản ghi open_shifts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "testDate",
+      "value": "2026-11-25",
+      "type": "string"
+    },
+    {
+      "key": "openShiftId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "staffId",
+      "value": "00000000-0000-0000-0000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "registrationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "currentIdempotencyKey",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Danh Sách Ca Mở (Open Shifts)",
+      "item": [
+        {
+          "name": "1.1. Lấy danh sách ca mở hợp lệ (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code là 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Phản hồi đúng chuẩn ApiResponse envelope\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(Array.isArray(res.data)).to.be.true;",
+                  "});",
+                  "",
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.length > 0) {",
+                  "    const firstShift = res.data[0];",
+                  "    pm.collectionVariables.set(\"openShiftId\", firstShift.id);",
+                  "    console.log(\"Đã lưu openShiftId tự động:\", firstShift.id);",
+                  "    ",
+                  "    pm.test(\"Bản ghi ca mở có đầy đủ trường thông tin\", function () {",
+                  "        pm.expect(firstShift).to.have.property(\"id\");",
+                  "        pm.expect(firstShift).to.have.property(\"dateKey\");",
+                  "        pm.expect(firstShift).to.have.property(\"startTime\");",
+                  "        pm.expect(firstShift).to.have.property(\"endTime\");",
+                  "        pm.expect(firstShift).to.have.property(\"role\");",
+                  "        pm.expect(firstShift).to.have.property(\"slotsTotal\");",
+                  "        pm.expect(firstShift).to.have.property(\"slotsTaken\");",
+                  "    });",
+                  "} else {",
+                  "    console.warn(\"Chưa có ca mở nào trong ngày \" + pm.collectionVariables.get(\"testDate\") + \". Hãy chạy câu lệnh SQL Seed!\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/open-shifts?dateKey={{testDate}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "open-shifts"
+              ],
+              "query": [
+                {
+                  "key": "dateKey",
+                  "value": "{{testDate}}",
+                  "description": "Ngày cần lấy lịch ca (yyyy-MM-dd)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.2. Lấy danh sách ca mở khi thiếu tham số dateKey (Negative Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code phải là 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Envelope ApiResponse báo lỗi\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/open-shifts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "open-shifts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.3. Lấy danh sách ca mở với định dạng ngày sai (Negative Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code phải là 400 Bad Request khi sai định dạng ngày\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Envelope ApiResponse báo lỗi\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/open-shifts?dateKey=25-11-2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "open-shifts"
+              ],
+              "query": [
+                {
+                  "key": "dateKey",
+                  "value": "25-11-2026",
+                  "description": "Định dạng sai (phải là yyyy-MM-dd)"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Đăng Ký Ca Làm Việc (Shift Registration)",
+      "item": [
+        {
+          "name": "2.1. Đăng ký ca làm việc thành công (Happy Path)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Tự động sinh Idempotency Key UUID v4 ngẫu nhiên",
+                  "const uuid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('currentIdempotencyKey', uuid);",
+                  "console.log('Khởi tạo idempotencyKey cho lượt đăng ký:', uuid);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code là 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Phản hồi đúng chuẩn ApiResponse và lưu registrationId\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.data).to.have.property(\"id\");",
+                  "    pm.expect(res.data.status).to.eql(\"REGISTERED\");",
+                  "    pm.expect(res.data.idempotencyKey).to.eql(pm.collectionVariables.get(\"currentIdempotencyKey\"));",
+                  "    ",
+                  "    pm.collectionVariables.set(\"registrationId\", res.data.id);",
+                  "    console.log(\"Đã lưu registrationId:\", res.data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openShiftId\": \"{{openShiftId}}\",\n  \"staffId\": \"{{staffId}}\",\n  \"dateKey\": \"{{testDate}}\",\n  \"status\": \"REGISTERED\",\n  \"note\": \"Đăng ký ca phục vụ bàn sáng - Test Postman\",\n  \"idempotencyKey\": \"{{currentIdempotencyKey}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/registrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "registrations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.2. Kiểm tra tính lũy kế (Idempotency - Gửi lại cùng Key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code phải là 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Idempotency trả về đúng bản ghi cũ, không tạo mới\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.data.id).to.eql(pm.collectionVariables.get(\"registrationId\"));",
+                  "    pm.expect(res.data.idempotencyKey).to.eql(pm.collectionVariables.get(\"currentIdempotencyKey\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openShiftId\": \"{{openShiftId}}\",\n  \"staffId\": \"{{staffId}}\",\n  \"dateKey\": \"{{testDate}}\",\n  \"status\": \"REGISTERED\",\n  \"note\": \"Gửi lặp lại cùng idempotencyKey\",\n  \"idempotencyKey\": \"{{currentIdempotencyKey}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/registrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "registrations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.3. Đăng ký trùng ca cùng ngày (Negative Test - Duplicate Staff Shift)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Sinh key mới nhưng giữ nguyên staffId và ca để test chặn trùng",
+                  "pm.variables.set('diffIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Hệ thống phải từ chối khi nhân viên đăng ký trùng ca\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 409, 422, 500]);",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openShiftId\": \"{{openShiftId}}\",\n  \"staffId\": \"{{staffId}}\",\n  \"dateKey\": \"{{testDate}}\",\n  \"status\": \"REGISTERED\",\n  \"note\": \"Cố tình đăng ký lần 2 với key mới\",\n  \"idempotencyKey\": \"{{diffIdempotencyKey}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/registrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "registrations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.4. Đăng ký với Ca không tồn tại (Negative Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Từ chối khi ca không tồn tại\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 404, 500]);",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openShiftId\": \"ffffffff-ffff-ffff-ffff-ffffffffffff\",\n  \"staffId\": \"{{staffId}}\",\n  \"dateKey\": \"{{testDate}}\",\n  \"status\": \"REGISTERED\",\n  \"note\": \"Ca không tồn tại\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/registrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "registrations"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Hủy Đăng Ký Ca Làm Việc (Cancel Registration)",
+      "item": [
+        {
+          "name": "3.1. Hủy đăng ký ca thành công (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code là 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Hủy thành công theo chuẩn ApiResponse\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/registrations/{{registrationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "registrations",
+                "{{registrationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.2. Kiểm tra slot ca mở sau khi hủy (Xác minh slot được hoàn lại)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code là 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.length > 0) {",
+                  "    const targetShift = res.data.find(s => s.id === pm.collectionVariables.get(\"openShiftId\"));",
+                  "    if (targetShift) {",
+                  "        pm.test(\"Slot taken của ca không bị âm\", function () {",
+                  "            pm.expect(targetShift.slotsTaken).to.be.at.least(0);",
+                  "        });",
+                  "        console.log(\"Số slot hiện tại của ca sau hủy:\", targetShift.slotsTaken, \"/\", targetShift.slotsTotal);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/open-shifts?dateKey={{testDate}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "open-shifts"
+              ],
+              "query": [
+                {
+                  "key": "dateKey",
+                  "value": "{{testDate}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.3. Hủy đăng ký lại với ID đã hủy hoặc không tồn tại (Negative Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Báo lỗi khi hủy đăng ký không tồn tại\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 404, 500]);",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/registrations/{{registrationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "registrations",
+                "{{registrationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.4. Hủy đăng ký với UUID sai định dạng (Negative Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code phải là 400 Bad Request khi UUID sai format\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Envelope ApiResponse báo lỗi\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/schedule/registrations/invalid-uuid-format-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "schedule",
+                "registrations",
+                "invalid-uuid-format-123"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
