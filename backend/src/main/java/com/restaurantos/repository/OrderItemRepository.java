@@ -12,6 +12,10 @@ import java.util.UUID;
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID> {
 
+    List<OrderItemEntity> findByOrderId(UUID orderId);
+
+    List<OrderItemEntity> findByOrderIdIn(Collection<UUID> orderIds);
+
     List<OrderItemEntity> findByOrderIdOrderByCreatedAtAsc(UUID orderId);
 
     List<OrderItemEntity> findByOrderIdInOrderByCreatedAtAsc(Collection<UUID> orderIds);

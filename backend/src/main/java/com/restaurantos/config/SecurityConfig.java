@@ -52,10 +52,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
 
                 // 6. Quản trị nhân sự nội bộ (Admin User Management)
-                // NOTE: Tạm thời permitAll trong Sprint 0 để phục vụ kiểm thử tích hợp Frontend & Postman
-                // do Auth Service (JWT Token Filter) đang được phát triển song song ở nhánh khác.
-                // Controller đã được cấu hình sẵn @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')").
-                // TODO (Follow-up): Khóa lại .hasAnyRole("OWNER", "MANAGER") ngay sau khi Auth PR được merge lên dev.
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").permitAll()
 
                 // 7. Quản trị thực đơn món ăn (Admin Dish/Menu Management - UC_OWN_02)
@@ -67,6 +63,13 @@ public class SecurityConfig {
                 // NOTE: Tạm thời permitAll trong môi trường dev/local để phục vụ kiểm thử tích hợp Frontend & Postman.
                 // TODO (Follow-up): Khóa lại .authenticated() ngay sau khi Auth PR được merge lên dev.
                 .requestMatchers("/api/v1/staff/schedule/**").permitAll()
+
+                // 9. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
+
+                // 10. Danh sách bàn (Waiter FloorPlan & Reservation)
+                .requestMatchers(HttpMethod.GET, "/api/v1/tables/**").permitAll()
 
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
                 .anyRequest().authenticated()
