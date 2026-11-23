@@ -6,18 +6,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    public record FieldValidationError(String field, String reason) {}
 
     /**
      * 1. Bắt lỗi kiểm tra tính hợp lệ dữ liệu (@Valid, @Pattern, @Email, @NotBlank...)
@@ -29,7 +35,7 @@ public class GlobalExceptionHandler {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
 
-        String firstMessage = errors.values().stream().findFirst().orElse("Dữ liệu gửi lên không hợp lệ");
+        String firstMessage = errors.values().stream().findFirst().orElse("Dữ liệu đầu vào không hợp lệ");
         log.warn("Validation thất bại: {}", errors);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -37,7 +43,17 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 2. Bắt lỗi nghiệp vụ ném qua ResponseStatusException (400, 404, 409...)
+     * 2. Bắt lỗi nghiệp vụ đặt bàn & domain (BusinessException / ResourceNotFoundException)
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
+        log.warn("Ngoại lệ nghiệp vụ [{}]: {}", ex.getErrorCode(), ex.getMessage());
+        return ResponseEntity.status(ex.getStatus())
+                .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage(), null));
+    }
+
+    /**
+     * 3. Bắt lỗi nghiệp vụ ném qua ResponseStatusException (400, 404, 409...)
      */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(ResponseStatusException ex) {
@@ -59,7 +75,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 3. Bắt lỗi vi phạm toàn vẹn dữ liệu Database (trùng Unique key username/email/employee_code)
+     * 4. Bắt lỗi vi phạm toàn vẹn dữ liệu Database (Unique key / FK)
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
@@ -77,17 +93,41 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 3. Bắt lỗi vi phạm ràng buộc ConstraintViolation
+     * 5. Bắt lỗi vi phạm ràng buộc ConstraintViolation
      */
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(ConstraintViolationException ex) {
         log.warn("Vi phạm ràng buộc dữ liệu: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("CONSTRAINT_VIOLATION", ex.getMessage(), null));
+                .body(ApiResponse.error("VALIDATION_ERROR", ex.getMessage(), null));
     }
 
     /**
-     * 4. Bắt lỗi tham số phương thức không hợp lệ (IllegalArgumentException)
+     * 6. Bắt lỗi thiếu query param, sai kiểu tham số hoặc JSON lỗi
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException ex) {
+        FieldValidationError detail = new FieldValidationError(ex.getParameterName(), "Tham số bắt buộc bị thiếu");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("MISSING_PARAMETER", "Thiếu tham số bắt buộc: " + ex.getParameterName(), List.of(detail)));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        FieldValidationError detail = new FieldValidationError(ex.getName(), "Giá trị không đúng định dạng yêu cầu");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("INVALID_PARAMETER", "Tham số '" + ex.getName() + "' không hợp lệ", List.of(detail)));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotReadable(HttpMessageNotReadableException ex) {
+        log.warn("Invalid JSON payload: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("INVALID_REQUEST_BODY", "Nội dung JSON gửi lên không hợp lệ hoặc sai định dạng kiểu dữ liệu", null));
+    }
+
+    /**
+     * 7. Bắt lỗi tham số phương thức không hợp lệ (IllegalArgumentException)
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
@@ -97,7 +137,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 5. Bắt tất cả lỗi hệ thống chưa được định nghĩa (Fallback 500)
+     * 8. Bắt tất cả lỗi hệ thống chưa được định nghĩa (Fallback 500)
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {

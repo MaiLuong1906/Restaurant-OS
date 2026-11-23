@@ -57,6 +57,9 @@ public class SecurityConfig {
                 // 7. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
                 .requestMatchers("/api/v1/staff/schedule/**").permitAll()
 
+                // 8. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
+                // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
+                .requestMatchers("/api/v1/reservations/**").permitAll()
                 // 8. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
                 .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
