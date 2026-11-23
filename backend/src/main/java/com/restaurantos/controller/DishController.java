@@ -54,6 +54,7 @@ public class DishController {
     @PatchMapping("/{id}/availability")
     @Operation(summary = "Báo hết món hoặc mở lại món (Đầu bếp & Nhân viên UC20)",
                description = "Cập nhật nhanh trạng thái còn/hết món của thực đơn")
+    // @PreAuthorize("hasAnyRole('STAFF', 'CHEF', 'OWNER', 'MANAGER')")
     public ResponseEntity<ApiResponse<DishResponseDto>> updateAvailability(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateDishAvailabilityRequest request

@@ -28,8 +28,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -207,10 +209,18 @@ public class DishServiceImpl implements DishService {
             return Collections.emptyList();
         }
         List<DishComboEntity> entities = new ArrayList<>();
+        Set<UUID> seenIds = new HashSet<>();
         Instant now = Instant.now();
 
         for (ComboItemRequest itemReq : items) {
             UUID itemDishId = itemReq.dishId();
+            if (itemDishId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID món con trong combo không được để trống");
+            }
+            if (!seenIds.add(itemDishId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Danh sách món con trong combo bị trùng lặp dishId: " + itemDishId);
+            }
             if (comboDishId.equals(itemDishId)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Món combo không thể tự chứa chính nó làm món con");
             }

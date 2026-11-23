@@ -45,8 +45,13 @@ public class SecurityConfig {
                 // 3. Cổng kết nối WebSocket STOMP handshake
                 .requestMatchers("/ws/**").permitAll()
 
-                // 4. Menu công khai qua quét mã QR bàn (UC01, UC02) & Bếp báo hết món (UC20)
-                .requestMatchers("/api/v1/dishes/**").permitAll()
+                // 4. Menu công khai qua quét mã QR bàn (UC01, UC02) - Chỉ cho phép GET
+                .requestMatchers(HttpMethod.GET, "/api/v1/dishes/**").permitAll()
+
+                // Bếp & Thu ngân cập nhật nhanh trạng thái còn/hết món (UC20)
+                // NOTE: Tạm thời permitAll PATCH cho endpoint availability phục vụ trạm KDS/POS trong sprint test nội bộ.
+                // TODO (Follow-up): Khóa lại .hasAnyRole("STAFF", "CHEF", "OWNER", "MANAGER") sau khi Auth PR được merge.
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/dishes/*/availability").permitAll()
 
                 // 5. Xác thực người dùng (Auth endpoints)
                 .requestMatchers("/api/v1/auth/**").permitAll()

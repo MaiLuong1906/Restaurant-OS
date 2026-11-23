@@ -318,4 +318,43 @@ class DishServiceTest {
         assertThat(result.comboItems().get(0).dishName()).isEqualTo("Trà Đào Cam Sả");
         verify(dishComboRepository, times(1)).saveAll(any());
     }
+
+    @Test
+    @DisplayName("Tạo món Combo với món con bị trùng dishId ném lỗi 400 Bad Request")
+    void createDish_ComboWithDuplicateDishId_ThrowsBadRequest() {
+        UUID subDishId = UUID.randomUUID();
+        DishEntity subDish = DishEntity.builder()
+                .id(subDishId)
+                .name("Trà Đào Cam Sả")
+                .price(30000L)
+                .category("DRINK")
+                .isCombo(false)
+                .build();
+
+        CreateDishRequest request = new CreateDishRequest(
+                "Combo Trùng Món",
+                "Mô tả",
+                99000L,
+                "COMBO",
+                null,
+                true,
+                true,
+                List.of(
+                        new ComboItemRequest(subDishId, 1),
+                        new ComboItemRequest(subDishId, 2)
+                )
+        );
+
+        when(dishRepository.existsByNameIgnoreCase("Combo Trùng Món")).thenReturn(false);
+        when(dishRepository.save(any(DishEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dishRepository.findById(subDishId)).thenReturn(Optional.of(subDish));
+
+        org.springframework.web.server.ResponseStatusException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> dishService.createDish(request)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).contains("trùng lặp dishId");
+    }
 }
