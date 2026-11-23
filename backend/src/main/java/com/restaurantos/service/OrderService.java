@@ -4,9 +4,12 @@ import com.restaurantos.dto.OrderDtos;
 import com.restaurantos.entity.*;
 import com.restaurantos.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,8 +42,14 @@ public class OrderService {
 
         // 2. Validate table
         UUID tableUuid = parseUuid(req.tableId(), "tableId");
-        tableRepository.findById(tableUuid)
+        TableEntity table = tableRepository.findById(tableUuid)
                 .orElseThrow(() -> new IllegalArgumentException("Bàn không tồn tại: " + req.tableId()));
+
+        // Cập nhật trạng thái bàn sang SERVING nếu đang VACANT hoặc RESERVED
+        if ("VACANT".equalsIgnoreCase(table.getStatus()) || "RESERVED".equalsIgnoreCase(table.getStatus())) {
+            table.setStatus("SERVING");
+            tableRepository.save(table);
+        }
 
         // 3. Validate items
         if (req.items() == null || req.items().isEmpty()) {
@@ -104,6 +113,7 @@ public class OrderService {
                     .portionId(portionId)
                     .dishNameSnapshot(dish.getName())
                     .portionNameSnapshot(portionName)
+                    .slaDeadline(now.plus(Duration.ofMinutes(15)))
                     .isExpedited(false)
                     .createdAt(now)
                     .updatedAt(now)
@@ -128,7 +138,9 @@ public class OrderService {
             }
 
             order.setTotalAmount(order.getTotalAmount() + totalAmount);
-            order.setIdempotencyKey(req.idempotencyKey()); // Lưu idempotency key của lượt gọi thêm này
+            if (req.idempotencyKey() != null && !req.idempotencyKey().isBlank()) {
+                order.setIdempotencyKey(req.idempotencyKey()); // Lưu idempotency key của lượt gọi thêm này
+            }
             order.setUpdatedAt(now);
             if (req.customerNotes() != null && !req.customerNotes().isBlank()) {
                 String existingNotes = order.getCustomerNotes() != null ? order.getCustomerNotes() + " | " : "";
@@ -172,7 +184,7 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderDtos.OrderResponse getOrder(UUID orderId) {
         OrderEntity order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order không tồn tại: " + orderId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order không tồn tại: " + orderId));
         List<OrderItemEntity> items = orderItemRepository.findByOrderId(orderId);
         return toOrderResponse(order, items);
     }
