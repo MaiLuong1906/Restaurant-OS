@@ -3,6 +3,8 @@ import json
 import os
 import uuid
 import re
+from config import get_settings
+from llm import get_llm_provider
 from tools.schemas import TOOLS_DEFINITIONS
 from tools.executor import ToolExecutor
 from services.retriever import KnowledgeRetriever
@@ -10,11 +12,18 @@ from services.logger import ChatLogger
 
 class ChatEngine:
     def __init__(self, llm_provider=None, tool_executor: Optional[ToolExecutor] = None, retriever: Optional[KnowledgeRetriever] = None, chat_logger: Optional[ChatLogger] = None):
-        self.llm_provider = llm_provider
+        self.llm_provider = llm_provider or get_llm_provider()
         self.tool_executor = tool_executor or ToolExecutor()
         self.retriever = retriever or KnowledgeRetriever()
         self.chat_logger = chat_logger or ChatLogger()
         self.system_prompt = self._load_system_prompt()
+
+    def _is_live_mode(self) -> bool:
+        try:
+            get_settings().require_live()
+            return True
+        except RuntimeError:
+            return False
 
     def _load_system_prompt(self) -> str:
         prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts", "system_vi.md")
@@ -25,7 +34,17 @@ class ChatEngine:
 
     def _simulate_tool_decision(self, message: str) -> Optional[Dict[str, Any]]:
         msg = message.lower()
-        if "đặt bàn" in msg or "dat ban" in msg or "bàn" in msg:
+        if "hủy" in msg and "bàn" in msg:
+            code_match = re.search(r'PC-[A-Z0-9]+', message)
+            phone_match = re.search(r'0\d{8,10}', msg)
+            return {
+                "name": "cancel_booking",
+                "arguments": {
+                    "booking_code": code_match.group(0) if code_match else "PC-DEMO",
+                    "phone": phone_match.group(0) if phone_match else "0901234567"
+                }
+            }
+        elif "đặt bàn" in msg or "dat ban" in msg or "bàn" in msg:
             # Check availability or create booking
             # Try to extract party
             party = 2
@@ -66,22 +85,33 @@ class ChatEngine:
                 "name": "get_voucher",
                 "arguments": {"phone": phone}
             }
-        elif "hủy" in msg and "bàn" in msg:
-            code_match = re.search(r'PC-[A-Z0-9]+', message)
-            phone_match = re.search(r'0\d{8,10}', msg)
-            return {
-                "name": "cancel_booking",
-                "arguments": {
-                    "booking_code": code_match.group(0) if code_match else "PC-DEMO",
-                    "phone": phone_match.group(0) if phone_match else "0901234567"
-                }
-            }
-        elif "chay" in msg or "thực đơn" in msg or "món" in msg:
+        elif "chay" in msg or "thực đơn" in msg or "món" in msg or "phở" in msg or "lẩu" in msg or "bún" in msg or "nem" in msg:
             return {
                 "name": "search_menu",
                 "arguments": {"query": message, "diet_preference": "chay" if "chay" in msg else None}
             }
         return None
+
+    def _generate_live_reply(self, full_system: str, user_message: str, executed_tools: List[Dict[str, Any]]) -> Optional[str]:
+        if not self._is_live_mode() or not self.llm_provider:
+            return None
+        try:
+            messages = [{"role": "system", "content": full_system}]
+            if executed_tools:
+                tool_context = json.dumps(executed_tools, ensure_ascii=False)
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Khách hỏi: {user_message}\n"
+                        f"Kết quả hệ thống (BẮT BUỘC chỉ trả lời dựa trên dữ liệu này, "
+                        f"tuyệt đối không bịa thêm bàn, món hay mã voucher ngoài dữ liệu): {tool_context}"
+                    ),
+                })
+            else:
+                messages.append({"role": "user", "content": user_message})
+            return self.llm_provider.chat(messages)
+        except Exception:
+            return None
 
     def process_chat_stream(self, session_id: str, user_message: str) -> Iterator[Dict[str, Any]]:
         # 1. Log incoming message
@@ -98,8 +128,9 @@ class ChatEngine:
         executed_tools = []
         loop_count = 0
         max_loops = 3
+        final_text = ""
 
-        # Check tool execution (simulation or live LLM)
+        # Check tool execution (simulation + live LLM synthesis)
         while loop_count < max_loops:
             loop_count += 1
             tool_call = self._simulate_tool_decision(user_message)
@@ -113,34 +144,48 @@ class ChatEngine:
                 if tool_name == "create_booking" and tool_result.get("status") == "success":
                     booking = tool_result.get("booking", {})
                     yield {"event": "booking_card", "data": json.dumps(booking, ensure_ascii=False)}
-                    yield {"event": "text", "data": f"Nhà hàng Phố Cổ đã xác nhận giữ bàn thành công! Mã đặt bàn của bạn là {booking.get('booking_code')}."}
+                    live_reply = self._generate_live_reply(full_system, user_message, executed_tools)
+                    final_text = live_reply or f"Nhà hàng Phố Cổ đã xác nhận giữ bàn thành công! Mã đặt bàn của bạn là {booking.get('booking_code')}."
+                    yield {"event": "text", "data": final_text}
                     break
                 elif tool_name == "check_table_availability":
                     tables = tool_result.get("available_tables", [])
-                    yield {"event": "text", "data": f"Hiện tại quán còn {len(tables)} bàn trống phù hợp cho bạn. Bạn có muốn giữ bàn không ạ? Vui lòng cho mình xin tên và số điện thoại nhé."}
+                    live_reply = self._generate_live_reply(full_system, user_message, executed_tools)
+                    final_text = live_reply or f"Hiện tại quán còn {len(tables)} bàn trống phù hợp cho bạn. Bạn có muốn giữ bàn không ạ? Vui lòng cho mình xin tên và số điện thoại nhé."
+                    yield {"event": "text", "data": final_text}
                     break
                 elif tool_name == "get_voucher":
                     vouchers = tool_result.get("vouchers", [])
                     for v in vouchers:
                         yield {"event": "voucher_card", "data": json.dumps(v, ensure_ascii=False)}
-                    yield {"event": "text", "data": "Dạ đây là các ưu đãi voucher hiện có của quán dành cho bạn ạ!"}
+                    live_reply = self._generate_live_reply(full_system, user_message, executed_tools)
+                    final_text = live_reply or "Dạ đây là các ưu đãi voucher hiện có của quán dành cho bạn ạ!"
+                    yield {"event": "text", "data": final_text}
                     break
                 elif tool_name == "search_menu":
                     dishes = tool_result.get("dishes", [])
                     for d in dishes:
                         yield {"event": "dish_card", "data": json.dumps(d, ensure_ascii=False)}
-                    yield {"event": "text", "data": f"Quán gửi bạn danh sách món ăn tham khảo ạ!"}
+                    live_reply = self._generate_live_reply(full_system, user_message, executed_tools)
+                    final_text = live_reply or "Quán gửi bạn danh sách món ăn tham khảo ạ!"
+                    yield {"event": "text", "data": final_text}
                     break
                 elif tool_name == "cancel_booking":
-                    yield {"event": "text", "data": f"Đã ghi nhận yêu cầu hủy đặt bàn {args.get('booking_code')}. Bàn đã được hoàn lại vào hệ thống ạ."}
+                    live_reply = self._generate_live_reply(full_system, user_message, executed_tools)
+                    final_text = live_reply or f"Đã ghi nhận yêu cầu hủy đặt bàn {args.get('booking_code')}. Bàn đã được hoàn lại vào hệ thống ạ."
+                    yield {"event": "text", "data": final_text}
                     break
             else:
-                if knowledge_context:
-                    yield {"event": "text", "data": f"Dạ quán xin thông tin tới bạn:\n{chunks[0]['chunk_text']}"}
+                live_reply = self._generate_live_reply(full_system, user_message, executed_tools)
+                if live_reply:
+                    final_text = live_reply
+                elif knowledge_context:
+                    final_text = f"Dạ quán xin thông tin tới bạn:\n{chunks[0]['chunk_text']}"
                 else:
-                    yield {"event": "text", "data": "Chào bạn, mình là trợ lý AI Phố Cổ. Mình có thể hỗ trợ bạn xem thực đơn, kiểm tra bàn trống, đặt bàn và lấy voucher ạ!"}
+                    final_text = "Chào bạn, mình là trợ lý AI Phố Cổ. Mình có thể hỗ trợ bạn xem thực đơn, kiểm tra bàn trống, đặt bàn và lấy voucher ạ!"
+                yield {"event": "text", "data": final_text}
                 break
 
         # Log assistant message
-        self.chat_logger.log_message(session_id, "assistant", "Response finished", tool_calls=executed_tools)
+        self.chat_logger.log_message(session_id, "assistant", final_text or "Response finished", tool_calls=executed_tools)
         yield {"event": "done", "data": json.dumps({"status": "completed", "session_id": session_id})}

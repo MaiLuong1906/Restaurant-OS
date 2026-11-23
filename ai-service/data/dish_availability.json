@@ -1,8 +1,8 @@
 [
-  {"dish_id": "DISH-001", "name": "Phở Bò Tái", "available": true, "remaining": 15},
-  {"dish_id": "DISH-002", "name": "Bún Chả Hà Nội", "available": true, "remaining": 20},
-  {"dish_id": "DISH-003", "name": "Nem Rán Phố Cổ", "available": true, "remaining": 12},
-  {"dish_id": "DISH-004", "name": "Đậu Phụ Tẩm Hành (Chay)", "available": true, "remaining": 25},
-  {"dish_id": "DISH-005", "name": "Nấm Kho Chay", "available": true, "remaining": 18},
-  {"dish_id": "DISH-006", "name": "Lẩu Cua Đồng", "available": false, "remaining": 0}
+  {"dish_id": "DISH-001", "name": "Phở Bò Tái", "price": 75000, "description": "Bánh phở tươi, thịt bò tái mềm, nước dùng ninh xương 24h", "available": true, "remaining": 15},
+  {"dish_id": "DISH-002", "name": "Bún Chả Hà Nội", "price": 65000, "description": "Chả nướng than hoa, bún tươi, rau sống và nước chấm truyền thống", "available": true, "remaining": 20},
+  {"dish_id": "DISH-003", "name": "Nem Rán Phố Cổ", "price": 55000, "description": "Nem rán giòn rụm nhân thịt, mộc nhĩ, miến dong truyền thống", "available": true, "remaining": 12},
+  {"dish_id": "DISH-004", "name": "Đậu Phụ Tẩm Hành (Chay)", "price": 45000, "description": "Đậu phụ làng Mơ chiên vàng tẩm mỡ hành chay thơm dịu", "available": true, "remaining": 25},
+  {"dish_id": "DISH-005", "name": "Nấm Kho Chay", "price": 65000, "description": "Nấm đông cô và nấm đùi gà kho tiêu trong tộ đất", "available": true, "remaining": 18},
+  {"dish_id": "DISH-006", "name": "Lẩu Cua Đồng", "price": 280000, "description": "Lẩu riêu cua đồng bắp bò sườn sụn đậm đà vị Bắc", "available": false, "remaining": 0}
 ]
