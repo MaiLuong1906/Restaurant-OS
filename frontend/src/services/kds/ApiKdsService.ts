@@ -1,5 +1,6 @@
 import {
   Ticket,
+  OrderItem,
   OrderItemStatus,
   OrderChangeAlertData,
   DishAvailability,
@@ -21,22 +22,46 @@ export class ApiKdsService implements KdsService {
   }
 
   async updateTicketStatus(
-    _ticketId: string,
+    ticketId: string,
     _status: OrderItemStatus,
-    _idempotencyKey: string
+    idempotencyKey: string
   ): Promise<Ticket> {
-    // TODO: UC19 - Hoàn tất ticket / đồng bộ trạng thái đơn bếp qua backend
-    throw new Error('updateTicketStatus chưa được hỗ trợ ở live mode (TODO UC19)');
+    // K3 gửi body {}; field status là field chết trên BE, không gửi status khác READY
+    return fetchApi<Ticket>(`/kds/tickets/${ticketId}/complete`, {
+      method: 'PATCH',
+      headers: idempotencyKey ? { 'X-Request-ID': idempotencyKey } : undefined,
+      body: JSON.stringify({}),
+    });
   }
 
   async updateItemStatus(
-    _ticketId: string,
-    _itemId: string,
-    _status: OrderItemStatus,
-    _idempotencyKey: string
+    ticketId: string,
+    itemId: string,
+    status: OrderItemStatus,
+    idempotencyKey: string,
+    reason?: string
   ): Promise<Ticket> {
-    // TODO: UC18 - Cập nhật trạng thái từng món trong ticket
-    throw new Error('updateItemStatus chưa được hỗ trợ ở live mode (TODO UC18)');
+    if (status !== 'READY' && status !== 'REJECTED') {
+      throw new Error('Bếp chỉ được phép cập nhật trạng thái món sang READY hoặc REJECTED');
+    }
+
+    const trimmedReason = reason?.trim();
+    if (status === 'REJECTED') {
+      if (!trimmedReason || trimmedReason.length < 5 || trimmedReason.length > 200) {
+        throw new Error('Lý do từ chối là bắt buộc và phải từ 5 đến 200 ký tự');
+      }
+    }
+
+    await fetchApi<OrderItem>(`/kds/items/${itemId}/status`, {
+      method: 'PATCH',
+      headers: idempotencyKey ? { 'X-Request-ID': idempotencyKey } : undefined,
+      body: JSON.stringify({
+        status,
+        ...(trimmedReason !== undefined ? { reason: trimmedReason } : {}),
+      }),
+    });
+
+    return this.getTicketById(ticketId);
   }
 
   async getPendingOrderChanges(): Promise<OrderChangeAlertData[]> {

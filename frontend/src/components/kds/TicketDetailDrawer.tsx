@@ -10,7 +10,7 @@ interface TicketDetailDrawerProps {
   open: boolean;
   onClose: () => void;
   onComplete: (ticketId: string) => void;
-  onReportIncident?: (ticketId: string) => void;
+  onReportIncident?: (ticketId: string, itemId: string, reason: string) => Promise<void> | void;
   hasPendingAlert?: boolean;
   disabledComplete?: boolean;
 }
@@ -25,15 +25,40 @@ export function TicketDetailDrawer({
   disabledComplete,
 }: TicketDetailDrawerProps) {
   const [allergyExpanded, setAllergyExpanded] = React.useState<boolean>(false);
+  const [incidentFormOpen, setIncidentFormOpen] = React.useState<boolean>(false);
+  const [selectedIncidentItemId, setSelectedIncidentItemId] = React.useState<string>('');
+  const [incidentReason, setIncidentReason] = React.useState<string>('');
+  const [incidentError, setIncidentError] = React.useState<string | null>(null);
+  const [isSubmittingIncident, setIsSubmittingIncident] = React.useState<boolean>(false);
   const [incidentReported, setIncidentReported] = React.useState<boolean>(false);
   const [isCompleting, setIsCompleting] = React.useState<boolean>(false);
+
+  const rejectableItems = React.useMemo(
+    () =>
+      ticket
+        ? ticket.items.filter((i) => i.status === 'WAITING' || i.status === 'READY')
+        : [],
+    [ticket]
+  );
 
   // Reset local state when ticket changes
   React.useEffect(() => {
     setAllergyExpanded(false);
+    setIncidentFormOpen(false);
+    setIncidentReason('');
+    setIncidentError(null);
+    setIsSubmittingIncident(false);
     setIncidentReported(false);
     setIsCompleting(false);
   }, [ticket?.id]);
+
+  React.useEffect(() => {
+    if (rejectableItems.length > 0 && !rejectableItems.some((i) => i.id === selectedIncidentItemId)) {
+      setSelectedIncidentItemId(rejectableItems[0].id);
+    } else if (rejectableItems.length === 0) {
+      setSelectedIncidentItemId('');
+    }
+  }, [rejectableItems, selectedIncidentItemId]);
 
   // Handle ESC key to close
   React.useEffect(() => {
@@ -66,17 +91,41 @@ export function TicketDetailDrawer({
   const totalDishes = ticket.items.length;
   const totalPortions = ticket.items.reduce((sum, item) => sum + item.quantity, 0);
 
+  const trimmedReason = incidentReason.trim();
+  const isIncidentReasonValid = trimmedReason.length >= 5 && trimmedReason.length <= 200;
+
   const handleCompleteClick = () => {
-    if (isCompleting || hasPendingAlert || disabledComplete) return;
+    if (isCompleting || hasPendingAlert || disabledComplete || !ticket.items.some((i) => i.status === 'WAITING')) return;
     setIsCompleting(true);
     onComplete(ticket.id);
     onClose();
   };
 
-  const handleIncidentClick = () => {
-    setIncidentReported(true);
-    if (onReportIncident) {
-      onReportIncident(ticket.id);
+  const handleIncidentToggle = () => {
+    setIncidentError(null);
+    setIncidentFormOpen((prev) => !prev);
+  };
+
+  const handleSubmitIncident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedIncidentItemId || !isIncidentReasonValid || isSubmittingIncident) {
+      setIncidentError('Lý do sự cố là bắt buộc và phải từ 5 đến 200 ký tự.');
+      return;
+    }
+
+    try {
+      setIsSubmittingIncident(true);
+      setIncidentError(null);
+      if (onReportIncident) {
+        await onReportIncident(ticket.id, selectedIncidentItemId, trimmedReason);
+      }
+      setIncidentReported(true);
+      setIncidentFormOpen(false);
+      setIncidentReason('');
+    } catch (err) {
+      setIncidentError((err as Error).message || 'Không thể báo sự cố món ăn');
+    } finally {
+      setIsSubmittingIncident(false);
     }
   };
 
@@ -217,10 +266,10 @@ export function TicketDetailDrawer({
         <div className="p-6 border-t border-ops-border bg-white space-y-3">
           <button
             type="button"
-            disabled={isCompleting || hasPendingAlert || disabledComplete}
+            disabled={isCompleting || hasPendingAlert || disabledComplete || !ticket.items.some((i) => i.status === 'WAITING')}
             onClick={handleCompleteClick}
             className={`w-full h-12 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all ${
-              hasPendingAlert || disabledComplete
+              hasPendingAlert || disabledComplete || !ticket.items.some((i) => i.status === 'WAITING')
                 ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed border border-neutral-300'
                 : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50'
             }`}
@@ -235,15 +284,86 @@ export function TicketDetailDrawer({
             </span>
           </button>
 
-          <button
-            type="button"
-            disabled={incidentReported}
-            onClick={handleIncidentClick}
-            className="w-full py-2 text-center text-sm font-semibold text-ops-muted hover:text-danger-600 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
-          >
-            <AlertTriangle className="h-4 w-4 text-danger-600" />
-            <span>{incidentReported ? 'Đã báo sự cố cho Bếp trưởng' : 'Báo sự cố (không thể chế biến)'}</span>
-          </button>
+          {!incidentFormOpen && (
+            <button
+              type="button"
+              disabled={rejectableItems.length === 0}
+              onClick={handleIncidentToggle}
+              className="w-full py-2 text-center text-sm font-semibold text-ops-muted hover:text-danger-600 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+            >
+              <AlertTriangle className="h-4 w-4 text-danger-600" />
+              <span>Báo sự cố (không thể chế biến)</span>
+            </button>
+          )}
+
+          {incidentFormOpen && (
+            <form onSubmit={handleSubmitIncident} className="space-y-2.5 p-3 rounded-lg border border-danger-200 bg-danger-50/60">
+              {rejectableItems.length > 1 && (
+                <div>
+                  <label htmlFor="incident-item-select" className="block text-xs font-bold text-ops-ink mb-1">
+                    Chọn món gặp sự cố
+                  </label>
+                  <select
+                    id="incident-item-select"
+                    value={selectedIncidentItemId}
+                    onChange={(e) => setSelectedIncidentItemId(e.target.value)}
+                    className="w-full px-2.5 py-2 text-sm rounded border border-ops-border bg-white text-ops-ink"
+                  >
+                    {rejectableItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.quantity}× {item.dishName} ({item.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="incident-reason-input" className="block text-xs font-bold text-ops-ink mb-1">
+                  Lý do từ chối (5–200 ký tự) <span className="text-danger-600">*</span>
+                </label>
+                <input
+                  id="incident-reason-input"
+                  type="text"
+                  value={incidentReason}
+                  onChange={(e) => {
+                    setIncidentReason(e.target.value);
+                    if (incidentError) setIncidentError(null);
+                  }}
+                  maxLength={200}
+                  placeholder="hết nguyên liệu, cháy món..."
+                  className="w-full px-3 py-2 text-sm rounded border border-ops-border bg-white text-ops-ink focus:outline-none focus:ring-2 focus:ring-danger-500"
+                />
+                <div className="flex justify-between items-center mt-1">
+                  <span className={`text-[11px] ${trimmedReason.length > 0 && !isIncidentReasonValid ? 'text-danger-600 font-semibold' : 'text-ops-muted'}`}>
+                    {trimmedReason.length < 5 ? 'Cần ít nhất 5 ký tự' : 'Hợp lệ'}
+                  </span>
+                  <span className="text-[11px] text-ops-muted">{trimmedReason.length}/200</span>
+                </div>
+              </div>
+
+              {incidentError && (
+                <p className="text-xs text-danger-700 font-semibold">{incidentError}</p>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleIncidentToggle}
+                  className="flex-1 h-10 rounded-lg border border-ops-border bg-white text-xs font-bold text-ops-ink hover:bg-neutral-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={!selectedIncidentItemId || !isIncidentReasonValid || isSubmittingIncident}
+                  className="flex-1 h-10 rounded-lg bg-danger-600 hover:bg-danger-700 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingIncident ? 'Đang gửi...' : 'Xác nhận báo sự cố'}
+                </button>
+              </div>
+            </form>
+          )}
 
           {incidentReported && (
             <div className="text-xs text-danger-700 bg-danger-50 p-2.5 rounded border border-danger-200 text-center">

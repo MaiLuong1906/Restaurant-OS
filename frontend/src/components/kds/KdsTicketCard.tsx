@@ -29,7 +29,8 @@ export function KdsTicketCard({
   const allergy = ticket.items.find((i) => i.allergy)?.allergy;
 
   const actionableItems = ticket.items.filter((i) => i.status !== 'REJECTED');
-  const allReady = actionableItems.every((i) => i.status === 'READY');
+  const allRejected = actionableItems.length === 0;
+  const allReady = !allRejected && actionableItems.every((i) => i.status === 'READY');
 
   return (
     <div
@@ -114,14 +115,14 @@ export function KdsTicketCard({
 
       <button
         type="button"
-        disabled={isCompleting || allReady || hasPendingAlert || disabledComplete}
+        disabled={isCompleting || allReady || allRejected || hasPendingAlert || disabledComplete}
         onClick={(e) => {
           e.stopPropagation();
-          if (hasPendingAlert || disabledComplete) return;
+          if (hasPendingAlert || disabledComplete || allRejected) return;
           onComplete(ticket.id);
         }}
         className={`w-full h-12 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all ${
-          hasPendingAlert || disabledComplete
+          hasPendingAlert || disabledComplete || allRejected
             ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed border border-neutral-300'
             : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50 disabled:cursor-not-allowed'
         }`}
@@ -135,6 +136,11 @@ export function KdsTicketCard({
           <>
             <Lock className="h-5 w-5" />
             <span>Đang khóa (có thay đổi)</span>
+          </>
+        ) : allRejected ? (
+          <>
+            <Lock className="h-5 w-5" />
+            <span>Đã báo sự cố</span>
           </>
         ) : (
           <>
