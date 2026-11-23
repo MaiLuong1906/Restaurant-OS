@@ -36,6 +36,9 @@ export default function SchedulePage() {
   const [b7OpenShifts, setB7OpenShifts] = React.useState<OpenShift[]>([]);
   const [b7SelectedShiftId, setB7SelectedShiftId] = React.useState<string>('');
   const [b7Note, setB7Note] = React.useState<string>('');
+  const [b7IdempotencyKey, setB7IdempotencyKey] = React.useState<string>(() =>
+    generateIdempotencyKey()
+  );
   const [b7Submitting, setB7Submitting] = React.useState<boolean>(false);
   const [b7SuccessReg, setB7SuccessReg] = React.useState<ShiftRegistration | null>(null);
   const [b7Cancelled, setB7Cancelled] = React.useState<boolean>(false);
@@ -48,6 +51,9 @@ export default function SchedulePage() {
   const [b8Search, setB8Search] = React.useState<string>('');
   const [b8SelectedPeerId, setB8SelectedPeerId] = React.useState<string>('');
   const [b8Reason, setB8Reason] = React.useState<string>('');
+  const [b8IdempotencyKey, setB8IdempotencyKey] = React.useState<string>(() =>
+    generateIdempotencyKey()
+  );
   const [b8Submitting, setB8Submitting] = React.useState<boolean>(false);
   const [b8SuccessSwap, setB8SuccessSwap] = React.useState<ShiftSwapRequest | null>(null);
   const [b8Error, setB8Error] = React.useState<string | null>(null);
@@ -86,7 +92,17 @@ export default function SchedulePage() {
     setCurrentWeekStart((prev) => addDays(prev, 7));
   };
 
-  // Mở màn hình B7 (Đăng ký ca)
+  // Chọn ca trong B7: sinh mới idempotencyKey khi đổi sang ca khác
+  const handleSelectB7Shift = (shiftId: string) => {
+    setB7SelectedShiftId((prev) => {
+      if (prev !== shiftId) {
+        setB7IdempotencyKey(generateIdempotencyKey());
+      }
+      return shiftId;
+    });
+  };
+
+  // Mở màn hình B7 (Đăng ký ca): sinh key 1 lần cho phiên thao tác
   const handleOpenB7 = async (initialDateKey?: string, presetShiftId?: string) => {
     const targetDate = initialDateKey || selectedDateKey || currentWeekStart;
     setB7SelectedDateKey(targetDate);
@@ -94,6 +110,7 @@ export default function SchedulePage() {
     setB7SuccessReg(null);
     setB7Cancelled(false);
     setB7Error(null);
+    setB7IdempotencyKey(generateIdempotencyKey());
     setView('B7');
 
     try {
@@ -110,10 +127,11 @@ export default function SchedulePage() {
     }
   };
 
-  // Đổi ngày trong form B7
+  // Đổi ngày trong form B7: sinh mới idempotencyKey cho lựa chọn ngày/ca mới
   const handleB7ChangeDate = async (newDateKey: string) => {
     setB7SelectedDateKey(newDateKey);
     setB7Error(null);
+    setB7IdempotencyKey(generateIdempotencyKey());
     try {
       const openList = await staffScheduleService.listOpenShifts(newDateKey);
       setB7OpenShifts(openList);
@@ -124,7 +142,7 @@ export default function SchedulePage() {
     }
   };
 
-  // Gửi đăng ký ca B7
+  // Gửi đăng ký ca B7: dùng lại b7IdempotencyKey cho mọi lần thử lại của cùng 1 thao tác
   const handleSubmitB7 = async () => {
     if (!b7SelectedShiftId || b7Submitting) return;
     setB7Submitting(true);
@@ -134,7 +152,7 @@ export default function SchedulePage() {
         openShiftId: b7SelectedShiftId,
         dateKey: b7SelectedDateKey,
         note: b7Note.trim() || undefined,
-        idempotencyKey: generateIdempotencyKey(),
+        idempotencyKey: b7IdempotencyKey,
       });
       setB7SuccessReg(reg);
       loadData(currentWeekStart);
@@ -156,13 +174,33 @@ export default function SchedulePage() {
     }
   };
 
-  // Mở màn hình B8 (Đổi ca)
+  // Chọn ca của tôi hoặc người nhận trong B8: sinh mới idempotencyKey khi đổi đối tượng
+  const handleSelectB8OwnShift = (shiftId: string) => {
+    setB8SelectedOwnShiftId((prev) => {
+      if (prev !== shiftId) {
+        setB8IdempotencyKey(generateIdempotencyKey());
+      }
+      return shiftId;
+    });
+  };
+
+  const handleSelectB8Peer = (peerId: string) => {
+    setB8SelectedPeerId((prev) => {
+      if (prev !== peerId) {
+        setB8IdempotencyKey(generateIdempotencyKey());
+      }
+      return peerId;
+    });
+  };
+
+  // Mở màn hình B8 (Đổi ca): sinh key 1 lần cho phiên thao tác
   const handleOpenB8 = async (presetShiftId?: string) => {
     setView('B8');
     setB8Error(null);
     setB8SuccessSwap(null);
     setB8Reason('');
     setB8Search('');
+    setB8IdempotencyKey(generateIdempotencyKey());
 
     try {
       const [allShifts, peers] = await Promise.all([
@@ -179,7 +217,7 @@ export default function SchedulePage() {
     }
   };
 
-  // Gửi đổi ca B8
+  // Gửi đổi ca B8: dùng lại b8IdempotencyKey cho mọi lần thử lại của cùng 1 thao tác
   const handleSubmitB8 = async () => {
     if (!b8SelectedOwnShiftId || !b8SelectedPeerId || b8Submitting) return;
     setB8Submitting(true);
@@ -190,7 +228,7 @@ export default function SchedulePage() {
         requesterShiftId: b8SelectedOwnShiftId,
         peerId: b8SelectedPeerId,
         reason: b8Reason.trim() || undefined,
-        idempotencyKey: generateIdempotencyKey(),
+        idempotencyKey: b8IdempotencyKey,
       });
       setB8SuccessSwap(swap);
       loadData(currentWeekStart);
@@ -283,7 +321,7 @@ export default function SchedulePage() {
             error={b7Error}
             onBackToSchedule={() => setView('B6')}
             onChangeDate={handleB7ChangeDate}
-            onSelectShift={setB7SelectedShiftId}
+            onSelectShift={handleSelectB7Shift}
             onChangeNote={setB7Note}
             onSubmit={handleSubmitB7}
             onCancelRegistration={handleCancelRegistration}
@@ -304,9 +342,9 @@ export default function SchedulePage() {
             successSwap={b8SuccessSwap}
             error={b8Error}
             onBackToSchedule={() => setView('B6')}
-            onSelectOwnShift={setB8SelectedOwnShiftId}
+            onSelectOwnShift={handleSelectB8OwnShift}
             onChangeSearch={setB8Search}
-            onSelectPeer={setB8SelectedPeerId}
+            onSelectPeer={handleSelectB8Peer}
             onChangeReason={setB8Reason}
             onSubmit={handleSubmitB8}
             onResetForm={() => handleOpenB8()}
