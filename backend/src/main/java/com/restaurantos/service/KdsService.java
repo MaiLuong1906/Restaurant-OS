@@ -2,13 +2,17 @@ package com.restaurantos.service;
 
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.CompleteTicketRequest;
+import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.entity.OrderEntity;
 import com.restaurantos.entity.OrderItemEntity;
 import com.restaurantos.repository.OrderItemRepository;
 import com.restaurantos.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -71,6 +75,85 @@ public class KdsService {
         return orderItemRepository.findActiveItems().stream()
                 .map(this::mapToItemDto)
                 .toList();
+    }
+
+    /**
+     * K3: Hoàn tất ticket (chuyển toàn bộ món WAITING sang READY).
+     * Idempotent: nếu ticket đã READY hết hoặc không có món WAITING thì trả lại ticket hiện tại, không lỗi.
+     */
+    @Transactional
+    public Optional<KdsTicketDto> completeTicket(UUID ticketId, CompleteTicketRequest request) {
+        return orderRepository.findById(ticketId)
+                .map(order -> {
+                    List<OrderItemEntity> items = orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
+                    boolean hasWaiting = false;
+                    Instant now = Instant.now();
+
+                    for (OrderItemEntity item : items) {
+                        if ("WAITING".equalsIgnoreCase(item.getStatus())) {
+                            item.setStatus("READY");
+                            item.setUpdatedAt(now);
+                            hasWaiting = true;
+                        }
+                    }
+
+                    if (hasWaiting) {
+                        orderItemRepository.saveAll(items);
+                    }
+
+                    return mapToTicketDto(order, items);
+                });
+    }
+
+    /**
+     * K4: Cập nhật trạng thái từng món trong ticket.
+     * Chỉ cho phép: WAITING -> READY, WAITING -> REJECTED, READY -> REJECTED.
+     * Bếp không được set SERVED (trả 409).
+     * Yêu cầu reason 5-200 ký tự khi REJECTED (trả 400 nếu vi phạm).
+     * Idempotent: nếu món đã ở trạng thái đích thì trả lại món hiện tại, không update lại.
+     */
+    @Transactional
+    public Optional<KdsItemDto> updateItemStatus(UUID itemId, UpdateItemStatusRequest request) {
+        OrderItemEntity item = orderItemRepository.findById(itemId).orElse(null);
+        if (item == null) {
+            return Optional.empty();
+        }
+
+        String targetStatus = request.status() != null ? request.status().trim().toUpperCase() : "";
+        String currentStatus = item.getStatus() != null ? item.getStatus().trim().toUpperCase() : "";
+
+        // 1. Kiểm tra trạng thái đích hợp lệ
+        if (!"READY".equals(targetStatus) && !"REJECTED".equals(targetStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ cho phép cập nhật sang trạng thái READY hoặc REJECTED");
+        }
+
+        // 2. Idempotent check: nếu món đã ở trạng thái đích thì trả lại nguyên trạng
+        if (targetStatus.equals(currentStatus)) {
+            return Optional.of(mapToItemDto(item));
+        }
+
+        // 3. Kiểm tra chuyển trạng thái hợp lệ
+        boolean validTransition = ("WAITING".equals(currentStatus) && ("READY".equals(targetStatus) || "REJECTED".equals(targetStatus)))
+                || ("READY".equals(currentStatus) && "REJECTED".equals(targetStatus));
+
+        if (!validTransition) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Không thể chuyển trạng thái từ " + currentStatus + " sang " + targetStatus);
+        }
+
+        // 4. Validate reason khi REJECTED (5 - 200 ký tự)
+        if ("REJECTED".equals(targetStatus)) {
+            String reason = request.reason();
+            if (reason == null || reason.trim().length() < 5 || reason.trim().length() > 200) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lý do từ chối là bắt buộc và phải từ 5 đến 200 ký tự khi chuyển sang REJECTED");
+            }
+            // TODO: UC19 - Hiện schema order_items chưa có cột lưu lý do từ chối (reason). Cần thêm cột + migration ở backlog sau.
+        }
+
+        item.setStatus(targetStatus);
+        item.setUpdatedAt(Instant.now());
+        OrderItemEntity saved = orderItemRepository.save(item);
+
+        return Optional.of(mapToItemDto(saved));
     }
 
     private KdsTicketDto mapToTicketDto(OrderEntity order, List<OrderItemEntity> itemEntities) {

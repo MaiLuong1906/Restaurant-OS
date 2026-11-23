@@ -3,6 +3,8 @@ package com.restaurantos.controller;
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.CompleteTicketRequest;
+import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.service.KdsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,5 +68,61 @@ class KdsControllerTest {
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().data()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("K3: completeTicket returns 200 on success")
+    void completeTicket_returnsSuccess() {
+        UUID ticketId = UUID.randomUUID();
+        KdsTicketDto ticket = new KdsTicketDto(ticketId, "Bàn 01", UUID.randomUUID(), "READY", Instant.now(), Instant.now(), List.of());
+        when(kdsService.completeTicket(ticketId, null)).thenReturn(Optional.of(ticket));
+
+        ResponseEntity<ApiResponse<KdsTicketDto>> response = kdsController.completeTicket(ticketId, null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().data().status()).isEqualTo("READY");
+    }
+
+    @Test
+    @DisplayName("K3: completeTicket returns 404 when ticket not found")
+    void completeTicket_notFound_returns404() {
+        UUID missingId = UUID.randomUUID();
+        when(kdsService.completeTicket(missingId, null)).thenReturn(Optional.empty());
+
+        ResponseEntity<ApiResponse<KdsTicketDto>> response = kdsController.completeTicket(missingId, null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().success()).isFalse();
+    }
+
+    @Test
+    @DisplayName("K4: updateItemStatus returns 200 on success")
+    void updateItemStatus_returnsSuccess() {
+        UUID itemId = UUID.randomUUID();
+        UpdateItemStatusRequest request = new UpdateItemStatusRequest("READY", null);
+        KdsItemDto item = new KdsItemDto(itemId, UUID.randomUUID(), "Phở Bò", 1, null, null, "READY", null, false);
+        when(kdsService.updateItemStatus(itemId, request)).thenReturn(Optional.of(item));
+
+        ResponseEntity<ApiResponse<KdsItemDto>> response = kdsController.updateItemStatus(itemId, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().data().status()).isEqualTo("READY");
+    }
+
+    @Test
+    @DisplayName("K4: updateItemStatus returns 404 when item not found")
+    void updateItemStatus_notFound_returns404() {
+        UUID missingId = UUID.randomUUID();
+        UpdateItemStatusRequest request = new UpdateItemStatusRequest("READY", null);
+        when(kdsService.updateItemStatus(missingId, request)).thenReturn(Optional.empty());
+
+        ResponseEntity<ApiResponse<KdsItemDto>> response = kdsController.updateItemStatus(missingId, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().success()).isFalse();
     }
 }
