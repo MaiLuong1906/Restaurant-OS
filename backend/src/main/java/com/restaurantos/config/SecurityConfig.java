@@ -69,11 +69,15 @@ public class SecurityConfig {
                 // TODO (Follow-up): Khóa lại .authenticated() ngay sau khi Auth PR được merge lên dev.
                 .requestMatchers("/api/v1/staff/schedule/**").permitAll()
 
-                // 9. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
+                // 9. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
+                // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
+                .requestMatchers("/api/v1/reservations/**").permitAll()
+
+                // 10. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
                 .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
 
-                // 10. Danh sách bàn (Waiter FloorPlan & Reservation)
+                // 11. Danh sách bàn (Waiter FloorPlan & Reservation)
                 .requestMatchers(HttpMethod.GET, "/api/v1/tables/**").permitAll()
 
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
