@@ -25,6 +25,9 @@ public class TableEntity {
     @Column(name = "table_number", nullable = false, length = 50)
     private String tableNumber;
 
+    @Column(name = "qr_code_token", length = 100)
+    private String qrCodeToken;
+
     @Column(nullable = false)
     private Integer capacity;
 

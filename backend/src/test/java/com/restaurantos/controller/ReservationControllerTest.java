@@ -9,12 +9,18 @@ import com.restaurantos.enums.TableStatus;
 import com.restaurantos.exception.BusinessException;
 import com.restaurantos.exception.GlobalExceptionHandler;
 import com.restaurantos.service.ReservationService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -28,6 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ReservationController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class ReservationControllerTest {
 
@@ -39,6 +46,26 @@ class ReservationControllerTest {
 
     @MockBean
     private ReservationService reservationService;
+
+    @BeforeEach
+    void setUpCashierAuth() {
+        var auth = new UsernamePasswordAuthenticationToken(
+                "cashier-test",
+                null,
+                List.of(
+                        new SimpleGrantedAuthority("ROLE_CASHIER"),
+                        new SimpleGrantedAuthority("TABLE:RESERVATION:VIEW"),
+                        new SimpleGrantedAuthority("TABLE:RESERVATION:CREATE"),
+                        new SimpleGrantedAuthority("TABLE:RESERVATION:UPDATE")
+                )
+        );
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    @AfterEach
+    void clearAuth() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void getAvailableTables_returns200AndEnvelope() throws Exception {
