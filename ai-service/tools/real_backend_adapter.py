@@ -178,7 +178,7 @@ class RealBackendAdapter:
             return {"is_mock": False, "status": "failed", "available_tables": []}
 
     def create_booking(self, name: str, phone: str, date: str, time: str, party_size: int, table_id: str, note: Optional[str] = None, idempotency_key: Optional[str] = None) -> Dict[str, Any]:
-        # Nếu chưa có table_id, tự động lấy bàn trống đầu tiên phù hợp từ available-tables
+        # Nếu chưa có table_id hợp lệ, tra bàn trống và trả danh sách để khách chọn (không tự chọn bàn đầu tiên)
         if not table_id or table_id.startswith("TB-"):
             avail = self.check_table_availability(date, time, party_size)
             tables = avail.get("available_tables", [])
@@ -188,7 +188,12 @@ class RealBackendAdapter:
                     "status": "failed",
                     "message": "Rất tiếc vào khung giờ này nhà hàng không còn bàn trống phù hợp ạ."
                 }
-            table_id = tables[0]["table_id"]
+            return {
+                "is_mock": False,
+                "status": "needs_table_selection",
+                "available_tables": tables,
+                "message": f"Hiện có {len(tables)} bàn trống, bạn muốn chọn bàn nào?"
+            }
 
         iso_time = self._convert_to_utc_iso(date, time)
         idemp = idempotency_key or str(uuid.uuid4())

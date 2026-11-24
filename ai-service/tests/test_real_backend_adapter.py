@@ -208,3 +208,38 @@ def test_vouchers_seed_data_in_real_adapter():
     # Test double redeem
     res2 = adapter.redeem_voucher("PHOCO10", "booking-uuid-1")
     assert res2["status"] == "failed"
+
+def test_create_booking_without_table_id_returns_needs_table_selection():
+    post_called = False
+
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_called
+        if request.url.path == "/api/v1/reservations/available-tables" and request.method == "GET":
+            return httpx.Response(200, json=TABLES_MOCK_DATA)
+        if request.url.path == "/api/v1/reservations" and request.method == "POST":
+            post_called = True
+            return httpx.Response(201, json={"success": True, "data": {}})
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(mock_handler))
+    adapter = RealBackendAdapter(base_url="http://localhost:8080/api/v1", client=client)
+
+    res = adapter.create_booking(
+        name="Nguyễn Văn A",
+        phone="0912345678",
+        date="2026-11-25",
+        time="19:00",
+        party_size=4,
+        table_id=""
+    )
+
+    assert post_called is False, "Không được gọi POST /reservations khi chưa có table_id hợp lệ"
+    assert res["status"] == "needs_table_selection"
+    assert len(res["available_tables"]) == 1
+    assert res["available_tables"][0]["table_id"] == "e8f7a6b5-0000-1111-2222-333344445555"
+
+def test_cancel_without_booking_code_returns_none():
+    from services.chat_engine import ChatEngine
+    engine = ChatEngine()
+    decision = engine._simulate_tool_decision("Hủy bàn vừa đặt giúp mình")
+    assert decision is None, "Không được sinh tool call với mã giả khi chưa có mã đặt bàn"

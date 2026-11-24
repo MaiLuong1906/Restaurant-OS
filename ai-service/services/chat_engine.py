@@ -54,13 +54,16 @@ class ChatEngine:
             phone_match = re.search(r'0\d{8,10}', msg)
             booking_code = (
                 uuid_match.group(0) if uuid_match
-                else (code_match.group(0) if code_match else getattr(self, "_last_created_booking_code", "DEMO-UUID"))
+                else (code_match.group(0) if code_match else getattr(self, "_last_created_booking_code", None))
             )
+            if not booking_code:
+                return None
+            phone = phone_match.group(0) if phone_match else getattr(self, "_last_booking_phone", None)
             return {
                 "name": "cancel_booking",
                 "arguments": {
                     "booking_code": booking_code,
-                    "phone": phone_match.group(0) if phone_match else "0901234567"
+                    "phone": phone
                 }
             }
 
