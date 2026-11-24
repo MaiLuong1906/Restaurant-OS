@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { AdminToast, useAdminToast } from '@/components/admin/AdminToast';
 import { ApiError } from '@/lib/api-client';
 import { dishService } from '@/services/dishService';
@@ -20,8 +20,6 @@ import {
   DishFormModal,
 } from './components';
 
-const PAGE_SIZE = 20;
-
 export default function AdminMenuBomPage() {
   // =========================================================================
   // State: data
@@ -39,6 +37,7 @@ export default function AdminMenuBomPage() {
   const [selectedCategory, setSelectedCategory] = React.useState('ALL');
   const [availabilityFilter, setAvailabilityFilter] = React.useState('ALL');
   const [currentPage, setCurrentPage] = React.useState(0);
+  const [pageSize, setPageSize] = React.useState(5);
 
   // =========================================================================
   // State: loading / error
@@ -62,20 +61,20 @@ export default function AdminMenuBomPage() {
   // =========================================================================
   // Toast
   // =========================================================================
-  const { toastMsg, showToast } = useAdminToast();
+  const { toastMsg, showToast, hideToast } = useAdminToast();
 
   // =========================================================================
   // Fetch danh sách món ăn
   // =========================================================================
   const fetchDishes = React.useCallback(
-    async (page = 0) => {
+    async (page = 0, size = pageSize) => {
       setIsLoading(true);
       setApiError(null);
 
       try {
         const params: Parameters<typeof dishService.getAllDishesPaged>[0] = {
           page,
-          size: PAGE_SIZE,
+          size,
         };
         if (selectedCategory !== 'ALL') params.category = selectedCategory;
         if (searchQuery.trim()) params.search = searchQuery.trim();
@@ -99,7 +98,7 @@ export default function AdminMenuBomPage() {
         setIsLoading(false);
       }
     },
-    [selectedCategory, searchQuery, availabilityFilter]
+    [selectedCategory, searchQuery, availabilityFilter, pageSize]
   );
 
   // Fetch categories & non-combo dishes (for combo form) — chỉ 1 lần khi mount
@@ -240,7 +239,7 @@ export default function AdminMenuBomPage() {
   // =========================================================================
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    fetchDishes(page);
+    fetchDishes(page, pageSize);
   };
 
   // =========================================================================
@@ -249,7 +248,7 @@ export default function AdminMenuBomPage() {
   return (
     <div className="w-full">
       {/* Toast */}
-      <AdminToast message={toastMsg} />
+      <AdminToast message={toastMsg} onClose={hideToast} />
 
       <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 max-w-[1720px] mx-auto w-full">
         {/* ================================================================
@@ -304,11 +303,9 @@ export default function AdminMenuBomPage() {
                 <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">
                   Danh Mục Món Ăn ({pageData?.totalElements ?? 0})
                 </span>
-                {pageData && pageData.totalPages > 1 && (
-                  <span className="text-xs font-semibold text-stone-500">
-                    Trang {currentPage + 1}/{pageData.totalPages}
-                  </span>
-                )}
+                <span className="text-xs font-semibold text-stone-500 font-mono">
+                  Trang {currentPage + 1}/{Math.max(pageData?.totalPages ?? 1, 1)}
+                </span>
               </div>
 
               {/* Filter Bar */}
@@ -332,28 +329,87 @@ export default function AdminMenuBomPage() {
                 isLoading={isLoading}
               />
 
-              {/* Pagination */}
-              {pageData && pageData.totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-2 border-t border-stone-200 shrink-0">
+              {/* Pagination Bar */}
+              <div className="pt-3 border-t border-stone-200 shrink-0 space-y-2.5">
+                {/* Thông tin số lượng & Chọn page size */}
+                <div className="flex items-center justify-between text-xs text-stone-500 font-medium">
+                  <span>
+                    Hiển thị{' '}
+                    <strong className="text-stone-800 font-bold font-mono">
+                      {pageData && pageData.totalElements > 0
+                        ? `${currentPage * pageSize + 1} - ${Math.min((currentPage + 1) * pageSize, pageData.totalElements)}`
+                        : '0'}
+                    </strong>{' '}
+                    / <strong className="text-stone-800 font-bold font-mono">{pageData?.totalElements ?? 0}</strong> món
+                  </span>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-stone-500">Mỗi trang:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        const newSize = Number(e.target.value);
+                        setPageSize(newSize);
+                        setCurrentPage(0);
+                        fetchDishes(0, newSize);
+                      }}
+                      className="px-2 py-0.5 bg-stone-50 border border-stone-200 rounded font-mono text-xs font-bold text-stone-700 focus:outline-none focus:border-ops-brand cursor-pointer"
+                    >
+                      <option value={5}>5 món</option>
+                      <option value={10}>10 món</option>
+                      <option value={20}>20 món</option>
+                      <option value={50}>50 món</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Các nút điều hướng */}
+                <div className="flex items-center justify-center gap-1.5">
+                  <button
+                    onClick={() => handlePageChange(0)}
+                    disabled={currentPage === 0 || isLoading}
+                    className="p-1.5 rounded-lg border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-stone-600"
+                    title="Trang đầu"
+                    aria-label="Trang đầu"
+                  >
+                    <ChevronsLeft className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={pageData.isFirst}
-                    className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-xs font-bold disabled:opacity-40 cursor-pointer transition-colors"
+                    disabled={currentPage === 0 || isLoading}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-mono text-xs font-bold text-stone-700"
+                    title="Trang trước"
+                    aria-label="Trang trước"
                   >
-                    ← Trước
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Trước</span>
                   </button>
-                  <span className="font-mono text-xs text-stone-500 font-semibold">
-                    {currentPage + 1} / {pageData.totalPages}
+
+                  <span className="px-3 py-1 font-mono text-xs font-extrabold text-stone-800 bg-stone-50 border border-stone-200 rounded-lg">
+                    {currentPage + 1} / {Math.max(pageData?.totalPages ?? 1, 1)}
                   </span>
+
                   <button
                     onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={pageData.isLast}
-                    className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-xs font-bold disabled:opacity-40 cursor-pointer transition-colors"
+                    disabled={!pageData || currentPage >= pageData.totalPages - 1 || isLoading}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-mono text-xs font-bold text-stone-700"
+                    title="Trang sau"
+                    aria-label="Trang sau"
                   >
-                    Tiếp →
+                    <span>Sau</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handlePageChange((pageData?.totalPages ?? 1) - 1)}
+                    disabled={!pageData || currentPage >= pageData.totalPages - 1 || isLoading}
+                    className="p-1.5 rounded-lg border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-stone-600"
+                    title="Trang cuối"
+                    aria-label="Trang cuối"
+                  >
+                    <ChevronsRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

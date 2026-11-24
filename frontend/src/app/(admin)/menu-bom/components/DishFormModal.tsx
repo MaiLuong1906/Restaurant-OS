@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Plus, Trash2, UtensilsCrossed, Upload, X } from 'lucide-react';
+import { Plus, Trash2, UtensilsCrossed, Upload, X, Loader2 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 import {
   DISH_CATEGORY_LABELS,
@@ -13,6 +13,7 @@ import {
 } from '@/types/dish';
 import { AdminModal } from '@/components/admin/AdminModal';
 import { dishService } from '@/services/dishService';
+import { storageService, UploadResult } from '@/services/storageService';
 
 // Danh sách category cố định theo enum backend
 const ALL_CATEGORIES: DishCategory[] = [
@@ -84,16 +85,26 @@ export function DishFormModal({
   const [form, setForm] = React.useState<FormState>(() => getInitialState(dish));
   const [errors, setErrors] = React.useState<Partial<Record<keyof FormState | 'combo' | 'image', string>>>({});
   const [isDragging, setIsDragging] = React.useState(false);
+  const [isUploadingImage, setIsUploadingImage] = React.useState(false);
+  const [storageType, setStorageType] = React.useState<'supabase' | 'base64' | null>(() => {
+    if (!dish?.imageUrl) return null;
+    return dish.imageUrl.startsWith('data:') ? 'base64' : 'supabase';
+  });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Khi edit và dish thay đổi — reset form
   React.useEffect(() => {
     setForm(getInitialState(dish));
     setErrors({});
+    if (dish?.imageUrl) {
+      setStorageType(dish.imageUrl.startsWith('data:') ? 'base64' : 'supabase');
+    } else {
+      setStorageType(null);
+    }
   }, [dish]);
 
-  // Xử lý upload file hình ảnh và nén nếu kích thước lớn
-  const handleProcessFile = (file: File) => {
+  // Xử lý upload file hình ảnh qua Hybrid Storage Service
+  const handleProcessFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       setErrors((prev) => ({ ...prev, image: 'Vui lòng chọn file hình ảnh (PNG, JPG, WEBP)' }));
       return;
@@ -109,41 +120,19 @@ export function DishFormModal({
       return next;
     });
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 800;
-        let width = img.width;
-        let height = img.height;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const optimized = canvas.toDataURL('image/jpeg', 0.85);
-          setForm((p) => ({ ...p, imageUrl: optimized }));
-        } else {
-          setForm((p) => ({ ...p, imageUrl: dataUrl }));
-        }
-      };
-      img.onerror = () => {
-        setForm((p) => ({ ...p, imageUrl: dataUrl }));
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingImage(true);
+    try {
+      const result: UploadResult = await storageService.uploadDishImage(file);
+      setForm((p) => ({ ...p, imageUrl: result.url }));
+      setStorageType(result.storageType);
+    } catch (err) {
+      setErrors((prev) => ({
+        ...prev,
+        image: err instanceof Error ? err.message : 'Lỗi khi xử lý file ảnh',
+      }));
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,13 +248,13 @@ export function DishFormModal({
           <button
             type="submit"
             form="dish-form"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isUploadingImage}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-xs disabled:opacity-60"
           >
-            {isSubmitting ? (
+            {isSubmitting || isUploadingImage ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Đang lưu...
+                {isUploadingImage ? 'Đang tải ảnh...' : 'Đang lưu...'}
               </>
             ) : mode === 'create' ? (
               <>
@@ -364,7 +353,13 @@ export function DishFormModal({
             onChange={handleFileInputChange}
           />
 
-          {form.imageUrl ? (
+          {isUploadingImage ? (
+            <div className="flex flex-col items-center justify-center p-6 bg-stone-50 border border-stone-200 rounded-xl space-y-2">
+              <Loader2 className="w-6 h-6 text-ops-brand animate-spin" />
+              <p className="text-xs font-bold text-stone-700">Đang tối ưu &amp; lưu trữ ảnh...</p>
+              <p className="text-[10px] text-stone-500">Tự động kết nối Supabase Storage</p>
+            </div>
+          ) : form.imageUrl ? (
             <div className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -373,7 +368,19 @@ export function DishFormModal({
                 className="w-16 h-16 rounded-lg object-cover border border-stone-200 shadow-2xs shrink-0 bg-stone-100"
               />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-stone-900 truncate">Ảnh món ăn đã chọn</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-xs font-bold text-stone-900 truncate">Ảnh món ăn đã chọn</p>
+                  {storageType === 'supabase' && (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                      ☁️ Supabase CDN
+                    </span>
+                  )}
+                  {storageType === 'base64' && (
+                    <span className="text-[10px] bg-stone-100 text-stone-600 border border-stone-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                      📦 Base64
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-stone-500 mt-0.5">Định dạng PNG, JPG, WEBP</p>
                 <div className="flex items-center gap-2 mt-2">
                   <button
@@ -386,7 +393,10 @@ export function DishFormModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setForm((p) => ({ ...p, imageUrl: '' }))}
+                    onClick={() => {
+                      setForm((p) => ({ ...p, imageUrl: '' }));
+                      setStorageType(null);
+                    }}
                     className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 border border-stone-200 hover:border-rose-200 rounded-md font-mono text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
                   >
                     <X className="w-3 h-3" />
