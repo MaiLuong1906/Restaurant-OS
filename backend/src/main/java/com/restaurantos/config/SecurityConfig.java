@@ -64,10 +64,10 @@ public class SecurityConfig {
                 // Controller đã được cấu hình sẵn @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')").
                 .requestMatchers("/api/v1/admin/dishes", "/api/v1/admin/dishes/**").permitAll()
 
-                // 8. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
+                // 8. Quản lý ca mở, Đơn xin nghỉ phép & Phiếu lương/Tip nhân viên (UC_STF_03, UC_STF_04, UC_STF_05)
                 // NOTE: Tạm thời permitAll trong môi trường dev/local để phục vụ kiểm thử tích hợp Frontend & Postman.
                 // TODO (Follow-up): Khóa lại .authenticated() ngay sau khi Auth PR được merge lên dev.
-                .requestMatchers("/api/v1/staff/schedule/**").permitAll()
+                .requestMatchers("/api/v1/staff/schedule/**", "/api/v1/staff/leaves/**", "/api/v1/staff/payroll/**").permitAll()
 
                 // 9. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
                 // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
