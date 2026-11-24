@@ -1,6 +1,8 @@
 package com.restaurantos.config;
 
+import com.restaurantos.repository.UserRepository;
 import com.restaurantos.security.JwtAuthenticationFilter;
+import com.restaurantos.security.JwtTokenProvider;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -35,7 +37,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            ObjectProvider<JwtAuthenticationFilter> jwtAuthenticationFilterProvider) throws Exception {
+            ObjectProvider<JwtTokenProvider> jwtTokenProvider,
+            ObjectProvider<UserRepository> userRepositoryProvider) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
@@ -91,9 +94,12 @@ public class SecurityConfig {
                         // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
                         .anyRequest().authenticated());
 
-        JwtAuthenticationFilter jwtFilter = jwtAuthenticationFilterProvider.getIfAvailable();
-        if (jwtFilter != null) {
-            http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        JwtTokenProvider tokenProvider = jwtTokenProvider.getIfAvailable();
+        UserRepository userRepo = userRepositoryProvider.getIfAvailable();
+        if (tokenProvider != null && userRepo != null) {
+            http.addFilterBefore(
+                    new JwtAuthenticationFilter(tokenProvider, userRepo),
+                    UsernamePasswordAuthenticationFilter.class);
         }
 
         return http.build();
