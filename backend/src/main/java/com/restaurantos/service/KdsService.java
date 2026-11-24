@@ -2,6 +2,7 @@ package com.restaurantos.service;
 
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.CompleteBatchRequest;
 import com.restaurantos.dto.CompleteTicketRequest;
 import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.entity.OrderEntity;
@@ -154,6 +155,78 @@ public class KdsService {
         OrderItemEntity saved = orderItemRepository.save(item);
 
         return Optional.of(mapToItemDto(saved));
+    }
+
+    /**
+     * K5: Hoàn tất mẻ nấu (chuyển danh sách món WAITING sang READY trong 1 transaction).
+     * - Dedupe itemIds âm thầm.
+     * - Thiếu bất kỳ itemId nào -> Optional.empty() (404).
+     * - Có món ở trạng thái REJECTED hoặc SERVED -> 409 CONFLICT (all-or-nothing, không đổi gì).
+     * - Món đã READY -> bỏ qua (idempotent).
+     * - Trả về danh sách ticket DISTINCT chứa các món trong itemIds sau khi cập nhật.
+     */
+    @Transactional
+    public Optional<List<KdsTicketDto>> completeBatch(CompleteBatchRequest request) {
+        if (request == null || request.itemIds() == null || request.itemIds().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh sách món không được để trống");
+        }
+
+        List<UUID> distinctItemIds = request.itemIds().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (distinctItemIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh sách món không được để trống");
+        }
+
+        List<OrderItemEntity> foundItems = orderItemRepository.findAllById(distinctItemIds);
+        if (foundItems.size() != distinctItemIds.size()) {
+            return Optional.empty();
+        }
+
+        for (OrderItemEntity item : foundItems) {
+            String currentStatus = item.getStatus() != null ? item.getStatus().trim().toUpperCase() : "";
+            if ("REJECTED".equals(currentStatus) || "SERVED".equals(currentStatus)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Không thể hoàn tất mẻ vì có món đã ở trạng thái " + currentStatus
+                );
+            }
+            if (!"WAITING".equals(currentStatus) && !"READY".equals(currentStatus)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Không thể hoàn tất mẻ vì có món ở trạng thái không hợp lệ: " + currentStatus
+                );
+            }
+        }
+
+        boolean hasWaiting = false;
+        Instant now = Instant.now();
+        for (OrderItemEntity item : foundItems) {
+            if ("WAITING".equalsIgnoreCase(item.getStatus())) {
+                item.setStatus("READY");
+                item.setUpdatedAt(now);
+                hasWaiting = true;
+            }
+        }
+
+        if (hasWaiting) {
+            orderItemRepository.saveAll(foundItems);
+        }
+
+        List<UUID> distinctOrderIds = foundItems.stream()
+                .map(OrderItemEntity::getOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        List<KdsTicketDto> updatedTickets = distinctOrderIds.stream()
+                .map(this::getTicketById)
+                .flatMap(Optional::stream)
+                .toList();
+
+        return Optional.of(updatedTickets);
     }
 
     private KdsTicketDto mapToTicketDto(OrderEntity order, List<OrderItemEntity> itemEntities) {

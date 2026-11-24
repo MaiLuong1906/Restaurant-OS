@@ -3,6 +3,7 @@ package com.restaurantos.controller;
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.CompleteBatchRequest;
 import com.restaurantos.dto.CompleteTicketRequest;
 import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.service.KdsService;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,7 +27,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/kds")
 @RequiredArgsConstructor
-@Tag(name = "KDS Bếp chính", description = "Các API màn hình điều phối bếp KDS (K1, K2, K6)")
+@Tag(name = "KDS Bếp chính", description = "Các API màn hình điều phối bếp KDS (K1–K6)")
 public class KdsController {
 
     private final KdsService kdsService;
@@ -80,5 +82,16 @@ public class KdsController {
                 .map(item -> ResponseEntity.ok(ApiResponse.success(item, "Cập nhật trạng thái món thành công")))
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy món với ID: " + itemId, null)));
+    }
+
+    @PostMapping("/batches/complete")
+    @Operation(summary = "K5: Hoàn tất mẻ nấu", description = "Chuyển danh sách các món WAITING trong mẻ sang READY trong 1 transaction. Idempotent khi món đã READY.")
+    public ResponseEntity<ApiResponse<List<KdsTicketDto>>> completeBatch(
+            @Valid @RequestBody CompleteBatchRequest request
+    ) {
+        return kdsService.completeBatch(request)
+                .map(tickets -> ResponseEntity.ok(ApiResponse.success(tickets, "Hoàn tất mẻ nấu thành công")))
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy một hoặc nhiều món trong mẻ nấu", null)));
     }
 }
