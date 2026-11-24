@@ -697,6 +697,24 @@ export function ReservationView({
             </span>
           </div>
 
+          {reservations.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-sand-300 bg-cream/30 p-8 text-center">
+              <p className="text-sm font-bold text-ink">
+                Hiện chưa có đơn đặt bàn trước nào
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Các đơn đặt bàn từ hệ thống sẽ tự động hiển thị tại đây theo thời gian thực.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('create')}
+                className="mt-4 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-bold text-white shadow-warm-sm transition-colors hover:bg-primary-600"
+              >
+                <CalendarPlus className="h-4 w-4" />
+                <span>+ Tạo đặt bàn mới</span>
+              </button>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {reservations.map((res) => {
               const isConfirmed = res.status === 'CONFIRMED';
@@ -794,6 +812,7 @@ export function ReservationView({
               );
             })}
           </div>
+          )}
         </div>
       )}
     </div>
