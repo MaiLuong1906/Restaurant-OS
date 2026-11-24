@@ -17,9 +17,13 @@ export default function PosReservationPage() {
   const {
     tables,
     reservations,
+    isLoading,
+    syncError,
+    hasBackendTableUuids,
     createReservation,
     checkInReservation,
     cancelReservation,
+    syncWithBackend,
     syncRealtimeClockSeed,
     initializeWebSocket,
   } = usePosStore();
@@ -43,13 +47,21 @@ export default function PosReservationPage() {
       <ReservationView
         tables={tables}
         reservations={reservations}
+        isLoading={isLoading}
+        syncError={syncError}
+        hasBackendTableUuids={hasBackendTableUuids}
+        onRetrySync={() => {
+          void syncWithBackend();
+        }}
         initialTab={reservationSubTab}
         onCreateReservation={createReservation}
-        onCheckInReservation={(resId) => {
-          checkInReservation(resId);
+        onCheckInReservation={(resId, idempotencyKey) => {
+          checkInReservation(resId, idempotencyKey);
           router.push('/pos/floor');
         }}
-        onCancelReservation={cancelReservation}
+        onCancelReservation={(resId, idempotencyKey) => {
+          cancelReservation(resId, idempotencyKey);
+        }}
       />
     </div>
   );

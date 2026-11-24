@@ -2,10 +2,12 @@
 
 import * as React from 'react';
 import {
+  AlertTriangle,
   CalendarPlus,
   CheckCircle2,
   Clock,
   Phone,
+  RefreshCw,
   SearchCheck,
   UserCheck,
   Users,
@@ -24,6 +26,7 @@ import {
   formatIsoToShortVN,
   formatTimeHHMM,
   formatVND,
+  generateIdempotencyKey,
   getDateRelativeLabel,
   getUpcomingTimeSlot,
   isPastReservationDateTime,
@@ -33,6 +36,10 @@ import {
 interface ReservationModalProps {
   tables: CashierTable[];
   reservations: TableReservation[];
+  isLoading?: boolean;
+  syncError?: string | null;
+  hasBackendTableUuids?: boolean;
+  onRetrySync?: () => void;
   initialTab?: 'create' | 'checkin';
   onCreateReservation: (input: {
     customerName: string;
@@ -45,9 +52,10 @@ interface ReservationModalProps {
     depositAmount: number;
     depositMethod: PaymentMethodType;
     note?: string;
-  }) => void;
-  onCheckInReservation: (reservationId: string) => void;
-  onCancelReservation: (reservationId: string) => void;
+    idempotencyKey?: string;
+  }) => TableReservation | null | void;
+  onCheckInReservation: (reservationId: string, idempotencyKey?: string) => void;
+  onCancelReservation: (reservationId: string, idempotencyKey?: string) => void;
 }
 
 const AREAS: CashierTableArea[] = ['Sảnh Tầng 1', 'Tầng 2 VIP', 'Sân vườn'];
@@ -60,12 +68,30 @@ const MINUTES_STEP_5 = Array.from({ length: 12 }, (_, idx) =>
 export function ReservationView({
   tables,
   reservations,
+  isLoading = false,
+  syncError = null,
+  hasBackendTableUuids = true,
+  onRetrySync,
   initialTab = 'create',
   onCreateReservation,
   onCheckInReservation,
   onCancelReservation,
 }: ReservationModalProps) {
   const [activeSubTab, setActiveSubTab] = React.useState<'create' | 'checkin'>(initialTab);
+
+  // Giữ idempotencyKey ổn định cho từng lần tạo đơn / check-in / hủy đơn để chống gửi trùng khi bấm lại
+  const [createIdempotencyKey, setCreateIdempotencyKey] = React.useState<string>(() =>
+    generateIdempotencyKey()
+  );
+  const actionKeyMapRef = React.useRef<Map<string, string>>(new Map());
+  const getStableActionKey = (action: 'checkin' | 'cancel', reservationId: string): string => {
+    const mapKey = `${action}:${reservationId}`;
+    const existing = actionKeyMapRef.current.get(mapKey);
+    if (existing) return existing;
+    const fresh = generateIdempotencyKey();
+    actionKeyMapRef.current.set(mapKey, fresh);
+    return fresh;
+  };
 
   React.useEffect(() => {
     setActiveSubTab(initialTab);
@@ -236,9 +262,16 @@ export function ReservationView({
       return;
     }
 
+    if (!hasBackendTableUuids) {
+      setFormError(
+        'Chưa đồng bộ được danh sách bàn từ máy chủ nên chưa thể tạo đặt bàn và thu cọc. Vui lòng bấm "Thử đồng bộ lại".'
+      );
+      return;
+    }
+
     const chosenTable = tables.find((t) => t.id === selectedTableId);
     setFormError(null);
-    onCreateReservation({
+    const created = onCreateReservation({
       customerName,
       phone,
       partySize,
@@ -249,11 +282,20 @@ export function ReservationView({
       depositAmount: collectDeposit ? depositAmount : 0,
       depositMethod,
       note,
+      idempotencyKey: createIdempotencyKey,
     });
+
+    if (created === null) {
+      setFormError(
+        'Chưa kết nối được máy chủ đặt bàn — chưa thể lưu đơn và chưa ghi tiền cọc.'
+      );
+      return;
+    }
 
     setCustomerName('');
     setPhone('');
     setNote('');
+    setCreateIdempotencyKey(generateIdempotencyKey());
     setActiveSubTab('checkin');
   };
 
@@ -673,10 +715,17 @@ export function ReservationView({
 
             <button
               type="submit"
-              className="flex min-h-13 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 py-3.5 text-base font-bold text-white shadow-warm transition-colors hover:bg-primary-600"
+              disabled={isLoading || !hasBackendTableUuids}
+              className="flex min-h-13 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 py-3.5 text-base font-bold text-white shadow-warm transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CalendarPlus className="h-5 w-5" />
-              <span>Xác nhận Đặt Bàn & Lưu Cọc</span>
+              <span>
+                {isLoading
+                  ? 'Đang đồng bộ danh sách bàn...'
+                  : !hasBackendTableUuids
+                  ? 'Chưa đồng bộ máy chủ — Chưa thể lưu cọc'
+                  : 'Xác nhận Đặt Bàn & Lưu Cọc'}
+              </span>
             </button>
           </div>
         </form>
@@ -697,10 +746,75 @@ export function ReservationView({
             </span>
           </div>
 
-          {reservations.length === 0 ? (
+          {syncError ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-xs text-amber-900">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
+                <span className="font-bold">{syncError}</span>
+              </div>
+              {onRetrySync ? (
+                <button
+                  type="button"
+                  onClick={onRetrySync}
+                  className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Thử đồng bộ lại</span>
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {isLoading && reservations.length === 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-busy="true">
+              {[1, 2].map((skeletonIdx) => (
+                <div
+                  key={skeletonIdx}
+                  className="flex flex-col justify-between rounded-2xl border border-sand-200 bg-cream/30 p-5"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="h-6 w-36 animate-pulse rounded-lg bg-sand-200" />
+                      <div className="h-6 w-24 animate-pulse rounded-lg bg-sand-200" />
+                    </div>
+                    <div className="h-5 w-48 animate-pulse rounded bg-sand-200" />
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      <div className="h-4 w-28 animate-pulse rounded bg-sand-200" />
+                      <div className="h-4 w-24 animate-pulse rounded bg-sand-200" />
+                      <div className="h-4 w-32 animate-pulse rounded bg-sand-200" />
+                      <div className="h-4 w-28 animate-pulse rounded bg-sand-200" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2 border-t border-sand-200 pt-4">
+                    <div className="h-12 flex-1 animate-pulse rounded-xl bg-sand-200" />
+                    <div className="h-12 w-20 animate-pulse rounded-xl bg-sand-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !isLoading && syncError && reservations.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 p-8 text-center">
+              <p className="text-sm font-bold text-amber-900">
+                Chưa đồng bộ được danh sách đặt bàn từ máy chủ
+              </p>
+              <p className="mt-1 text-xs text-amber-800">
+                Vui lòng kiểm tra kết nối mạng hoặc trạng thái máy chủ Backend và thử đồng bộ lại.
+              </p>
+              {onRetrySync ? (
+                <button
+                  type="button"
+                  onClick={onRetrySync}
+                  className="mt-4 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-bold text-white shadow-warm-sm transition-colors hover:bg-primary-600"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Thử đồng bộ lại</span>
+                </button>
+              ) : null}
+            </div>
+          ) : reservations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-sand-300 bg-cream/30 p-8 text-center">
               <p className="text-sm font-bold text-ink">
-                Hiện chưa có đơn đặt bàn trước nào
+                Hiện chưa có đơn đặt bàn trước nào trong hôm nay
               </p>
               <p className="mt-1 text-xs text-muted">
                 Các đơn đặt bàn từ hệ thống sẽ tự động hiển thị tại đây theo thời gian thực.
@@ -792,7 +906,12 @@ export function ReservationView({
                     <div className="mt-4 flex gap-2 border-t border-sand-200 pt-4">
                       <button
                         type="button"
-                        onClick={() => onCheckInReservation(res.id)}
+                        onClick={() =>
+                          onCheckInReservation(
+                            res.id,
+                            getStableActionKey('checkin', res.id)
+                          )
+                        }
                         className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-xs font-bold text-white shadow-warm transition-colors hover:bg-primary-600"
                       >
                         <CheckCircle2 className="h-4 w-4" />
@@ -800,7 +919,12 @@ export function ReservationView({
                       </button>
                       <button
                         type="button"
-                        onClick={() => onCancelReservation(res.id)}
+                        onClick={() =>
+                          onCancelReservation(
+                            res.id,
+                            getStableActionKey('cancel', res.id)
+                          )
+                        }
                         className="flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-danger-200 bg-white px-3.5 text-xs font-bold text-danger-600 transition-colors hover:bg-kds-overdue-bg"
                       >
                         <XCircle className="h-4 w-4" />

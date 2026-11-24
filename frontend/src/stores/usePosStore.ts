@@ -16,6 +16,7 @@ import { getStompClient } from '../lib/stomp';
 import { fetchApi } from '../lib/api-client';
 import {
   SSR_FALLBACK_DATE,
+  formatIsoDate,
   formatShortDateVN,
   formatTimeHHMM,
   formatTimeHHMMSS,
@@ -84,6 +85,9 @@ function mapBackendTableStatus(
 function mapBackendReservationToFrontend(res: BackendReservationResponse): TableReservation {
   const dt = new Date(res.reservationTime);
   const isValidDate = !Number.isNaN(dt.getTime());
+  if (!isValidDate) {
+    console.warn('[POS] Backend trả về reservationTime không hợp lệ:', res.reservationTime);
+  }
   const reservedTime = isValidDate ? formatTimeHHMM(dt) : '19:00';
   const reservedDate = isValidDate ? formatShortDateVN(dt) : formatShortDateVN(new Date());
   const mappedStatus: TableReservation['status'] =
@@ -458,6 +462,8 @@ interface CreateReservationInput {
   depositAmount: number;
   depositMethod: PaymentMethodType;
   note?: string;
+  idempotencyKey?: string;
+  allowLocalOnly?: boolean;
 }
 
 interface PosStoreState {
@@ -471,6 +477,8 @@ interface PosStoreState {
   isCashDrawerOpen: boolean;
   isConnected: boolean;
   isLoading: boolean;
+  hasBackendTableUuids: boolean;
+  syncError: string | null;
   lastSyncedAt: number | null;
   lastActionToast: string | null;
   lastPrintedReceipt: {
@@ -501,11 +509,11 @@ interface PosStoreState {
 
   // UC1: Create Table Reservation + Check Table Availability + Collect Booking Deposit
   checkAvailableTables: (area: CashierTableArea | 'ALL', partySize: number) => CashierTable[];
-  createReservation: (input: CreateReservationInput) => TableReservation;
+  createReservation: (input: CreateReservationInput) => TableReservation | null;
 
   // UC2: Check-in Reserved Table
-  checkInReservation: (reservationId: string) => void;
-  cancelReservation: (reservationId: string) => void;
+  checkInReservation: (reservationId: string, idempotencyKey?: string) => void;
+  cancelReservation: (reservationId: string, idempotencyKey?: string) => void;
 
   // UC3: Merge 2+ tables (keeping merged tables active OCCUPIED) & Split/unmerge selected tables from merged group
   mergeTables: (sourceTableIds: string | string[], targetTableId: string) => void;
@@ -557,6 +565,8 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
   isCashDrawerOpen: false,
   isConnected: false,
   isLoading: false,
+  hasBackendTableUuids: false,
+  syncError: null,
   lastSyncedAt: null,
   lastActionToast: null,
   lastPrintedReceipt: null,
@@ -581,13 +591,35 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
   syncWithBackend: async () => {
     set({ isLoading: true });
     try {
-      const futureCheckTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const now = new Date();
+      const todayIso = formatIsoDate(now);
+      const todayShortVN = formatShortDateVN(now);
+      const futureCheckTime = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+
       const [remoteReservationsResult, availableTablesResult] = await Promise.allSettled([
-        fetchApi<BackendReservationResponse[]>('/reservations'),
+        fetchApi<BackendReservationResponse[]>(
+          `/reservations?date=${encodeURIComponent(todayIso)}`
+        ),
         fetchApi<BackendAvailableTableResponse[]>(
           `/reservations/available-tables?time=${encodeURIComponent(futureCheckTime)}&guestCount=1`
         ),
       ]);
+
+      if (
+        remoteReservationsResult.status === 'rejected' &&
+        availableTablesResult.status === 'rejected'
+      ) {
+        const reason =
+          remoteReservationsResult.reason instanceof Error
+            ? remoteReservationsResult.reason.message
+            : 'Không thể kết nối máy chủ đặt bàn';
+        set({
+          isLoading: false,
+          syncError: `Chưa đồng bộ được với máy chủ (${reason}). Đang hiển thị dữ liệu gần nhất.`,
+          lastActionToast: `Chưa đồng bộ được danh sách đặt bàn: ${reason}`,
+        });
+        return;
+      }
 
       const nextReservations =
         remoteReservationsResult.status === 'fulfilled' &&
@@ -617,13 +649,16 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
         });
       }
 
-      // Đồng bộ trạng thái các bàn đã đặt trước / đã check-in từ danh sách đặt bàn thực tế trên DB
+      // Đồng bộ trạng thái các bàn đã đặt trước / đã check-in TRONG NGÀY HÔM NAY từ DB
       if (
         remoteReservationsResult.status === 'fulfilled' &&
         Array.isArray(remoteReservationsResult.value)
       ) {
         for (const rawRes of remoteReservationsResult.value) {
           const mappedRes = mapBackendReservationToFrontend(rawRes);
+          if (mappedRes.reservedDate !== todayShortVN) {
+            continue;
+          }
           nextTables = nextTables.map((t) => {
             const isSameTable =
               (rawRes.tableId && t.id === rawRes.tableId) ||
@@ -662,14 +697,29 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
         }
       }
 
+      const hasUuids = nextTables.some((t) => UUID_V4_REGEX.test(t.id));
+      const partialError =
+        remoteReservationsResult.status === 'rejected'
+          ? 'Chưa tải được danh sách đơn đặt bàn từ máy chủ.'
+          : availableTablesResult.status === 'rejected'
+          ? 'Chưa đồng bộ được danh sách bàn trống từ máy chủ.'
+          : null;
+
       set({
         reservations: nextReservations,
         tables: nextTables,
+        hasBackendTableUuids: hasUuids,
+        syncError: partialError,
         isLoading: false,
         lastSyncedAt: Date.now(),
       });
-    } catch {
-      set({ isLoading: false, lastSyncedAt: Date.now() });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Lỗi kết nối máy chủ';
+      set({
+        isLoading: false,
+        syncError: `Chưa đồng bộ được với máy chủ (${msg}).`,
+        lastActionToast: `Chưa đồng bộ được với máy chủ: ${msg}`,
+      });
     }
   },
 
@@ -759,9 +809,19 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
 
   // UC1: Create Table Reservation + <<extend>> Collect Booking Deposit
   createReservation: (input) => {
-    const idempotencyKey = generateIdempotencyKey();
+    const idempotencyKey = input.idempotencyKey || generateIdempotencyKey();
     const { tables, reservations, shift } = get();
     const targetTable = tables.find((t) => t.id === input.tableId);
+    const isUuidTable = UUID_V4_REGEX.test(input.tableId);
+
+    if (!isUuidTable && !input.allowLocalOnly) {
+      set({
+        lastActionToast:
+          'Chưa kết nối được máy chủ đặt bàn (chưa đồng bộ mã UUID của bàn) — chưa thể lưu đơn và chưa ghi tiền cọc.',
+      });
+      return null;
+    }
+
     const depositInt = Math.max(0, Math.round(input.depositAmount));
 
     const now = new Date();
@@ -786,6 +846,13 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
       depositMethod: input.depositMethod,
       note: input.note?.trim(),
       status: 'CONFIRMED',
+    };
+
+    const prevReservations = [...reservations];
+    const prevTables = tables.map((t) => ({ ...t }));
+    const prevShift: ShiftSettlementRecord = {
+      ...shift,
+      drawerOpenLogs: [...shift.drawerOpenLogs],
     };
 
     const nextDrawerLogs = [...shift.drawerOpenLogs];
@@ -828,12 +895,14 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
         drawerOpenLogs: nextDrawerLogs,
       },
       selectedTableId: input.tableId,
-      lastActionToast: `Đã tạo đặt bàn ${newReservation.tableLabel} lúc ${newReservation.reservedTime} (${newReservation.reservedDate}) cho ${newReservation.customerName}${
-        depositInt > 0 ? ` (Đã thu cọc ${depositInt.toLocaleString('vi-VN')} ₫)` : ''
-      }.`,
+      lastActionToast: isUuidTable
+        ? `Đang gửi yêu cầu đặt bàn ${newReservation.tableLabel} lên máy chủ...`
+        : `Đã tạo đặt bàn ${newReservation.tableLabel} lúc ${newReservation.reservedTime} (${newReservation.reservedDate}) cho ${newReservation.customerName}${
+            depositInt > 0 ? ` (Đã thu cọc ${depositInt.toLocaleString('vi-VN')} ₫)` : ''
+          }.`,
     });
 
-    if (UUID_V4_REGEX.test(input.tableId)) {
+    if (isUuidTable) {
       const payload = {
         tableId: input.tableId,
         customerName: newReservation.customerName,
@@ -857,20 +926,35 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
             tables: state.tables.map((t) =>
               t.id === input.tableId ? { ...t, reservationId: synced.id } : t
             ),
+            lastActionToast: `Đã tạo đặt bàn ${synced.tableLabel} lúc ${synced.reservedTime} (${synced.reservedDate}) cho ${synced.customerName}${
+              depositInt > 0 ? ` (Đã thu cọc ${depositInt.toLocaleString('vi-VN')} ₫)` : ''
+            }.`,
           }));
         })
-        .catch(() => {});
+        .catch((err) => {
+          const reason = err instanceof Error ? err.message : 'Lỗi máy chủ khi tạo đặt bàn';
+          set({
+            reservations: prevReservations,
+            tables: prevTables,
+            shift: prevShift,
+            lastActionToast: `Không thể tạo đặt bàn ${newReservation.tableLabel}: ${reason} (Đã hoàn tác tiền cọc & trạng thái bàn).`,
+          });
+        });
     }
 
     return newReservation;
   },
 
   // UC2: Check-in Reserved Table
-  checkInReservation: (reservationId) => {
-    const idempotencyKey = generateIdempotencyKey();
+  checkInReservation: (reservationId, providedIdempotencyKey) => {
+    const idempotencyKey = providedIdempotencyKey || generateIdempotencyKey();
     const { reservations, tables } = get();
     const res = reservations.find((r) => r.id === reservationId);
     if (!res) return;
+
+    const prevReservations = [...reservations];
+    const prevTables = tables.map((t) => ({ ...t }));
+    const isUuidReservation = UUID_V4_REGEX.test(reservationId);
 
     set({
       reservations: reservations.map((r) =>
@@ -889,22 +973,43 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
           : t
       ),
       selectedTableId: res.tableId,
-      lastActionToast: `Check-in thành công ${res.tableLabel} — Khách: ${res.customerName}. Tiền cọc đã gắn vào bill.`,
+      lastActionToast: isUuidReservation
+        ? `Đang xác nhận Check-in ${res.tableLabel} với máy chủ...`
+        : `Check-in thành công ${res.tableLabel} — Khách: ${res.customerName}. Tiền cọc đã gắn vào bill.`,
     });
 
-    if (UUID_V4_REGEX.test(reservationId)) {
+    if (isUuidReservation) {
       fetchApi<BackendReservationResponse>(`/reservations/${reservationId}/check-in`, {
         method: 'POST',
         headers: { 'X-Idempotency-Key': idempotencyKey },
-      }).catch(() => {});
+      })
+        .then((checkedIn) => {
+          const synced = mapBackendReservationToFrontend(checkedIn);
+          set((state) => ({
+            reservations: state.reservations.map((r) => (r.id === reservationId ? synced : r)),
+            lastActionToast: `Check-in thành công ${res.tableLabel} — Khách: ${res.customerName}. Tiền cọc đã gắn vào bill.`,
+          }));
+        })
+        .catch((err) => {
+          const reason = err instanceof Error ? err.message : 'Lỗi máy chủ khi Check-in';
+          set({
+            reservations: prevReservations,
+            tables: prevTables,
+            lastActionToast: `Không thể Check-in ${res.tableLabel}: ${reason} (Đã hoàn tác trạng thái bàn).`,
+          });
+        });
     }
   },
 
-  cancelReservation: (reservationId) => {
-    const idempotencyKey = generateIdempotencyKey();
+  cancelReservation: (reservationId, providedIdempotencyKey) => {
+    const idempotencyKey = providedIdempotencyKey || generateIdempotencyKey();
     const { reservations, tables } = get();
     const res = reservations.find((r) => r.id === reservationId);
     if (!res) return;
+
+    const prevReservations = [...reservations];
+    const prevTables = tables.map((t) => ({ ...t }));
+    const isUuidReservation = UUID_V4_REGEX.test(reservationId);
 
     set({
       reservations: reservations.map((r) =>
@@ -922,14 +1027,31 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
             }
           : t
       ),
-      lastActionToast: `Đã hủy đặt bàn ${res.tableLabel} (${res.customerName}). Bàn đã mở trống trở lại.`,
+      lastActionToast: isUuidReservation
+        ? `Đang gửi yêu cầu hủy đặt bàn ${res.tableLabel} lên máy chủ...`
+        : `Đã hủy đặt bàn ${res.tableLabel} (${res.customerName}). Bàn đã mở trống trở lại.`,
     });
 
-    if (UUID_V4_REGEX.test(reservationId)) {
+    if (isUuidReservation) {
       fetchApi<BackendReservationResponse>(`/reservations/${reservationId}/cancel`, {
         method: 'POST',
         headers: { 'X-Idempotency-Key': idempotencyKey },
-      }).catch(() => {});
+      })
+        .then((cancelled) => {
+          const synced = mapBackendReservationToFrontend(cancelled);
+          set((state) => ({
+            reservations: state.reservations.map((r) => (r.id === reservationId ? synced : r)),
+            lastActionToast: `Đã hủy đặt bàn ${res.tableLabel} (${res.customerName}). Bàn đã mở trống trở lại.`,
+          }));
+        })
+        .catch((err) => {
+          const reason = err instanceof Error ? err.message : 'Lỗi máy chủ khi hủy đặt bàn';
+          set({
+            reservations: prevReservations,
+            tables: prevTables,
+            lastActionToast: `Không thể hủy đặt bàn ${res.tableLabel}: ${reason} (Đã khôi phục trạng thái đặt bàn).`,
+          });
+        });
     }
   },
 
