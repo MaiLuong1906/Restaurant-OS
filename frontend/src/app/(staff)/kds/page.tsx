@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Ticket, Batch, OrderChangeAlertData } from '@/types';
 import { kdsService as mockKdsService } from '@/services/mock';
 import { ApiKdsService, KdsService, filterActiveTickets, sortKdsTickets } from '@/services/kds';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
 import { KdsBatchCard } from '@/components/kds/KdsBatchCard';
 import { TicketDetailDrawer } from '@/components/kds/TicketDetailDrawer';
@@ -13,6 +14,67 @@ import { RotateCcw, AlertCircle, RefreshCw, Bell } from 'lucide-react';
 
 const isLiveMode = process.env.NEXT_PUBLIC_KDS_MODE === 'live';
 const kdsService: KdsService = isLiveMode ? new ApiKdsService() : mockKdsService;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+const PENDING_COMPLETE_KEY = 'kds_pending_complete_ticket';
+
+interface PendingCompletePayload {
+  ticketId: string;
+  requestId: string;
+}
+
+function readPendingComplete(): PendingCompletePayload | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_COMPLETE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingCompletePayload;
+    if (parsed?.ticketId && parsed?.requestId) return parsed;
+  } catch {
+    // ignore storage parse error
+  }
+  return null;
+}
+
+function writePendingComplete(payload: PendingCompletePayload | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (payload) {
+      window.sessionStorage.setItem(PENDING_COMPLETE_KEY, JSON.stringify(payload));
+    } else {
+      window.sessionStorage.removeItem(PENDING_COMPLETE_KEY);
+    }
+  } catch {
+    // ignore storage error
+  }
+}
+
+function flushPendingCompleteKeepalive(): Promise<void> | null {
+  const pending = readPendingComplete();
+  if (!pending) return null;
+  writePendingComplete(null);
+
+  if (!isLiveMode) {
+    return kdsService.updateTicketStatus(pending.ticketId, 'READY', pending.requestId).then(() => undefined).catch(() => undefined);
+  }
+
+  const token = useAuthStore.getState().getAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Request-ID': pending.requestId,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return fetch(`${API_BASE_URL}/kds/tickets/${pending.ticketId}/complete`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({}),
+    keepalive: true,
+  })
+    .then(() => undefined)
+    .catch(() => undefined);
+}
 
 export default function KitchenDisplayScreen() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
@@ -58,7 +120,27 @@ export default function KitchenDisplayScreen() {
   }, []);
 
   React.useEffect(() => {
-    fetchTickets();
+    const init = async () => {
+      const pendingFlush = flushPendingCompleteKeepalive();
+      if (pendingFlush) {
+        await pendingFlush;
+      }
+      await fetchTickets();
+    };
+    init();
+
+    // Flush thao tác Hoàn tất đang chờ trong 5s khi reload / đóng tab / ẩn trang
+    const handleBeforeUnload = () => {
+      flushPendingCompleteKeepalive();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingCompleteKeepalive();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // Poll REST K1 mỗi 10s ở live mode (TODO: thống nhất useKdsStore WS ở sprint sau)
     let intervalId: NodeJS.Timeout | null = null;
     if (isLiveMode) {
@@ -67,6 +149,8 @@ export default function KitchenDisplayScreen() {
       }, 10000);
     }
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (intervalId) clearInterval(intervalId);
     };
   }, [fetchTickets]);
@@ -117,11 +201,8 @@ export default function KitchenDisplayScreen() {
 
   // Hoàn tất 1 ticket kèm Hoàn tác 5s
   const handleCompleteTicket = (ticketId: string) => {
-    if (isLiveMode) {
-      // TODO: UC19 - Hoàn tất ticket ở live mode khi kết nối BE PATCH/POST
-      return;
-    }
     const snapshot = structuredClone(tickets);
+    const requestId = crypto.randomUUID();
 
     // Optimistic Update
     setTickets((prev) =>
@@ -136,11 +217,16 @@ export default function KitchenDisplayScreen() {
       )
     );
 
-    // Hiển thị Toast Hoàn tác 5s
-    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    // Nếu trước đó có ticket khác đang chờ 5s thì flush ngay trước khi ghi đè
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+      flushPendingCompleteKeepalive();
+    }
+
+    writePendingComplete({ ticketId, requestId });
 
     setUndoToast({
-      id: crypto.randomUUID(),
+      id: requestId,
       message: `Đã hoàn tất ticket #${ticketId}`,
       targetType: 'ticket',
       targetId: ticketId,
@@ -148,13 +234,31 @@ export default function KitchenDisplayScreen() {
     });
 
     undoTimeoutRef.current = setTimeout(async () => {
+      const stillPending = readPendingComplete();
+      setUndoToast(null);
+      if (!stillPending || stillPending.requestId !== requestId) return;
+      writePendingComplete(null);
       try {
-        await kdsService.updateTicketStatus(ticketId, 'READY', crypto.randomUUID());
+        const updatedTicket = await kdsService.updateTicketStatus(ticketId, 'READY', requestId);
+        setTickets((prev) => prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t)));
       } catch (err) {
         console.error('Lỗi khi đồng bộ ticket sang READY:', err);
+        setTickets(snapshot);
+        setError((err as Error).message || 'Không thể hoàn tất ticket');
       }
-      setUndoToast(null);
     }, 5000);
+  };
+
+  // Báo sự cố 1 món (K4 REJECTED) kèm lý do bắt buộc 5-200 ký tự
+  const handleReportIncident = async (ticketId: string, itemId: string, reason: string) => {
+    const updatedTicket = await kdsService.updateItemStatus(
+      ticketId,
+      itemId,
+      'REJECTED',
+      crypto.randomUUID(),
+      reason
+    );
+    setTickets((prev) => prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t)));
   };
 
   // Hoàn tất 1 mẻ kèm Hoàn tác 5s
@@ -212,6 +316,7 @@ export default function KitchenDisplayScreen() {
   // Nút bấm Hoàn tác
   const handleUndo = () => {
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    writePendingComplete(null);
     if (undoToast) {
       setTickets(undoToast.snapshot);
       setUndoToast(null);
@@ -347,7 +452,6 @@ export default function KitchenDisplayScreen() {
                   key={ticket.id}
                   ticket={ticket}
                   hasPendingAlert={hasAlert}
-                  disabledComplete={isLiveMode}
                   onViewAlert={(tId) => {
                     const alert = alerts.find((a) => a.ticketId === tId && !a.acknowledged);
                     if (alert) setActiveAlertId(alert.id);
@@ -392,12 +496,12 @@ export default function KitchenDisplayScreen() {
         ticket={tickets.find((t) => t.id === selectedTicketId) || null}
         open={Boolean(selectedTicketId)}
         hasPendingAlert={alerts.some((a) => a.ticketId === selectedTicketId && !a.acknowledged)}
-        disabledComplete={isLiveMode}
         onClose={() => setSelectedTicketId(null)}
         onComplete={(ticketId) => {
           handleCompleteTicket(ticketId);
           setSelectedTicketId(null);
         }}
+        onReportIncident={handleReportIncident}
       />
 
       {/* A6 Order Change Alert Modal */}
