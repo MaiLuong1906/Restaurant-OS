@@ -2,6 +2,8 @@ package com.restaurantos.service;
 
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.CompleteTicketRequest;
+import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.entity.DishEntity;
 import com.restaurantos.entity.OrderEntity;
 import com.restaurantos.entity.OrderItemEntity;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -23,6 +26,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -209,6 +216,138 @@ class KdsServiceTest {
         assertThat(activeItems).hasSize(1);
         assertThat(activeItems.get(0).status()).isEqualTo("READY");
         assertThat(activeItems.get(0).dishName()).isEqualTo("Phở Bò Đặc Biệt");
+    }
+
+    @Test
+    @DisplayName("K3 completeTicket: converts all WAITING items to READY, preserves READY and REJECTED")
+    void testCompleteTicket_convertsWaitingItemsToReady() {
+        OrderItemEntity item1 = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemEntity item2 = createItem("READY", null, now.plus(Duration.ofMinutes(5)));
+        OrderItemEntity item3 = createItem("REJECTED", null, null);
+
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1, item2, item3));
+
+        Optional<KdsTicketDto> result = kdsService.completeTicket(order.getId(), null);
+
+        assertThat(result).isPresent();
+        assertThat(item1.getStatus()).isEqualTo("READY");
+        assertThat(item2.getStatus()).isEqualTo("READY");
+        assertThat(item3.getStatus()).isEqualTo("REJECTED");
+        verify(orderItemRepository).saveAll(List.of(item1, item2, item3));
+    }
+
+    @Test
+    @DisplayName("K3 completeTicket idempotent: when no WAITING items exist, no saveAll is triggered")
+    void testCompleteTicket_idempotentWhenAlreadyReady() {
+        OrderItemEntity item1 = createItem("READY", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemEntity item2 = createItem("REJECTED", null, null);
+
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1, item2));
+
+        Optional<KdsTicketDto> result = kdsService.completeTicket(order.getId(), new CompleteTicketRequest("READY"));
+
+        assertThat(result).isPresent();
+        verify(orderItemRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: WAITING -> READY valid transition")
+    void testUpdateItemStatus_waitingToReady_success() {
+        OrderItemEntity item = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(orderItemRepository.save(any(OrderItemEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<KdsItemDto> result = kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("READY", null));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().status()).isEqualTo("READY");
+        assertThat(item.getStatus()).isEqualTo("READY");
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: WAITING -> REJECTED with valid reason (5-200 chars) succeeds")
+    void testUpdateItemStatus_waitingToRejected_withValidReason_success() {
+        OrderItemEntity item = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(orderItemRepository.save(any(OrderItemEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<KdsItemDto> result = kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("REJECTED", "Hết nguyên liệu"));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().status()).isEqualTo("REJECTED");
+        assertThat(item.getStatus()).isEqualTo("REJECTED");
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: READY -> REJECTED with valid reason succeeds")
+    void testUpdateItemStatus_readyToRejected_success() {
+        OrderItemEntity item = createItem("READY", null, now.plus(Duration.ofMinutes(10)));
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(orderItemRepository.save(any(OrderItemEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<KdsItemDto> result = kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("REJECTED", "Khách đổi món khác"));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().status()).isEqualTo("REJECTED");
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: REJECTED without reason throws 400 Bad Request")
+    void testUpdateItemStatus_rejectedWithoutReason_throws400() {
+        OrderItemEntity item = createItem("WAITING", null, null);
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("REJECTED", null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400 BAD_REQUEST");
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: REJECTED with reason < 5 chars throws 400 Bad Request")
+    void testUpdateItemStatus_rejectedReasonTooShort_throws400() {
+        OrderItemEntity item = createItem("WAITING", null, null);
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("REJECTED", "1234")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400 BAD_REQUEST");
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: invalid transition READY -> WAITING throws 409 Conflict")
+    void testUpdateItemStatus_readyToWaiting_throws409() {
+        OrderItemEntity item = createItem("READY", null, null);
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("WAITING", null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT");
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: attempting SERVED transition throws 409 Conflict")
+    void testUpdateItemStatus_servedTarget_throws409() {
+        OrderItemEntity item = createItem("READY", null, null);
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("SERVED", null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT");
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus idempotent: calling with same status returns entity without saving")
+    void testUpdateItemStatus_idempotent_returnsCurrent() {
+        OrderItemEntity item = createItem("READY", null, null);
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        Optional<KdsItemDto> result = kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("READY", null));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().status()).isEqualTo("READY");
+        verify(orderItemRepository, never()).save(any());
     }
 
     private OrderItemEntity createItem(String status, String allergyNote, Instant slaDeadline) {
