@@ -118,11 +118,11 @@ export function KdsTicketCard({
         disabled={isCompleting || allReady || allRejected || hasPendingAlert || disabledComplete}
         onClick={(e) => {
           e.stopPropagation();
-          if (hasPendingAlert || disabledComplete || allRejected) return;
+          if (hasPendingAlert || disabledComplete || allRejected || allReady) return;
           onComplete(ticket.id);
         }}
         className={`w-full h-12 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-xs transition-all ${
-          hasPendingAlert || disabledComplete || allRejected
+          hasPendingAlert || disabledComplete || allRejected || allReady
             ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed border border-neutral-300'
             : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50 disabled:cursor-not-allowed'
         }`}

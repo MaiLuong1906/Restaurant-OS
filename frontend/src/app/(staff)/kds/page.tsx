@@ -234,6 +234,9 @@ export default function KitchenDisplayScreen() {
     });
 
     undoTimeoutRef.current = setTimeout(async () => {
+      const stillPending = readPendingComplete();
+      setUndoToast(null);
+      if (!stillPending || stillPending.requestId !== requestId) return;
       writePendingComplete(null);
       try {
         const updatedTicket = await kdsService.updateTicketStatus(ticketId, 'READY', requestId);
@@ -243,7 +246,6 @@ export default function KitchenDisplayScreen() {
         setTickets(snapshot);
         setError((err as Error).message || 'Không thể hoàn tất ticket');
       }
-      setUndoToast(null);
     }, 5000);
   };
 

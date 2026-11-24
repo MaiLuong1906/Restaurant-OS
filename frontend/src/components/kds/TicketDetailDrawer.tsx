@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Ticket } from '@/types';
 import { SlaTimer } from './SlaTimer';
-import { X, AlertTriangle, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, AlertTriangle, Check, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 
 interface TicketDetailDrawerProps {
   ticket: Ticket | null;
@@ -40,6 +40,10 @@ export function TicketDetailDrawer({
         : [],
     [ticket]
   );
+
+  const actionableItems = ticket ? ticket.items.filter((i) => i.status !== 'REJECTED') : [];
+  const allRejected = actionableItems.length === 0;
+  const allReady = !allRejected && actionableItems.every((i) => i.status === 'READY');
 
   // Reset local state when ticket changes
   React.useEffect(() => {
@@ -274,14 +278,27 @@ export function TicketDetailDrawer({
                 : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50'
             }`}
           >
-            <Check className="h-5 w-5" />
-            <span>
-              {disabledComplete
-                ? 'Hoàn tất ticket (TODO UC19)'
-                : hasPendingAlert
-                ? 'Khóa (Có thay đổi chưa xác nhận)'
-                : '✓ Hoàn tất ticket'}
-            </span>
+            {disabledComplete ? (
+              <>
+                <Lock className="h-5 w-5" />
+                <span>Hoàn tất ticket (TODO UC19)</span>
+              </>
+            ) : hasPendingAlert ? (
+              <>
+                <Lock className="h-5 w-5" />
+                <span>Khóa (Có thay đổi chưa xác nhận)</span>
+              </>
+            ) : allRejected ? (
+              <>
+                <Lock className="h-5 w-5" />
+                <span>Đã báo sự cố</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-5 w-5" />
+                <span>{allReady ? 'Đã hoàn tất' : 'Hoàn tất ticket'}</span>
+              </>
+            )}
           </button>
 
           {!incidentFormOpen && (
