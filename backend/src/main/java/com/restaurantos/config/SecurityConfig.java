@@ -45,8 +45,13 @@ public class SecurityConfig {
                 // 3. Cổng kết nối WebSocket STOMP handshake
                 .requestMatchers("/ws/**").permitAll()
 
-                // 4. Menu công khai qua quét mã QR bàn (UC01, UC02)
+                // 4. Menu công khai qua quét mã QR bàn (UC01, UC02) - Chỉ cho phép GET
                 .requestMatchers(HttpMethod.GET, "/api/v1/dishes/**").permitAll()
+
+                // Bếp & Thu ngân cập nhật nhanh trạng thái còn/hết món (UC20)
+                // NOTE: Tạm thời permitAll PATCH cho endpoint availability phục vụ trạm KDS/POS trong sprint test nội bộ.
+                // TODO (Follow-up): Khóa lại .hasAnyRole("STAFF", "CHEF", "OWNER", "MANAGER") sau khi Auth PR được merge.
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/dishes/*/availability").permitAll()
 
                 // 5. Xác thực người dùng (Auth endpoints)
                 .requestMatchers("/api/v1/auth/**").permitAll()
@@ -54,17 +59,25 @@ public class SecurityConfig {
                 // 6. Quản trị nhân sự nội bộ (Admin User Management)
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").permitAll()
 
-                // 7. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
+                // 7. Quản trị thực đơn món ăn (Admin Dish/Menu Management - UC_OWN_02)
+                // NOTE: Tạm thời permitAll trong môi trường dev/local để phục vụ kiểm thử tích hợp Frontend & Postman.
+                // Controller đã được cấu hình sẵn @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')").
+                .requestMatchers("/api/v1/admin/dishes", "/api/v1/admin/dishes/**").permitAll()
+
+                // 8. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
+                // NOTE: Tạm thời permitAll trong môi trường dev/local để phục vụ kiểm thử tích hợp Frontend & Postman.
+                // TODO (Follow-up): Khóa lại .authenticated() ngay sau khi Auth PR được merge lên dev.
                 .requestMatchers("/api/v1/staff/schedule/**").permitAll()
 
-                // 8. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
+                // 9. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
                 // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
                 .requestMatchers("/api/v1/reservations/**").permitAll()
-                // 8. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
+
+                // 10. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
                 .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
 
-                // 9. Danh sách bàn (Waiter FloorPlan & Reservation)
+                // 11. Danh sách bàn (Waiter FloorPlan & Reservation)
                 .requestMatchers(HttpMethod.GET, "/api/v1/tables/**").permitAll()
 
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
