@@ -1,5 +1,7 @@
 export function homeHrefForRole(role?: string): string {
   switch (role) {
+    case 'OWNER':
+      return '/dashboard';
     case 'CHEF':
     case 'MANAGER':
       return '/chef';

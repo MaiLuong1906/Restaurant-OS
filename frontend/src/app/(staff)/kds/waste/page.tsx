@@ -17,14 +17,16 @@ const REASONS: WasteReason[] = [
 
 export default function KdsWastePage() {
   const staffUser = useAuthStore((s) => s.staffUser);
+  const isKdsAuthenticated = useAuthStore((s) => s.isKdsAuthenticated);
 
-  // Kiểm tra quyền Bếp trưởng
+  // Kiểm tra quyền Bếp / Quản lý (chỉ cho phép khi đã đăng nhập KDS session hoặc có role hợp lệ)
   // Lưu ý bảo mật: UI chỉ chặn trải nghiệm, API backend bắt buộc enforce server-side
   const isChef = React.useMemo(() => {
-    if (!staffUser) return true; // Mặc định trong tablet bếp KDS nếu chưa đăng nhập staff user
+    if (isKdsAuthenticated) return true;
+    if (!staffUser) return process.env.NEXT_PUBLIC_ENABLE_ROUTE_GUARD !== 'true';
     const role = (staffUser.role || '').toUpperCase();
-    return role === 'HEAD_CHEF' || role === 'CHEF' || role.includes('CHEF');
-  }, [staffUser]);
+    return role === 'HEAD_CHEF' || role === 'CHEF' || role === 'MANAGER' || role === 'OWNER' || role.includes('CHEF');
+  }, [staffUser, isKdsAuthenticated]);
 
   const [dishOptions, setDishOptions] = React.useState<WasteDishOption[]>([]);
   const [stats, setStats] = React.useState<WasteTodayStats>({ logCount: 0, portionCount: 0 });
