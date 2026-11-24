@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     llm_fallback_model: str = "qwen/qwen3.8-27b"
     embedding_model: str = "BAAI/bge-m3"
 
+    # Backend API integration
+    backend_api_url: str = "http://localhost:8080/api/v1"
+    backend_mode: str = "mock"
+
     # Live secrets without default (placeholder values in .env.example are treated as unset)
     llm_api_key: Optional[str] = None
     database_url: Optional[str] = None

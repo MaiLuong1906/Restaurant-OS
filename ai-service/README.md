@@ -58,22 +58,41 @@ curl http://localhost:8000/health
 
 ---
 
-## 4. Chạy kiểm thử & Eval Harness 20 câu Golden
+## 4. Chạy kiểm thử & Eval Harness 40 câu Golden
 
 ### Chế độ Mock (CI / Local không cần key / không cần mạng)
 ```bash
 source .venv/bin/activate
-PYTHONPATH=. pytest tests/eval_golden.py -v
+python -m pytest test_config.py tests/test_chat_and_tools.py tests/test_real_backend_adapter.py tests/eval_golden.py -q
 ```
 
-### Chế độ Live (Dùng Groq LLM Key thật)
-Điền `LLM_API_KEY` vào file `.env`, sau đó chạy:
+### Chế độ Live (Dùng Groq LLM Key thật + Backend Spring Boot thật)
+Cấu hình trong file `.env`: `BACKEND_MODE=real`, `BACKEND_API_URL=http://localhost:8080/api/v1`, sau đó chạy:
 ```bash
 source .venv/bin/activate
-PYTHONPATH=. pytest tests/eval_golden.py -v -m live
+BACKEND_MODE=real python tests/eval_golden.py --live
 ```
-Báo cáo đánh giá được ghi nhận dựa trên 4 chỉ số cốt lõi:
-1. Tỉ lệ hiểu đúng ý định & tách đúng thông tin (ngày/giờ/số người/khu vực) $\ge 90\%$.
+Báo cáo đánh giá được ghi nhận dựa trên các chỉ số cốt lõi:
+1. Tỉ lệ hiểu đúng ý định & tách đúng thông tin (Intent & Slots) $\ge 90\%$.
 2. Tỉ lệ đặt bàn thành công ngay lần đầu không hỏi lại quá 2 lần $\ge 85\%$.
-3. **Tỉ lệ bịa bàn/voucher không qua tool: = 0 (Gate merge bắt buộc)**.
-4. Tỉ lệ phản hồi lỗi thân thiện khi provider gặp sự cố: 100%.
+3. **Tỉ lệ bịa bàn/voucher không qua tool: = 0 (Gate bắt buộc)**.
+4. Timeout tối đa 120s/câu, dọn sạch dữ liệu test sau khi hoàn tất.
+
+---
+
+## 5. Quy trình Review Lỗi Hàng Tuần (Weekly Failure Review Loop)
+
+Để đảm bảo chất lượng AI liên tục nâng cao từ phản hồi thực tế của khách hàng:
+
+1. **Chạy script trích xuất phiên lỗi:**
+   ```bash
+   source .venv/bin/activate
+   python scripts/review_weekly_failures.py --days 7 --output review_weekly_report.md
+   ```
+2. **Đọc và phân loại các phiên bị gắn cờ:**
+   - **Thiếu kiến thức**: Món mới hoặc câu hỏi chính sách chưa có trong tài liệu -> Bổ sung vào `policy_faq.md` hoặc kiểm tra lại ingestion backend.
+   - **Sai tool**: AI gọi nhầm tool hoặc không gọi tool -> Tinh chỉnh prompt tại `prompts/system_vi.md`.
+   - **Thiếu slot**: Người dùng cung cấp chưa đủ thông tin -> Kiểm tra cơ chế làm rõ (`expect_clarify`).
+   - **Ngoài phạm vi**: Yêu cầu đặc biệt (đặt tiệc lớn, phàn nàn) -> Bàn giao nhân viên quản lý.
+3. **Đưa câu lỗi vào bộ câu hỏi Golden Eval đợt tiếp theo.**
+4. **Sửa bằng Prompt & RAG trước:** Tuyệt đối không vội fine-tune model. Fine-tune chỉ là bước cuối cùng khi eval chứng minh prompt + RAG không thể giải quyết được một nhóm lỗi đặc thù.
