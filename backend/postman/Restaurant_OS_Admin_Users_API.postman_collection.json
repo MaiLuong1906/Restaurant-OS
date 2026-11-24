@@ -1,0 +1,844 @@
+{
+  "info": {
+    "_postman_id": "c1f7b24a-71a0-4b2a-8d39-68d1e28b1234",
+    "name": "Restaurant OS — Admin User Management API",
+    "description": "Bộ kiểm thử tự động toàn diện cho Module Quản trị tài khoản & Phân quyền RBAC (/api/v1/admin/users).\nBao phủ 100% các API CRUD, kiểm tra validation số điện thoại/email, mã PIN trạm, phân quyền Enum, và xóa mềm (Soft Delete).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employeeCode",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Danh Sách & Lọc Nhân Sự",
+      "item": [
+        {
+          "name": "1.1. Lấy tất cả nhân sự (Chưa bị xóa mềm)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Phản hồi đúng chuẩn ApiResponse envelope\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(Array.isArray(res.data)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Lấy toàn bộ danh sách nhân sự đang hoạt động trong hệ thống kèm vai trò và hạn mức chiết khấu."
+          }
+        },
+        {
+          "name": "1.2. Lọc nhân sự theo vai trò (role=MANAGER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Toàn bộ kết quả đều có roleCode là MANAGER\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    res.data.forEach(user => {",
+                  "        pm.expect(user.roleCode).to.eql(\"MANAGER\");",
+                  "        pm.expect(user.discountCeiling).to.eql(20);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users?role=MANAGER",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "MANAGER"
+                }
+              ]
+            },
+            "description": "Lọc danh sách nhân sự theo mã vai trò chuẩn (OWNER, MANAGER, CASHIER, CHEF, WAITER, STAFF)."
+          }
+        },
+        {
+          "name": "1.3. Lọc nhân sự đang bị tạm khóa (isActive=false)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Toàn bộ nhân sự trong danh sách đều có isActive = false\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(Array.isArray(res.data)).to.be.true;",
+                  "    res.data.forEach(user => {",
+                  "        pm.expect(user.isActive).to.be.false;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users?isActive=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Lọc danh sách các tài khoản nhân sự đang bị tạm khóa/đình chỉ để quản lý xem xét mở khóa."
+          }
+        },
+        {
+          "name": "1.4. Lọc nhân sự đang hoạt động bình thường (isActive=true)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Toàn bộ nhân sự trong danh sách đều có isActive = true\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(Array.isArray(res.data)).to.be.true;",
+                  "    res.data.forEach(user => {",
+                  "        pm.expect(user.isActive).to.be.true;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users?isActive=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Lọc danh sách các tài khoản nhân sự đang hoạt động phục vụ ca làm việc."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Cấp Tài Khoản Mới (Create & Validations)",
+      "item": [
+        {
+          "name": "2.1. Cấp tài khoản mới thành công (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Tạo user thành công và tự động lưu userId vào biến\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.data.username).to.eql(\"linh.cashier\");",
+                  "    pm.expect(res.data.roleCode).to.eql(\"CASHIER\");",
+                  "    pm.expect(res.data.discountCeiling).to.eql(5);",
+                  "    pm.expect(res.data.hasPin).to.be.true;",
+                  "    pm.expect(res.data.employeeCode).to.match(/^TN\\d{3}$/);",
+                  "    pm.expect(res.data.createdAt).to.match(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/);",
+                  "    pm.collectionVariables.set(\"userId\", res.data.id);",
+                  "    pm.environment.set(\"userId\", res.data.id);",
+                  "    pm.collectionVariables.set(\"employeeCode\", res.data.employeeCode);",
+                  "    pm.environment.set(\"employeeCode\", res.data.employeeCode);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Lê Thùy Linh\",\n  \"username\": \"linh.cashier\",\n  \"password\": \"Cashier@123\",\n  \"email\": \"linh.cashier@restaurant.vn\",\n  \"phone\": \"0987654321\",\n  \"roleCode\": \"CASHIER\",\n  \"pinCode\": \"1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Tạo tài khoản nhân viên thu ngân mới với đầy đủ thông tin hợp lệ."
+          }
+        },
+        {
+          "name": "2.2. Lỗi Validation: SĐT và Email sai định dạng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Trả về chuẩn ApiResponse với chi tiết từng trường vi phạm (VALIDATION_ERROR)\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "    pm.expect(res.error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "    pm.expect(res.error.details).to.be.an(\"object\");",
+                  "    pm.expect(res.error.details.phone).to.exist;",
+                  "    pm.expect(res.error.details.email).to.exist;",
+                  "    pm.expect(res.timestamp).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Trần Sai Định Dạng\",\n  \"username\": \"user.invalid\",\n  \"password\": \"123456\",\n  \"email\": \"email-khong-hop-le\",\n  \"phone\": \"12345678\",\n  \"roleCode\": \"WAITER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Kiểm tra hệ thống chặn lỗi validation khi email không có đuôi @ và sđt không đúng 10 số Việt Nam."
+          }
+        },
+        {
+          "name": "2.3. Lỗi Trùng Lặp: Tên đăng nhập đã tồn tại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 409 Conflict\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test(\"Trả về chuẩn ApiResponse CONFLICT với thông điệp rõ ràng\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "    pm.expect(res.error.code).to.eql(\"CONFLICT\");",
+                  "    pm.expect(res.error.message).to.include(\"đã tồn tại\");",
+                  "    pm.expect(res.timestamp).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Lê Thùy Linh Nhái\",\n  \"username\": \"linh.cashier\",\n  \"password\": \"Cashier@123\",\n  \"roleCode\": \"CASHIER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Gửi lại cùng tên đăng nhập 'linh.cashier' để xác thực cơ chế chống trùng lặp."
+          }
+        },
+        {
+          "name": "2.4. Lỗi Vai Trò: RoleCode không thuộc UserRole Enum",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Trả về chuẩn ApiResponse BAD_REQUEST khi roleCode không hợp lệ\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "    pm.expect(res.error.code).to.eql(\"BAD_REQUEST\");",
+                  "    pm.expect(res.error.message).to.include(\"không hợp lệ\");",
+                  "    pm.expect(res.timestamp).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nhân Sự Ảo\",\n  \"username\": \"user.fake\",\n  \"password\": \"123456\",\n  \"roleCode\": \"SUPER_ADMIN_FAKE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Truyền mã vai trò không tồn tại trong UserRole Enum (OWNER, MANAGER, CASHIER, CHEF, WAITER, STAFF)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Xem Chi Tiết Nhân Viên",
+      "item": [
+        {
+          "name": "3.1. Xem chi tiết nhân viên theo ID (UUID)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Thông tin khớp với nhân sự vừa tạo (Truy vấn theo UUID)\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    const targetId = pm.environment.get(\"userId\") || pm.collectionVariables.get(\"userId\");",
+                  "    pm.expect(res.data.id).to.eql(targetId);",
+                  "    pm.expect(res.data.username).to.eql(\"linh.cashier\");",
+                  "    pm.expect(res.data.employeeCode).to.match(/^TN\\d{3}$/);",
+                  "    pm.expect(res.data.createdAt).to.match(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Truy vấn thông tin chi tiết của nhân sự theo UUID."
+          }
+        },
+        {
+          "name": "3.2. Xem chi tiết nhân sự theo Mã nhân viên (Dual-lookup: TN001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Truy vấn thành công bằng Mã nhân sự định danh ngắn gọn\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    const targetCode = pm.environment.get(\"employeeCode\") || pm.collectionVariables.get(\"employeeCode\");",
+                  "    pm.expect(res.data.employeeCode).to.eql(targetCode);",
+                  "    pm.expect(res.data.username).to.eql(\"linh.cashier\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{employeeCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{employeeCode}}"
+              ]
+            },
+            "description": "Truy vấn thông tin chi tiết của nhân sự theo Mã nhân viên (ví dụ: TN001, QL001) siêu ngắn gọn."
+          }
+        },
+        {
+          "name": "3.3. Xem chi tiết nhân viên (Định danh không tồn tại: NV999999)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Trả về chuẩn ApiResponse NOT_FOUND cho định danh không tồn tại\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "    pm.expect(res.error.code).to.eql(\"NOT_FOUND\");",
+                  "    pm.expect(res.error.message).to.include(\"Không tìm thấy nhân sự\");",
+                  "    pm.expect(res.timestamp).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/NV999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "NV999999"
+              ]
+            },
+            "description": "Truy vấn với mã định danh không tồn tại để kiểm tra cơ chế báo lỗi 404."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Cập Nhật Thông Tin & Đổi PIN Trạm",
+      "item": [
+        {
+          "name": "4.1. Thăng chức nhân sự lên Quản lý (roleCode=MANAGER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Thăng chức thành công, tự động cấp mã QL và trần chiết khấu nhảy lên 20%\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.data.roleCode).to.eql(\"MANAGER\");",
+                  "    pm.expect(res.data.discountCeiling).to.eql(20);",
+                  "    pm.expect(res.data.employeeCode).to.match(/^QL\\d{3}$/);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleCode\": \"MANAGER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Thăng chức nhân sự lên vai trò Quản lý (MANAGER), hệ thống tự động cập nhật trần chiết khấu lên 20% mà không làm ảnh hưởng thông tin cá nhân khác."
+          }
+        },
+        {
+          "name": "4.2. Đổi mã PIN trạm thành công (pinCode=5678)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pinCode\": \"5678\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}/pin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{userId}}",
+                "pin"
+              ]
+            },
+            "description": "Cập nhật mã PIN trạm mới 4 chữ số cho nhân viên."
+          }
+        },
+        {
+          "name": "4.3. Lỗi Đổi PIN: Mã PIN sai định dạng (không đủ số)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Trả về chuẩn ApiResponse VALIDATION_ERROR khi mã PIN không đủ số\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "    pm.expect(res.error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "    pm.expect(res.error.details.pinCode).to.include(\"4 đến 6 chữ số\");",
+                  "    pm.expect(res.timestamp).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pinCode\": \"12\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}/pin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{userId}}",
+                "pin"
+              ]
+            },
+            "description": "Kiểm tra chặn lỗi validation khi mã PIN chỉ có 2 chữ số (yêu cầu từ 4-6 số)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Khóa & Xóa Mềm Tài Khoản (Soft Delete)",
+      "item": [
+        {
+          "name": "5.1. Khóa / Mở khóa tài khoản (toggle-status)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Khóa/Mở khóa thành công và trả về dữ liệu nhân sự cập nhật\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.data).to.be.an(\"object\");",
+                  "    pm.expect(res.data.isActive).to.be.a(\"boolean\");",
+                  "    pm.expect(res.message).to.include(\"thành công\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}/toggle-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{userId}}",
+                "toggle-status"
+              ]
+            },
+            "description": "Chuyển đổi trạng thái isActive giữa true và false."
+          }
+        },
+        {
+          "name": "5.2. Xóa mềm tài khoản nhân sự (Soft Delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Xóa mềm thành công và trả về thông tin nhân sự vừa xóa\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.message).to.include(\"thành công\");",
+                  "    pm.expect(res.data.isActive).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Đánh dấu thời điểm deleted_at = CURRENT_TIMESTAMP và vô hiệu hóa tài khoản."
+          }
+        },
+        {
+          "name": "5.3. Kiểm chứng: Gọi lại nhân viên đã xóa mềm -> Phải ra 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"HTTP Status 404 Not Found (Xóa mềm thành công)\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Nhân sự đã xóa mềm không còn truy cập được qua định danh\", function () {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.false;",
+                  "    pm.expect(res.error.code).to.eql(\"NOT_FOUND\");",
+                  "    pm.expect(res.error.message).to.include(\"Không tìm thấy nhân sự\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Kiểm tra bảo đảm nhân sự đã bị xóa mềm không còn xuất hiện trong các truy vấn dữ liệu."
+          }
+        }
+      ]
+    }
+  ]
+}
