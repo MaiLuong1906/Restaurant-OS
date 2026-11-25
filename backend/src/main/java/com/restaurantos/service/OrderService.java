@@ -210,6 +210,67 @@ public class OrderService {
                 .toList();
     }
 
+    /**
+     * Phục vụ xác nhận đã giao 1 món cho khách (READY -> SERVED).
+     * Dùng atomic conditional update để chống giao trùng hoặc race condition khi 2 phục vụ bấm cùng lúc.
+     * Nếu toàn bộ món hợp lệ (không bị REJECTED) trong đơn đều đã SERVED, tự đồng bộ trạng thái đơn sang SERVED
+     * nhưng KHÔNG tự giải phóng bàn sang VACANT.
+     */
+    @Transactional
+    public OrderDtos.OrderItemResponse serveOrderItem(UUID itemId) {
+        OrderItemEntity item = orderItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Không tìm thấy món với ID: " + itemId));
+
+        String currentStatus = item.getStatus() != null ? item.getStatus().toUpperCase() : "";
+        if ("SERVED".equals(currentStatus)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Món '" + item.getDishNameSnapshot() + "' đã được giao cho khách trước đó.");
+        }
+        if ("WAITING".equals(currentStatus)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Món '" + item.getDishNameSnapshot() + "' đang chờ bếp chế biến, chưa thể giao.");
+        }
+        if ("REJECTED".equals(currentStatus)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Món '" + item.getDishNameSnapshot() + "' đã bị bếp từ chối, không thể giao.");
+        }
+        if (!"READY".equals(currentStatus)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Trạng thái món không hợp lệ để giao: " + item.getStatus());
+        }
+
+        Instant now = Instant.now();
+        int updated = orderItemRepository.markAsServedIfReady(itemId, now);
+        if (updated == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Món '" + item.getDishNameSnapshot() + "' đã được cập nhật bởi thao tác khác.");
+        }
+
+        item.setStatus("SERVED");
+        item.setUpdatedAt(now);
+
+        // Đồng bộ trạng thái Order sang SERVED nếu tất cả món không bị REJECTED đều đã SERVED
+        if (item.getOrderId() != null) {
+            List<OrderItemEntity> orderItems = orderItemRepository.findByOrderId(item.getOrderId());
+            boolean hasUnserved = orderItems.stream()
+                    .anyMatch(i -> "WAITING".equalsIgnoreCase(i.getStatus()) || "READY".equalsIgnoreCase(i.getStatus()));
+            boolean hasServed = orderItems.stream()
+                    .anyMatch(i -> "SERVED".equalsIgnoreCase(i.getStatus()));
+            if (!hasUnserved && hasServed) {
+                orderRepository.findById(item.getOrderId()).ifPresent(order -> {
+                    if ("PLACED".equalsIgnoreCase(order.getStatus()) || "CONFIRMED".equalsIgnoreCase(order.getStatus())) {
+                        order.setStatus("SERVED");
+                        order.setUpdatedAt(now);
+                        orderRepository.save(order);
+                    }
+                });
+            }
+        }
+
+        return toOrderItemResponse(item);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private UUID parseUuid(String value, String field) {
@@ -220,20 +281,27 @@ public class OrderService {
         }
     }
 
+    private OrderDtos.OrderItemResponse toOrderItemResponse(OrderItemEntity item) {
+        return new OrderDtos.OrderItemResponse(
+                item.getId(),
+                item.getDishId(),
+                item.getDishNameSnapshot(),
+                item.getPortionId(),
+                item.getPortionNameSnapshot(),
+                item.getQuantity(),
+                item.getUnitPrice(),
+                item.getStatus(),
+                item.getNotes(),
+                item.getAllergyNote(),
+                item.getCreatedAt(),
+                item.getSlaDeadline(),
+                item.getUpdatedAt()
+        );
+    }
+
     private OrderDtos.OrderResponse toOrderResponse(OrderEntity order, List<OrderItemEntity> items) {
         List<OrderDtos.OrderItemResponse> itemResponses = items.stream()
-                .map(item -> new OrderDtos.OrderItemResponse(
-                        item.getId(),
-                        item.getDishId(),
-                        item.getDishNameSnapshot(),
-                        item.getPortionId(),
-                        item.getPortionNameSnapshot(),
-                        item.getQuantity(),
-                        item.getUnitPrice(),
-                        item.getStatus(),
-                        item.getNotes(),
-                        item.getAllergyNote()
-                ))
+                .map(this::toOrderItemResponse)
                 .toList();
 
         return new OrderDtos.OrderResponse(

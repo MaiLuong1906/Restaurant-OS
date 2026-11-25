@@ -55,10 +55,17 @@ public final class OrderDtos {
             Long unitPrice,
             String status,
             String notes,
-            String allergyNote
+            String allergyNote,
+            Instant createdAt,
+            Instant slaDeadline,
+            Instant updatedAt
     ) {}
 
-    // ─── Table Response ───────────────────────────────────────────────────────
+    // ─── Table Request / Response ─────────────────────────────────────────────
+
+    public record UpdateTableStatusRequest(
+            String status
+    ) {}
 
     public record TableResponse(
             UUID id,
