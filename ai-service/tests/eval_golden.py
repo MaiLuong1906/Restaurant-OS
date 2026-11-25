@@ -14,7 +14,7 @@ from config import get_settings
 from services.chat_engine import ChatEngine
 from tools.executor import ToolExecutor
 
-chat_engine = ChatEngine()
+chat_engine = ChatEngine(force_mock_llm=True)
 
 GOLDEN_QUESTIONS = [
     # Nhóm 1: Hỏi thực đơn & món ăn
@@ -108,13 +108,15 @@ def test_golden_eval_mock(case):
     assert "done" in event_names, f"Query '{case['query']}' did not emit done event"
     assert "text" in event_names or "dish_card" in event_names or "voucher_card" in event_names or "booking_card" in event_names
 
-def run_live_evaluation() -> int:
+def run_live_evaluation(live: bool = True) -> int:
     settings = get_settings()
-    settings.require_live()
+    if live:
+        settings.require_live()
 
-    engine = ChatEngine()
+    engine = ChatEngine(force_mock_llm=not live)
     is_real_backend = (settings.backend_mode == "real")
-    print(f"=== KHỞI ĐỘNG EVAL LIVE 40 CÂU (BACKEND_MODE={settings.backend_mode}) ===")
+    mode_label = "LIVE" if live else "MOCK"
+    print(f"=== KHỞI ĐỘNG EVAL {mode_label} 40 CÂU (BACKEND_MODE={settings.backend_mode}) ===")
 
     results = []
     intent_pass = 0
@@ -245,10 +247,12 @@ def run_live_evaluation() -> int:
             "timed_out": timed_out,
             "preview": full_text.replace("\n", " ")[:140]
         })
-        time.sleep(0.5)
+        if live:
+            time.sleep(0.5)
 
     # Dọn dẹp dữ liệu test khỏi Postgres
-    cleanup_test_reservations()
+    if is_real_backend:
+        cleanup_test_reservations()
 
     total = len(GOLDEN_QUESTIONS)
     intent_pct = (intent_pass / total) * 100.0
@@ -256,41 +260,43 @@ def run_live_evaluation() -> int:
     gate_passed = (intent_pct >= 90.0) and (booking_pct >= 85.0) and (hallucinations == 0)
 
     report_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval_report.md")
-    lines = [
-        "# AI Guest Chat — Live Groq Evaluation Report (40 Golden Questions)",
-        "",
-        f"- **Backend Mode**: `{'REAL (Spring Boot port 8080)' if is_real_backend else 'MOCK'}`",
-        f"- **LLM Provider**: LIVE (`{settings.llm_base_url}`, model: `{settings.llm_model}`, fallback: `{settings.llm_fallback_model}`)",
-        f"- **Total Questions**: {total}",
-        f"- **Intent & Slots Accuracy**: {intent_pass}/{total} (**{intent_pct:.1f}%**) — Gate: >= 90%",
-        f"- **First-try Booking Resolution**: {booking_pass}/{booking_cases} (**{booking_pct:.1f}%**) — Gate: >= 85%",
-        f"- **Hallucinated Tables / Vouchers**: **{hallucinations}** — Gate: = 0",
-        f"- **Slowest Question**: Câu {slowest_id} ({slowest_latency_ms} ms)",
-        f"- **Overall Gate Status**: **{'PASSED' if gate_passed else 'FAILED'}**",
-        "",
-        "## Detailed Results per Question",
-        "",
-        "| ID | Category | Query | Expected Tool | Actual Tool | Intent OK | Hallucination | Latency (ms) | Preview |",
-        "|---:|---|---|---|---|---|---|---:|---|",
-    ]
-    for r in results:
-        preview_clean = r["preview"].replace("|", "\\|")
-        lines.append(
-            f"| {r['id']} | `{r['category']}` | {r['query']} | `{r['expected_tool']}` | `{r['actual_tool']}` | "
-            f"{'PASS' if r['intent_ok'] else 'FAIL'} | {'YES' if r['hallucination'] else 'NO'} | {r['elapsed_ms']} | {preview_clean} |"
-        )
+    if live:
+        lines = [
+            "# AI Guest Chat — Live Groq Evaluation Report (40 Golden Questions)",
+            "",
+            f"- **Backend Mode**: `{'REAL (Spring Boot port 8080)' if is_real_backend else 'MOCK'}`",
+            f"- **LLM Provider**: LIVE (`{settings.llm_base_url}`, model: `{settings.llm_model}`, fallback: `{settings.llm_fallback_model}`)",
+            f"- **Total Questions**: {total}",
+            f"- **Intent & Slots Accuracy**: {intent_pass}/{total} (**{intent_pct:.1f}%**) — Gate: >= 90%",
+            f"- **First-try Booking Resolution**: {booking_pass}/{booking_cases} (**{booking_pct:.1f}%**) — Gate: >= 85%",
+            f"- **Hallucinated Tables / Vouchers**: **{hallucinations}** — Gate: = 0",
+            f"- **Slowest Question**: Câu {slowest_id} ({slowest_latency_ms} ms)",
+            f"- **Overall Gate Status**: **{'PASSED' if gate_passed else 'FAILED'}**",
+            "",
+            "## Detailed Results per Question",
+            "",
+            "| ID | Category | Query | Expected Tool | Actual Tool | Intent OK | Hallucination | Latency (ms) | Preview |",
+            "|---:|---|---|---|---|---|---|---:|---|",
+        ]
+        for r in results:
+            preview_clean = r["preview"].replace("|", "\\|")
+            lines.append(
+                f"| {r['id']} | `{r['category']}` | {r['query']} | `{r['expected_tool']}` | `{r['actual_tool']}` | "
+                f"{'PASS' if r['intent_ok'] else 'FAIL'} | {'YES' if r['hallucination'] else 'NO'} | {r['elapsed_ms']} | {preview_clean} |"
+            )
 
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
 
     print("\n" + "="*60)
-    print(f"BÁO CÁO EVAL 40 CÂU:")
+    print(f"BÁO CÁO EVAL 40 CÂU ({mode_label}):")
     print(f"- Intent+Slots: {intent_pass}/{total} ({intent_pct:.1f}%) [Gate >= 90%]")
     print(f"- Booking resolution: {booking_pass}/{booking_cases} ({booking_pct:.1f}%) [Gate >= 85%]")
     print(f"- Bịa bàn / voucher: {hallucinations} [Gate = 0]")
     print(f"- Câu chậm nhất: Câu {slowest_id} ({slowest_latency_ms} ms)")
     print(f"- GATE CHUNG: {'PASSED' if gate_passed else 'FAILED'}")
-    print(f"Báo cáo chi tiết đã ghi tại: {report_path}")
+    if live:
+        print(f"Báo cáo chi tiết đã ghi tại: {report_path}")
     print("="*60)
     return 0 if gate_passed else 1
 
@@ -298,4 +304,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--live", action="store_true", help="Run evaluation in live Groq mode")
     args = parser.parse_args()
-    sys.exit(run_live_evaluation())
+    sys.exit(run_live_evaluation(live=args.live))

@@ -70,7 +70,7 @@ class MockBackendAdapter:
             "date": date,
             "time": time,
             "party_size": party_size,
-            "table_id": table_id,
+            "table_id": table_id or "TB-01",
             "note": note or "",
             "status": "CONFIRMED",
             "idempotency_key": idempotency_key or str(uuid.uuid4())
