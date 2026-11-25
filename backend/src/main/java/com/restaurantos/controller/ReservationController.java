@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -27,6 +28,7 @@ public class ReservationController {
     private final ReservationService reservationService;
 
     @GetMapping("/zones")
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:VIEW')")
     @Operation(summary = "Danh sách phân khu bàn ăn")
     public ResponseEntity<ApiResponse<List<DiningZoneResponse>>> getDiningZones() {
         List<DiningZoneResponse> zones = reservationService.listDiningZones();
@@ -34,6 +36,7 @@ public class ReservationController {
     }
 
     @GetMapping("/available-tables")
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:VIEW')")
     @Operation(summary = "Kiểm tra bàn trống khả dụng (UC_CASH_01 <<include>>)")
     public ResponseEntity<ApiResponse<List<AvailableTableResponse>>> getAvailableTables(
             @RequestParam("time") Instant reservationTime,
@@ -46,6 +49,7 @@ public class ReservationController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:CREATE')")
     @Operation(summary = "Tạo đơn đặt bàn mới & thu cọc (UC_CASH_01)")
     public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(
             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
@@ -57,6 +61,7 @@ public class ReservationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:VIEW')")
     @Operation(summary = "Tra cứu danh sách đặt bàn theo ngày, trạng thái hoặc SĐT/tên khách")
     public ResponseEntity<ApiResponse<List<ReservationResponse>>> listReservations(
             @RequestParam(value = "date", required = false)
@@ -69,6 +74,7 @@ public class ReservationController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:VIEW')")
     @Operation(summary = "Chi tiết đơn đặt bàn theo UUID")
     public ResponseEntity<ApiResponse<ReservationResponse>> getReservationById(@PathVariable UUID id) {
         ReservationResponse detail = reservationService.getReservationById(id);
@@ -76,6 +82,7 @@ public class ReservationController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:UPDATE')")
     @Operation(summary = "Cập nhật thông tin đặt bàn (đổi giờ, đổi bàn, số khách, tiền cọc)")
     public ResponseEntity<ApiResponse<ReservationResponse>> updateReservation(
             @PathVariable UUID id,
@@ -86,6 +93,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/check-in")
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:UPDATE')")
     @Operation(summary = "Check-in nhận bàn đã đặt trước (UC_CASH_02)")
     public ResponseEntity<ApiResponse<ReservationResponse>> checkInReservation(@PathVariable UUID id) {
         ReservationResponse checkedIn = reservationService.checkInReservation(id);
@@ -93,6 +101,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:UPDATE')")
     @Operation(summary = "Hủy đơn đặt bàn & giải phóng bàn")
     public ResponseEntity<ApiResponse<ReservationResponse>> cancelReservation(
             @PathVariable UUID id,
@@ -103,6 +112,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/no-show")
+    @PreAuthorize("hasAuthority('TABLE:RESERVATION:UPDATE')")
     @Operation(summary = "Đánh dấu khách không đến (No-Show) & giải phóng bàn")
     public ResponseEntity<ApiResponse<ReservationResponse>> markNoShow(@PathVariable UUID id) {
         ReservationResponse result = reservationService.markNoShow(id);

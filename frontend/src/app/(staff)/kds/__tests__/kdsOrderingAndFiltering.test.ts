@@ -3,7 +3,7 @@ import { Ticket } from '../../../../types';
 import { filterActiveTickets, sortKdsTickets } from '../../../../services/kds';
 
 describe('KDS Ticket Ordering & Active Filter', () => {
-  it('lọc bỏ các ticket có tất cả món đã SERVED hoặc REJECTED', () => {
+  it('lọc bỏ ticket đã SERVED hết món nhưng giữ lại ticket chỉ còn món REJECTED (§1.3b)', () => {
     const rawTickets: Ticket[] = [
       {
         id: 't-served',
@@ -21,6 +21,26 @@ describe('KDS Ticket Ordering & Active Filter', () => {
             modifiers: [],
             status: 'SERVED',
             createdAt: '2026-11-20T10:00:00Z',
+          },
+        ],
+      },
+      {
+        id: 't-rejected-only',
+        tableId: 'tbl-3',
+        tableNo: 'Bàn 03',
+        status: 'REJECTED',
+        createdAt: '2026-11-20T10:02:00Z',
+        items: [
+          {
+            id: 'i-3',
+            orderId: 'o-3',
+            dishId: 'd-3',
+            dishName: 'Cơm Chiên Hải Sản',
+            quantity: 1,
+            unitPrice: 75000,
+            modifiers: [],
+            status: 'REJECTED',
+            createdAt: '2026-11-20T10:02:00Z',
           },
         ],
       },
@@ -46,8 +66,8 @@ describe('KDS Ticket Ordering & Active Filter', () => {
     ];
 
     const active = filterActiveTickets(rawTickets);
-    expect(active.length).toBe(1);
-    expect(active[0].id).toBe('t-active');
+    expect(active.length).toBe(2);
+    expect(active.map((t) => t.id)).toEqual(['t-rejected-only', 't-active']);
   });
 
   it('sắp xếp ưu tiên ticket có cảnh báo dị ứng lên đầu tiên', () => {

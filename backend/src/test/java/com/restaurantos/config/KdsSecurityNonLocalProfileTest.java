@@ -26,10 +26,10 @@ class KdsSecurityNonLocalProfileTest {
     private KdsService kdsService;
 
     @Test
-    @DisplayName("Non-local profile denies unauthenticated access to /api/v1/kds/tickets with 403")
+    @DisplayName("Non-local profile denies unauthenticated access to /api/v1/kds/tickets with 401")
     void nonLocalProfile_blocksKdsEndpointsWithoutAuth() throws Exception {
-        // Chưa có auth mechanism nên Spring trả 403 cho request không token — hành vi đúng hiện tại; khi JWT filter merge (trả 401) thì đổi test này sang 401
+        // Sau khi cấu hình AuthenticationEntryPoint trả JSON 401 theo Rule 06, request không token trả 401 Unauthorized
         mockMvc.perform(get("/api/v1/kds/tickets"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

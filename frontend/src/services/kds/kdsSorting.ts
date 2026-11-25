@@ -1,11 +1,15 @@
 import { Ticket } from '@/types';
 
 /**
- * Lọc các ticket còn việc cần làm (có ít nhất 1 món WAITING hoặc READY).
+ * Lọc các ticket còn hiển thị trên hàng đợi KDS:
+ * Giữ lại ticket có ít nhất 1 món WAITING, READY hoặc REJECTED (§1.3b).
+ * Chỉ ẩn khỏi KDS khi toàn bộ món đã SERVED.
  */
 export function filterActiveTickets(tickets: Ticket[]): Ticket[] {
   return tickets.filter((t) =>
-    t.items.some((i) => i.status === 'WAITING' || i.status === 'READY')
+    t.items.some(
+      (i) => i.status === 'WAITING' || i.status === 'READY' || i.status === 'REJECTED'
+    )
   );
 }
 

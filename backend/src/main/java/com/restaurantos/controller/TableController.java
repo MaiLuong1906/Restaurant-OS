@@ -6,6 +6,7 @@ import com.restaurantos.service.TableService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +23,7 @@ public class TableController {
      * GET /api/v1/tables — Lấy danh sách tất cả bàn.
      */
     @GetMapping
+    @PreAuthorize("hasAuthority('TABLE:FLOOR_PLAN:VIEW')")
     public ResponseEntity<ApiResponse<List<OrderDtos.TableResponse>>> getAllTables() {
         List<OrderDtos.TableResponse> tables = tableService.getAllTables();
         return ResponseEntity.ok(ApiResponse.success(tables));

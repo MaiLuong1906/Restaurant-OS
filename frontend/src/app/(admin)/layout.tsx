@@ -22,6 +22,9 @@ import {
   Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { canAccessRoute, PERMISSIONS } from '@/lib/rbac';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 export interface NavGroup {
   groupTitle: string;
@@ -71,7 +74,20 @@ const NAV_GROUPS: NavGroup[] = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const staffUser = useAuthStore((s) => s.staffUser);
+  const permissions = useAuthStore((s) => s.permissions);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
+  // Lọc động thanh menu Sidebar theo quyền RBAC khi đã đăng nhập
+  const visibleNavGroups = React.useMemo(() => {
+    if (!staffUser) return NAV_GROUPS;
+    return NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        canAccessRoute(item.href, staffUser.role, false, permissions),
+      ),
+    })).filter((group) => group.items.length > 0);
+  }, [staffUser, permissions]);
   const [pinModalOpen, setPinModalOpen] = React.useState(false);
   const [pinPurpose, setPinPurpose] = React.useState('Xác thực quyền quản trị');
   const [pinInput, setPinInput] = React.useState('');
@@ -180,7 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Navigation Tree */}
           <nav className="p-4 space-y-5 flex-1" id="sidebar-nav">
-            {NAV_GROUPS.map((group) => (
+            {visibleNavGroups.map((group) => (
               <div key={group.groupTitle} className="space-y-1">
                 <div className="px-3 py-1 flex items-center justify-between">
                   <span className="font-mono text-xs uppercase tracking-wider text-stone-700 font-bold">
@@ -304,7 +320,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* 3. MAIN CONTENT ROUTE AREA                                          */}
         {/* =================================================================== */}
         <main className="relative pt-16 bg-ops-bg min-h-screen flex-1">
-          {children}
+          <RoleGuard
+            requiredPermissions={[
+              PERMISSIONS.REPORT_OPERATIONS_KPI_VIEW,
+              PERMISSIONS.USER_ACCOUNT_VIEW,
+              PERMISSIONS.REPORT_FINANCE_PNL_BCG_VIEW,
+            ]}
+          >
+            {children}
+          </RoleGuard>
         </main>
       </div>
 

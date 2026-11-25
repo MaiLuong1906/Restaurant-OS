@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -52,9 +53,9 @@ public class DishController {
     }
 
     @PatchMapping("/{id}/availability")
+    @PreAuthorize("hasAuthority('MENU:AVAILABILITY:UPDATE')")
     @Operation(summary = "Báo hết món hoặc mở lại món (Đầu bếp & Nhân viên UC20)",
                description = "Cập nhật nhanh trạng thái còn/hết món của thực đơn")
-    // @PreAuthorize("hasAnyRole('STAFF', 'CHEF', 'OWNER', 'MANAGER')")
     public ResponseEntity<ApiResponse<DishResponseDto>> updateAvailability(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateDishAvailabilityRequest request
