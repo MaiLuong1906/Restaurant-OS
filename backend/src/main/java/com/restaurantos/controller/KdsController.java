@@ -22,6 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Controller màn hình điều phối bếp KDS.
+ * Lưu ý bảo mật: Phân quyền cho /api/v1/kds/** (KDS:QUEUE:VIEW cho GET và KDS:COOKING_STATUS:UPDATE cho PATCH)
+ * được cấu hình tập trung tại SecurityConfig cho các profile non-local (test/prod),
+ * nhằm giữ tương thích với KdsLocalSecurityConfig (permitAll ở profile local theo spec CHỐT A).
+ */
 @RestController
 @RequestMapping("/api/v1/kds")
 @RequiredArgsConstructor

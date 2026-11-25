@@ -17,6 +17,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -112,6 +114,9 @@ public class UserServiceImpl implements UserService {
                         "Vai trò '" + request.getRoleCode() + "' không hợp lệ. Cho phép: "
                                 + Arrays.toString(UserRole.values())));
 
+        // 4b. Chống leo thang đặc quyền: chỉ OWNER mới được tạo tài khoản OWNER
+        enforceCanAssignOrManageRole(userRole.name());
+
         // 5. Tìm role trong DB
         RoleEntity role = roleRepository.findByCode(userRole.name())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -149,6 +154,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponseDto updateUser(String identifier, UpdateUserRequest request) {
         UserEntity user = findUserOrThrow(identifier);
+        enforceCanAssignOrManageRole(user.getRole() != null ? user.getRole().getCode() : null);
 
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName().trim());
@@ -174,6 +180,9 @@ public class UserServiceImpl implements UserService {
             user.setEmail(email);
         }
         if (request.getIsActive() != null) {
+            if (Boolean.FALSE.equals(request.getIsActive())) {
+                enforceNotSelfTarget(user, "Không thể tự khóa tài khoản đang đăng nhập của chính bạn");
+            }
             user.setIsActive(request.getIsActive());
         }
         if (request.getRoleCode() != null && !request.getRoleCode().isBlank()) {
@@ -182,6 +191,11 @@ public class UserServiceImpl implements UserService {
                             HttpStatus.BAD_REQUEST,
                             "Vai trò '" + request.getRoleCode() + "' không hợp lệ. Cho phép: "
                                     + Arrays.toString(UserRole.values())));
+            enforceCanAssignOrManageRole(userRole.name());
+            String currentRoleCode = user.getRole() != null ? user.getRole().getCode() : null;
+            if (currentRoleCode == null || !currentRoleCode.equalsIgnoreCase(userRole.name())) {
+                enforceNotSelfTarget(user, "Không thể tự thay đổi vai trò của chính tài khoản đang đăng nhập");
+            }
             RoleEntity role = roleRepository.findByCode(userRole.name())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                             "Không tìm thấy vai trò: " + userRole.name()));
@@ -207,6 +221,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponseDto updatePin(String identifier, UpdatePinRequest request) {
         UserEntity user = findUserOrThrow(identifier);
+        enforceCanAssignOrManageRole(user.getRole() != null ? user.getRole().getCode() : null);
         user.setPinCodeHash(passwordEncoder.encode(request.getPinCode()));
         UserEntity saved = userRepository.save(user);
         log.info("Đã cập nhật mã PIN trạm cho nhân sự: employeeCode={}, username={}",
@@ -218,6 +233,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponseDto toggleActiveStatus(String identifier) {
         UserEntity user = findUserOrThrow(identifier);
+        enforceCanAssignOrManageRole(user.getRole() != null ? user.getRole().getCode() : null);
+        enforceNotSelfTarget(user, "Không thể tự khóa tài khoản đang đăng nhập của chính bạn");
         boolean newStatus = !Boolean.TRUE.equals(user.getIsActive());
         user.setIsActive(newStatus);
         UserEntity saved = userRepository.save(user);
@@ -230,6 +247,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponseDto deleteUser(String identifier) {
         UserEntity user = findUserOrThrow(identifier);
+        enforceNotSelfTarget(user, "Không thể tự xóa tài khoản đang đăng nhập của chính bạn");
         // Soft delete: lưu thời điểm xóa, vô hiệu hóa tài khoản
         user.setDeletedAt(Instant.now());
         user.setIsActive(false);
@@ -237,6 +255,39 @@ public class UserServiceImpl implements UserService {
         log.info("Đã khóa/xóa mềm tài khoản nhân sự: employeeCode={}, username={}",
                 saved.getEmployeeCode(), saved.getUsername());
         return UserResponseDto.fromEntity(saved);
+    }
+
+    /**
+     * Chống leo thang đặc quyền (Vertical & Horizontal Privilege Escalation):
+     * Nếu người thực hiện không phải OWNER (ví dụ MANAGER), cấm tạo/sửa/đổi PIN/khóa
+     * tài khoản mang vai trò OWNER hoặc MANAGER (MANAGER chỉ được quản lý cấp dưới).
+     */
+    private void enforceCanAssignOrManageRole(String targetRoleCode) {
+        if (!"OWNER".equalsIgnoreCase(targetRoleCode) && !"MANAGER".equalsIgnoreCase(targetRoleCode)) {
+            return;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return;
+        }
+        boolean actorIsOwner = auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_OWNER".equals(a.getAuthority()));
+        if (!actorIsOwner) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Chỉ Chủ nhà hàng (OWNER) mới có quyền tạo hoặc chỉnh sửa tài khoản OWNER / MANAGER");
+        }
+    }
+
+    /**
+     * Chặn người dùng tự khóa hoặc tự xóa chính tài khoản đang đăng nhập của mình.
+     */
+    private void enforceNotSelfTarget(UserEntity targetUser, String errorMessage) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof UserEntity currentUser
+                && currentUser.getId() != null && currentUser.getId().equals(targetUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
+        }
     }
 
     private String generateEmployeeCode(UserRole userRole) {

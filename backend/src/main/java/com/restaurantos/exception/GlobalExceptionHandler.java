@@ -7,6 +7,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -67,6 +69,8 @@ public class GlobalExceptionHandler {
             errorCode = "BAD_REQUEST";
         } else if (ex.getStatusCode() == HttpStatus.FORBIDDEN) {
             errorCode = "FORBIDDEN";
+        } else if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+            errorCode = "UNAUTHORIZED";
         }
 
         log.warn("Ngoại lệ nghiệp vụ: status={}, reason={}", ex.getStatusCode(), reason);
@@ -137,6 +141,23 @@ public class GlobalExceptionHandler {
         log.warn("Tham số không hợp lệ: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("INVALID_ARGUMENT", ex.getMessage(), null));
+    }
+
+    /**
+     * 7b. Bắt lỗi phân quyền RBAC (403 Forbidden) và xác thực (401 Unauthorized)
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
+        log.warn("Truy cập bị từ chối (403 Forbidden): {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("FORBIDDEN", "Bạn không có quyền thực hiện thao tác này.", null));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
+        log.warn("Xác thực thất bại (401 Unauthorized): {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("UNAUTHORIZED", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn.", null));
     }
 
     /**
