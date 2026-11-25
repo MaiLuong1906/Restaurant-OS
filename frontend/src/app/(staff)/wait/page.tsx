@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { usePosStore } from '@/stores/usePosStore';
+import { useWaiterStore } from '@/stores/useWaiterStore';
 import { staffService } from '@/services/mock/mockStaffService';
 import { kdsService } from '@/services/mock/mockKdsService';
 import { Shift, Payslip, TipRecord, LeaveBalance, Ticket } from '@/types';
@@ -21,7 +21,8 @@ import {
 
 export default function WaiterHomePage() {
   const staffUser = useAuthStore((s) => s.staffUser);
-  const tables = usePosStore((s) => s.tables);
+  const waiterTablesMap = useWaiterStore((s) => s.tables);
+  const syncFromBackend = useWaiterStore((s) => s.syncFromBackend);
 
   // States dữ liệu
   const [shifts, setShifts] = React.useState<Shift[]>([]);
@@ -42,6 +43,7 @@ export default function WaiterHomePage() {
         staffService.getTips(),
         staffService.getLeaveBalance(),
         kdsService.getTickets(),
+        syncFromBackend(),
       ]);
       setShifts(shiftsData);
       setPayslips(payslipsData);
@@ -53,7 +55,7 @@ export default function WaiterHomePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncFromBackend]);
 
   React.useEffect(() => {
     loadData();
@@ -81,26 +83,27 @@ export default function WaiterHomePage() {
     );
   }, [tickets]);
 
-  // Tính 3 metrics nghiệp vụ phục vụ:
-  // 1. Số bàn đang phục vụ: các bàn có trạng thái OCCUPIED hoặc OVERDUE
+  // Tính 3 metrics nghiệp vụ phục vụ từ dữ liệu thật (useWaiterStore <-> Backend API):
+  const waiterTables = React.useMemo(() => Object.values(waiterTablesMap), [waiterTablesMap]);
+
+  // 1. Số bàn đang phục vụ: các bàn có trạng thái serving hoặc billing
   const servingTablesCount = React.useMemo(() => {
-    return tables.filter((t) => t.status === 'OCCUPIED' || t.status === 'OVERDUE').length;
-  }, [tables]);
+    return waiterTables.filter((t) => t.status === 'serving' || t.status === 'billing').length;
+  }, [waiterTables]);
 
-  // 2. Món chờ giao: các items trong active ticket có trạng thái READY
+  // 2. Món chờ giao: các items trong đơn active có trạng thái ready (READY)
   const itemsWaitingDeliveryCount = React.useMemo(() => {
-    return tickets
-      .filter((t) => t.status !== 'SERVED' && t.status !== 'REJECTED')
-      .flatMap((t) => t.items)
-      .filter((item) => item.status === 'READY').length;
-  }, [tickets]);
+    return waiterTables
+      .flatMap((t) => t.confirmedItems)
+      .filter((item) => item.status === 'ready').length;
+  }, [waiterTables]);
 
-  // 3. Món đã giao: các items có trạng thái SERVED
+  // 3. Món đã giao: các items có trạng thái served (SERVED)
   const itemsDeliveredCount = React.useMemo(() => {
-    return tickets
-      .flatMap((t) => t.items)
-      .filter((item) => item.status === 'SERVED').length;
-  }, [tickets]);
+    return waiterTables
+      .flatMap((t) => t.confirmedItems)
+      .filter((item) => item.status === 'served').length;
+  }, [waiterTables]);
 
   const now = Date.now();
 
