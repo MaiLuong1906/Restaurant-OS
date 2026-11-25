@@ -64,6 +64,14 @@ export class ApiKdsService implements KdsService {
     return this.getTicketById(ticketId);
   }
 
+  async completeBatch(itemIds: string[], idempotencyKey: string): Promise<Ticket[]> {
+    return fetchApi<Ticket[]>('/kds/batches/complete', {
+      method: 'POST',
+      headers: idempotencyKey ? { 'X-Request-ID': idempotencyKey } : undefined,
+      body: JSON.stringify({ itemIds }),
+    });
+  }
+
   async getPendingOrderChanges(): Promise<OrderChangeAlertData[]> {
     return [];
   }

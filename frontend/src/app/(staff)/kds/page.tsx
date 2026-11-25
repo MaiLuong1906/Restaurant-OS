@@ -17,10 +17,17 @@ const kdsService: KdsService = isLiveMode ? new ApiKdsService() : mockKdsService
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 const PENDING_COMPLETE_KEY = 'kds_pending_complete_ticket';
 
-interface PendingCompletePayload {
-  ticketId: string;
-  requestId: string;
-}
+type PendingCompletePayload =
+  | {
+      targetType?: 'ticket';
+      ticketId: string;
+      requestId: string;
+    }
+  | {
+      targetType: 'batch';
+      itemIds: string[];
+      requestId: string;
+    };
 
 function readPendingComplete(): PendingCompletePayload | null {
   if (typeof window === 'undefined') return null;
@@ -28,7 +35,13 @@ function readPendingComplete(): PendingCompletePayload | null {
     const raw = window.sessionStorage.getItem(PENDING_COMPLETE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingCompletePayload;
-    if (parsed?.ticketId && parsed?.requestId) return parsed;
+    if (!parsed?.requestId) return null;
+    if (parsed.targetType === 'batch' && Array.isArray(parsed.itemIds) && parsed.itemIds.length > 0) {
+      return parsed;
+    }
+    if ('ticketId' in parsed && parsed.ticketId) {
+      return parsed;
+    }
   } catch {
     // ignore storage parse error
   }
@@ -54,6 +67,9 @@ function flushPendingCompleteKeepalive(): Promise<void> | null {
   writePendingComplete(null);
 
   if (!isLiveMode) {
+    if (pending.targetType === 'batch') {
+      return kdsService.completeBatch(pending.itemIds, pending.requestId).then(() => undefined).catch(() => undefined);
+    }
     return kdsService.updateTicketStatus(pending.ticketId, 'READY', pending.requestId).then(() => undefined).catch(() => undefined);
   }
 
@@ -64,6 +80,17 @@ function flushPendingCompleteKeepalive(): Promise<void> | null {
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (pending.targetType === 'batch') {
+    return fetch(`${API_BASE_URL}/kds/batches/complete`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ itemIds: pending.itemIds }),
+      keepalive: true,
+    })
+      .then(() => undefined)
+      .catch(() => undefined);
   }
 
   return fetch(`${API_BASE_URL}/kds/tickets/${pending.ticketId}/complete`, {
@@ -84,6 +111,7 @@ export default function KitchenDisplayScreen() {
   const [error, setError] = React.useState<string | null>(null);
   const [viewMode, setViewMode] = React.useState<'ticket' | 'batch'>('ticket');
   const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(null);
+  const [completingBatchId, setCompletingBatchId] = React.useState<string | null>(null);
 
   // Quản lý Toast và Hoàn tác 5 giây
   const [undoToast, setUndoToast] = React.useState<{
@@ -263,15 +291,13 @@ export default function KitchenDisplayScreen() {
 
   // Hoàn tất 1 mẻ kèm Hoàn tác 5s
   const handleCompleteBatch = (batchId: string) => {
-    if (isLiveMode) {
-      // TODO: UC19 - Hoàn tất mẻ ở live mode
-      return;
-    }
+    if (completingBatchId === batchId) return;
     const batch = batches.find((b) => b.id === batchId);
     if (!batch) return;
 
     const snapshot = structuredClone(tickets);
     const affectedItemIds = new Set(batch.itemIds);
+    const requestId = crypto.randomUUID();
 
     // Optimistic Update
     setTickets((prev) =>
@@ -281,18 +307,48 @@ export default function KitchenDisplayScreen() {
       }))
     );
 
-    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+      if (isLiveMode) {
+        flushPendingCompleteKeepalive();
+      }
+    }
+
+    if (isLiveMode) {
+      writePendingComplete({ targetType: 'batch', itemIds: batch.itemIds, requestId });
+    }
 
     setUndoToast({
-      id: crypto.randomUUID(),
+      id: requestId,
       message: `Đã hoàn tất mẻ ${batch.dishName} (${batch.totalQuantity} phần)`,
       targetType: 'batch',
       targetId: batchId,
       snapshot,
     });
 
-    undoTimeoutRef.current = setTimeout(() => {
+    undoTimeoutRef.current = setTimeout(async () => {
+      if (!isLiveMode) {
+        setUndoToast(null);
+        return;
+      }
+
+      const stillPending = readPendingComplete();
       setUndoToast(null);
+      if (!stillPending || stillPending.requestId !== requestId) return;
+      writePendingComplete(null);
+
+      setCompletingBatchId(batchId);
+      try {
+        const updatedTickets = await kdsService.completeBatch(batch.itemIds, requestId);
+        const updatedById = new Map(updatedTickets.map((t) => [t.id, t]));
+        setTickets((prev) => prev.map((t) => updatedById.get(t.id) ?? t));
+      } catch (err) {
+        console.error('Lỗi khi hoàn tất mẻ nấu:', err);
+        setTickets(snapshot);
+        setError((err as Error).message || 'Không thể hoàn tất mẻ nấu');
+      } finally {
+        setCompletingBatchId(null);
+      }
     }, 5000);
   };
 
@@ -468,7 +524,7 @@ export default function KitchenDisplayScreen() {
               <KdsBatchCard
                 key={batch.id}
                 batch={batch}
-                disabledComplete={isLiveMode}
+                isCompleting={completingBatchId === batch.id}
                 onComplete={handleCompleteBatch}
               />
             ))}
