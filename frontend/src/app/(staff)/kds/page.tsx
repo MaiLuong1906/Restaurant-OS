@@ -221,10 +221,10 @@ export default function KitchenDisplayScreen() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (intervalId) clearInterval(intervalId);
-      stompSub?.unsubscribe();
-      if (client && prevOnConnect !== undefined) {
-        client.onConnect = prevOnConnect;
+      if (client) {
+        client.onConnect = prevOnConnect ?? (() => {});
       }
+      stompSub?.unsubscribe();
     };
   }, [fetchTickets]);
 
@@ -337,8 +337,17 @@ export default function KitchenDisplayScreen() {
   // Hoàn tất 1 mẻ kèm Hoàn tác 5s
   const handleCompleteBatch = (batchId: string) => {
     if (completingBatchId === batchId) return;
+    if (undoToast?.targetType === 'batch' && undoToast.targetId === batchId) return;
     const batch = batches.find((b) => b.id === batchId);
     if (!batch) return;
+    const currentPending = readPendingComplete();
+    if (
+      currentPending?.targetType === 'batch' &&
+      currentPending.itemIds.length === batch.itemIds.length &&
+      batch.itemIds.every((id) => currentPending.itemIds.includes(id))
+    ) {
+      return;
+    }
 
     const snapshot = structuredClone(tickets);
     const affectedItemIds = new Set(batch.itemIds);
@@ -569,7 +578,10 @@ export default function KitchenDisplayScreen() {
               <KdsBatchCard
                 key={batch.id}
                 batch={batch}
-                isCompleting={completingBatchId === batch.id}
+                isCompleting={
+                  completingBatchId === batch.id ||
+                  (undoToast?.targetType === 'batch' && undoToast.targetId === batch.id)
+                }
                 onComplete={handleCompleteBatch}
               />
             ))}

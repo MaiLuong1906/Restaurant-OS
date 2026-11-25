@@ -278,12 +278,7 @@ export function TicketDetailDrawer({
                 : 'bg-ops-brand hover:bg-ops-brand-dark active:scale-98 text-white disabled:opacity-50'
             }`}
           >
-            {disabledComplete ? (
-              <>
-                <Lock className="h-5 w-5" />
-                <span>Hoàn tất ticket (TODO UC19)</span>
-              </>
-            ) : hasPendingAlert ? (
+            {hasPendingAlert ? (
               <>
                 <Lock className="h-5 w-5" />
                 <span>Khóa (Có thay đổi chưa xác nhận)</span>

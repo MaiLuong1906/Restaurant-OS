@@ -133,4 +133,48 @@ describe('ApiKdsService UC18 (K5 - completeBatch)', () => {
     expect(fetchMock.mock.calls[0][1].headers['X-Request-ID']).toBe('same-key-123');
     expect(fetchMock.mock.calls[1][1].headers['X-Request-ID']).toBe('same-key-123');
   });
+
+  it('guard bấm đúp trong cửa sổ hoàn tác 5s: gọi 2 lần cùng mẻ chỉ gửi 1 requestId, bấm Hoàn tác không gọi POST', async () => {
+    vi.useFakeTimers();
+    const completeBatchSpy = vi.fn().mockResolvedValue([]);
+    let pending: { targetType: 'batch'; batchId: string; itemIds: string[]; requestId: string } | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const triggerCompleteBatch = (batchId: string, itemIds: string[]) => {
+      if (pending && pending.targetType === 'batch' && pending.batchId === batchId) {
+        return;
+      }
+      const requestId = `req-${batchId}-1`;
+      pending = { targetType: 'batch', batchId, itemIds, requestId };
+      timer = setTimeout(async () => {
+        if (!pending || pending.requestId !== requestId) return;
+        pending = null;
+        await completeBatchSpy(itemIds, requestId);
+      }, 5000);
+    };
+
+    const triggerUndo = () => {
+      if (timer) clearTimeout(timer);
+      pending = null;
+    };
+
+    // Case 1: Bấm đúp 2 lần liên tiếp trong 5s -> chỉ gọi completeBatch 1 lần
+    triggerCompleteBatch('batch-1', ['item-1', 'item-2']);
+    vi.advanceTimersByTime(1000);
+    triggerCompleteBatch('batch-1', ['item-1', 'item-2']);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(completeBatchSpy).toHaveBeenCalledTimes(1);
+    expect(completeBatchSpy).toHaveBeenCalledWith(['item-1', 'item-2'], 'req-batch-1-1');
+
+    // Case 2: Bấm Hoàn tác trong 5s -> không gọi POST
+    completeBatchSpy.mockClear();
+    triggerCompleteBatch('batch-2', ['item-3']);
+    vi.advanceTimersByTime(2000);
+    triggerUndo();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(completeBatchSpy).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });
