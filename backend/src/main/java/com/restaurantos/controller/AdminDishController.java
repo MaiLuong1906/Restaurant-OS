@@ -24,12 +24,12 @@ import java.util.UUID;
 @RequestMapping("/api/v1/admin/dishes")
 @RequiredArgsConstructor
 @Tag(name = "Admin Menu Management", description = "Quản trị thực đơn món ăn, cấu hình đơn giá VND, phân mục & trạng thái (UC_OWN_02)")
-// @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
 public class AdminDishController {
 
     private final DishService dishService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('MENU:CATALOG:VIEW')")
     @Operation(summary = "Lấy danh sách món ăn quản trị có phân trang", description = "Trả về danh sách món ăn có phân trang cho Admin Portal, hỗ trợ tìm kiếm theo tên, lọc danh mục và trạng thái phục vụ")
     public ResponseEntity<ApiResponse<PageResponse<DishResponseDto>>> getDishesPaged(
             @Parameter(description = "Lọc theo danh mục (ví dụ: KHAI_VI, MON_CHINH, DO_UONG, TRANG_MIENG, COMBO hoặc ALL)") @RequestParam(required = false) String category,
@@ -46,6 +46,7 @@ public class AdminDishController {
     }
 
     @GetMapping("/categories")
+    @PreAuthorize("hasAuthority('MENU:CATALOG:VIEW')")
     @Operation(summary = "Lấy danh sách các danh mục món ăn hiện có", description = "Trả về toàn bộ danh mục độc bản hiện đang có trong thực đơn phục vụ bộ lọc UI")
     public ResponseEntity<ApiResponse<List<String>>> getCategories() {
         List<String> categories = dishService.getCategories();
@@ -53,6 +54,7 @@ public class AdminDishController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('MENU:CATALOG:VIEW')")
     @Operation(summary = "Xem thông tin chi tiết một món ăn theo ID")
     public ResponseEntity<ApiResponse<DishResponseDto>> getDishById(
             @Parameter(description = "UUID của món ăn") @PathVariable UUID id) {
@@ -61,6 +63,7 @@ public class AdminDishController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('MENU:CATALOG:CREATE_UPDATE')")
     @Operation(summary = "Tạo mới món ăn vào thực đơn", description = "Tạo mới món ăn với đơn giá niêm yết nguyên VND, danh mục và cấu hình tuỳ chọn")
     public ResponseEntity<ApiResponse<DishResponseDto>> createDish(
             @Valid @RequestBody CreateDishRequest request) {
@@ -70,6 +73,7 @@ public class AdminDishController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('MENU:CATALOG:CREATE_UPDATE')")
     @Operation(summary = "Cập nhật toàn diện thông tin món ăn", description = "Chỉnh sửa tên, đơn giá, danh mục, mô tả hoặc ảnh của món ăn")
     public ResponseEntity<ApiResponse<DishResponseDto>> updateDish(
             @PathVariable UUID id,
@@ -79,6 +83,7 @@ public class AdminDishController {
     }
 
     @PatchMapping("/{id}/availability")
+    @PreAuthorize("hasAuthority('MENU:AVAILABILITY:UPDATE')")
     @Operation(summary = "Bật/Tắt nhanh trạng thái Còn món / Hết món", description = "Cập nhật cờ isAvailable và lý do hết món tức thời (phục vụ quản lý và bếp UC20)")
     public ResponseEntity<ApiResponse<DishResponseDto>> updateAvailability(
             @PathVariable UUID id,
@@ -91,6 +96,7 @@ public class AdminDishController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('MENU:CATALOG:CREATE_UPDATE')")
     @Operation(summary = "Xóa món ăn khỏi thực đơn", description = "Xóa vĩnh viễn món ăn khỏi danh mục (nếu chưa phát sinh dữ liệu ràng buộc)")
     public ResponseEntity<ApiResponse<Void>> deleteDish(
             @PathVariable UUID id) {

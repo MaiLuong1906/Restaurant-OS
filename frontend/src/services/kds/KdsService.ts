@@ -13,7 +13,13 @@ export interface KdsService {
   getTickets(): Promise<Ticket[]>;
   getTicketById(ticketId: string): Promise<Ticket>;
   updateTicketStatus(ticketId: string, status: OrderItemStatus, idempotencyKey: string): Promise<Ticket>;
-  updateItemStatus(ticketId: string, itemId: string, status: OrderItemStatus, idempotencyKey: string): Promise<Ticket>;
+  updateItemStatus(
+    ticketId: string,
+    itemId: string,
+    status: OrderItemStatus,
+    idempotencyKey: string,
+    reason?: string
+  ): Promise<Ticket>;
   getPendingOrderChanges(): Promise<OrderChangeAlertData[]>;
   acknowledgeOrderChange(alertId: string, idempotencyKey?: string): Promise<{ alert: OrderChangeAlertData; ticket: Ticket }>;
   deferOrderChange(alertId: string): Promise<void>;

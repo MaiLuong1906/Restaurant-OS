@@ -269,7 +269,8 @@ export class MockKdsService implements KdsService {
     ticketId: string,
     itemId: string,
     status: OrderItemStatus,
-    idempotencyKey: string
+    idempotencyKey: string,
+    _reason?: string
   ): Promise<Ticket> {
     if (!idempotencyKey) {
       throw createValidationError('idempotencyKey là bắt buộc');
