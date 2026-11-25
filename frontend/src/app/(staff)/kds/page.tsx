@@ -4,7 +4,14 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Ticket, Batch, OrderChangeAlertData } from '@/types';
 import { kdsService as mockKdsService } from '@/services/mock';
-import { ApiKdsService, KdsService, filterActiveTickets, sortKdsTickets } from '@/services/kds';
+import {
+  ApiKdsService,
+  KdsService,
+  applyKdsOrderStatusEvent,
+  filterActiveTickets,
+  sortKdsTickets,
+} from '@/services/kds';
+import { getStompClient } from '@/lib/stomp';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { KdsTicketCard } from '@/components/kds/KdsTicketCard';
 import { KdsBatchCard } from '@/components/kds/KdsBatchCard';
@@ -169,9 +176,43 @@ export default function KitchenDisplayScreen() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Poll REST K1 mỗi 10s ở live mode (TODO: thống nhất useKdsStore WS ở sprint sau)
+    // Live mode: subscribe trực tiếp STOMP /topic/kds/orders + giữ poll REST K1 mỗi 10s làm fallback
+    // (Thống nhất hẳn sang useKdsStore vẫn để sprint sau)
     let intervalId: NodeJS.Timeout | null = null;
-    if (isLiveMode) {
+    let stompSub: { unsubscribe: () => void } | null = null;
+    const client = isLiveMode ? getStompClient() : null;
+    const prevOnConnect = client?.onConnect;
+
+    if (isLiveMode && client) {
+      const subscribeOrders = () => {
+        stompSub?.unsubscribe();
+        stompSub = client.subscribe('/topic/kds/orders', (message: { body: string }) => {
+          try {
+            const payload = JSON.parse(message.body);
+            if (payload?.action === 'UPDATE_STATUS' && payload?.data?.id && payload?.data?.status) {
+              setTickets((prev) =>
+                applyKdsOrderStatusEvent(prev, payload.data.id, payload.data.status)
+              );
+            } else if (payload?.action === 'CREATE_ITEM') {
+              fetchTickets(true);
+            }
+          } catch (e) {
+            console.error('[KDS STOMP] Parse message error:', e);
+          }
+        });
+      };
+
+      client.onConnect = (frame) => {
+        if (prevOnConnect) prevOnConnect(frame);
+        subscribeOrders();
+      };
+
+      if (client.connected) {
+        subscribeOrders();
+      } else if (!client.active) {
+        client.activate();
+      }
+
       intervalId = setInterval(() => {
         fetchTickets(true);
       }, 10000);
@@ -180,6 +221,10 @@ export default function KitchenDisplayScreen() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (intervalId) clearInterval(intervalId);
+      stompSub?.unsubscribe();
+      if (client && prevOnConnect !== undefined) {
+        client.onConnect = prevOnConnect;
+      }
     };
   }, [fetchTickets]);
 
