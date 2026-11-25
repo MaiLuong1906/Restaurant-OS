@@ -111,4 +111,47 @@ class CustomerAndWebSocketAuthTest {
         assertThatThrownBy(() -> stompInterceptor.preSend(chefMgrMsg, null))
                 .isInstanceOf(AccessDeniedException.class);
     }
+
+    @Test
+    @DisplayName("STOMP SEND & /topic/tables/**: Chặn SEND giả mạo vào /topic/kds và chặn STAFF thường vào /topic/tables/{id}/cart")
+    void stompSendAndPluralTablesTopic_enforcesAuthorization() {
+        // 1. Chặn Anonymous/Client gửi STOMP SEND trực tiếp vào /topic/kds/main
+        StompHeaderAccessor sendKdsAccessor = StompHeaderAccessor.create(StompCommand.SEND);
+        sendKdsAccessor.setDestination("/topic/kds/main");
+        Message<byte[]> sendKdsMsg = MessageBuilder.createMessage(new byte[0], sendKdsAccessor.getMessageHeaders());
+
+        assertThatThrownBy(() -> stompInterceptor.preSend(sendKdsMsg, null))
+                .isInstanceOf(AccessDeniedException.class);
+
+        // 2. Chặn STAFF thường subscribe /topic/tables/{id}/cart (số nhiều)
+        UUID tableId = UUID.randomUUID();
+        var staffAuth = new UsernamePasswordAuthenticationToken(
+                "staff", null,
+                UserRole.STAFF.getAllAuthorities().stream().map(SimpleGrantedAuthority::new).toList()
+        );
+        StompHeaderAccessor staffTableAccessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        staffTableAccessor.setDestination("/topic/tables/" + tableId + "/cart");
+        staffTableAccessor.setUser(staffAuth);
+        Message<byte[]> staffTableMsg = MessageBuilder.createMessage(new byte[0], staffTableAccessor.getMessageHeaders());
+
+        assertThatThrownBy(() -> stompInterceptor.preSend(staffTableMsg, null))
+                .isInstanceOf(AccessDeniedException.class);
+
+        // 3. Cho phép Customer có X-Table-Token hợp lệ subscribe /topic/tables/{id}/cart
+        TableEntity table = TableEntity.builder()
+                .id(tableId)
+                .tableNumber("Bàn 02")
+                .qrCodeToken("token-table-02")
+                .status("SERVING")
+                .build();
+        when(tableRepository.findById(tableId)).thenReturn(Optional.of(table));
+
+        StompHeaderAccessor custAccessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        custAccessor.setDestination("/topic/tables/" + tableId + "/cart");
+        custAccessor.setNativeHeader("X-Table-Token", "token-table-02");
+        Message<byte[]> custMsg = MessageBuilder.createMessage(new byte[0], custAccessor.getMessageHeaders());
+
+        assertThatCode(() -> stompInterceptor.preSend(custMsg, null))
+                .doesNotThrowAnyException();
+    }
 }

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +40,9 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     @Query("SELECT u FROM UserEntity u WHERE u.deletedAt IS NULL AND UPPER(u.role.code) = UPPER(:roleCode) ORDER BY u.createdAt DESC")
     List<UserEntity> findAllByRoleCodeAndDeletedAtIsNull(@Param("roleCode") String roleCode);
+
+    @Query("SELECT u FROM UserEntity u WHERE u.deletedAt IS NULL AND u.isActive = true AND u.pinCodeHash IS NOT NULL AND UPPER(u.role.code) IN :roleCodes ORDER BY u.createdAt DESC")
+    List<UserEntity> findActiveUsersWithPinByRoleCodes(@Param("roleCodes") Collection<String> roleCodes);
 
     @Query("SELECT u.employeeCode FROM UserEntity u WHERE u.employeeCode LIKE CONCAT(:prefix, '%')")
     List<String> findEmployeeCodesByPrefix(@Param("prefix") String prefix);

@@ -26,9 +26,11 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Bảo vệ kết nối và đăng ký kênh WebSocket STOMP theo RBAC & Table QR Token:
- * - CONNECT: Xác thực Bearer JWT (Staff / KDS Tablet) hoặc lưu X-Table-Token (Customer).
- * - SUBSCRIBE: Kiểm tra quyền trên từng nhóm topic nội bộ (/topic/kds, /topic/pos, /topic/manager, /topic/admin, /topic/table/{id}).
+ * Bảo vệ kết nối, đăng ký và gửi frame WebSocket STOMP theo RBAC & Table QR Token:
+ * - CONNECT: Xác thực Bearer JWT (từ chối ngay nếu gửi JWT sai/hết hạn) hoặc lưu X-Table-Token.
+ * - SUBSCRIBE: Kiểm tra quyền trên từng nhóm topic (/topic/kds, /topic/pos, /topic/manager, /topic/admin,
+ *              /topic/inventory, /topic/table/{id}, /topic/tables/**).
+ * - SEND: Chặn client gửi trực tiếp sự kiện giả mạo vào Simple Broker (/topic/**) ngoại trừ kênh giỏ hàng bàn hợp lệ.
  */
 @Component
 @RequiredArgsConstructor
@@ -37,6 +39,11 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String ATTR_TABLE_TOKEN = "X-Table-Token";
+
+    private static final Set<String> TABLE_VIEW_AUTHORITIES = Set.of(
+            Permission.ORDER_ACTIVE_VIEW.getAuthority(),
+            Permission.TABLE_FLOOR_PLAN_VIEW.getAuthority()
+    );
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
@@ -53,6 +60,8 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             handleConnect(accessor);
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             handleSubscribe(accessor);
+        } else if (StompCommand.SEND.equals(accessor.getCommand())) {
+            handleSend(accessor);
         }
 
         return message;
@@ -62,30 +71,38 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         String authHeader = accessor.getFirstNativeHeader("Authorization");
         if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
             String token = authHeader.substring(BEARER_PREFIX.length()).trim();
+            if (token.isEmpty()) {
+                throw new AccessDeniedException("JWT rỗng khi kết nối STOMP");
+            }
             try {
                 Claims claims = jwtTokenProvider.parseAndValidate(token);
                 String tokenType = jwtTokenProvider.extractTokenType(claims);
-                if (!JwtTokenProvider.TOKEN_TYPE_MANAGER_APPROVAL.equals(tokenType)) {
-                    UUID userId = jwtTokenProvider.extractUserId(claims);
-                    UserEntity user = userRepository.findById(userId)
-                            .filter(u -> u.getDeletedAt() == null && Boolean.TRUE.equals(u.getIsActive()))
-                            .orElse(null);
-
-                    if (user != null && user.getRole() != null) {
-                        Set<String> authStrings = JwtTokenProvider.TOKEN_TYPE_KDS.equals(tokenType)
-                                ? JwtTokenProvider.KDS_TABLET_AUTHORITIES
-                                : UserRole.fromCode(user.getRole().getCode()).orElse(UserRole.STAFF).getAllAuthorities();
-
-                        List<SimpleGrantedAuthority> authorities = authStrings.stream()
-                                .map(SimpleGrantedAuthority::new)
-                                .toList();
-
-                        Authentication auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
-                        accessor.setUser(auth);
-                    }
+                if (JwtTokenProvider.TOKEN_TYPE_MANAGER_APPROVAL.equals(tokenType)) {
+                    throw new AccessDeniedException("Không được dùng MANAGER_APPROVAL token để kết nối STOMP");
                 }
+
+                UUID userId = jwtTokenProvider.extractUserId(claims);
+                UserEntity user = userRepository.findById(userId)
+                        .filter(u -> u.getDeletedAt() == null && Boolean.TRUE.equals(u.getIsActive()))
+                        .orElseThrow(() -> new AccessDeniedException("Tài khoản không tồn tại hoặc đã bị khóa"));
+
+                if (user.getRole() == null) {
+                    throw new AccessDeniedException("Tài khoản chưa được gán vai trò");
+                }
+
+                Set<String> authStrings = JwtTokenProvider.TOKEN_TYPE_KDS.equals(tokenType)
+                        ? JwtTokenProvider.KDS_TABLET_AUTHORITIES
+                        : UserRole.fromCode(user.getRole().getCode()).orElse(UserRole.STAFF).getAllAuthorities();
+
+                List<SimpleGrantedAuthority> authorities = authStrings.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .toList();
+
+                Authentication auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
+                accessor.setUser(auth);
             } catch (JwtException | IllegalArgumentException ex) {
-                log.warn("STOMP CONNECT JWT không hợp lệ: {}", ex.getMessage());
+                log.warn("STOMP CONNECT bị từ chối do JWT không hợp lệ: {}", ex.getMessage());
+                throw new AccessDeniedException("JWT không hợp lệ hoặc đã hết hạn");
             }
         }
 
@@ -112,18 +129,57 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             ), destination);
         } else if (destination.startsWith("/topic/manager") || destination.startsWith("/topic/admin")) {
             requireAuthority(auth, Permission.REPORT_OPERATIONS_KPI_VIEW.getAuthority(), destination);
-        } else if (destination.startsWith("/topic/table/")) {
-            // Staff đã đăng nhập được theo dõi bàn; Customer cần X-Table-Token khớp đúng tableId
+        } else if (destination.startsWith("/topic/inventory")) {
+            requireAuthority(auth, Permission.INVENTORY_STOCK_VIEW.getAuthority(), destination);
+        } else if (destination.startsWith("/topic/table/") || destination.startsWith("/topic/tables/")) {
+            authorizeTableTopic(destination, auth, accessor);
+        }
+        // /topic/menu/** là kênh công khai cho thực đơn QR
+    }
+
+    private void handleSend(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null || destination.isBlank()) {
+            throw new AccessDeniedException("Destination không hợp lệ cho STOMP SEND");
+        }
+
+        Authentication auth = (accessor.getUser() instanceof Authentication a) ? a : null;
+
+        // Chặn tuyệt đối client gửi trực tiếp frame SEND vào Simple Broker /topic/**
+        // Ngoại lệ duy nhất: đồng bộ giỏ hàng nhóm tại bàn (/topic/table/{id}/cart hoặc /topic/tables/{id}/cart)
+        if (destination.startsWith("/topic/")) {
+            if ((destination.startsWith("/topic/table/") || destination.startsWith("/topic/tables/"))
+                    && destination.endsWith("/cart")) {
+                authorizeTableTopic(destination, auth, accessor);
+                return;
+            }
+            throw new AccessDeniedException("Không được phép gửi trực tiếp STOMP SEND vào kênh broadcast: " + destination);
+        }
+
+        // Các destination /app/** yêu cầu đã xác thực Staff hoặc có X-Table-Token hợp lệ
+        if (destination.startsWith("/app/")) {
             if (auth != null && auth.isAuthenticated()) {
                 return;
             }
-            UUID tableId = extractTableIdFromTopic(destination);
             String tableToken = extractSessionTableToken(accessor);
-            if (!customerTableAuthService.isValidTableToken(tableId, tableToken)) {
-                throw new AccessDeniedException("Không có quyền subscribe kênh bàn: " + destination);
+            if (tableToken == null || tableToken.isBlank()) {
+                throw new AccessDeniedException("Yêu cầu xác thực khi gửi STOMP SEND tới: " + destination);
             }
         }
-        // /topic/menu/** là kênh công khai cho thực đơn QR
+    }
+
+    private void authorizeTableTopic(String destination, Authentication auth, StompHeaderAccessor accessor) {
+        // 1. Staff phải có quyền ORDER:ACTIVE:VIEW hoặc TABLE:FLOOR_PLAN:VIEW (chặn STAFF thường xem trộm bàn)
+        if (hasAnyAuthority(auth, TABLE_VIEW_AUTHORITIES)) {
+            return;
+        }
+        // 2. Customer chỉ được truy cập đúng kênh bàn có UUID khớp X-Table-Token
+        UUID tableId = extractTableIdFromTopic(destination);
+        String tableToken = extractSessionTableToken(accessor);
+        if (tableId != null && customerTableAuthService.isValidTableToken(tableId, tableToken)) {
+            return;
+        }
+        throw new AccessDeniedException("Không có quyền truy cập kênh bàn: " + destination);
     }
 
     private void requireAuthority(Authentication auth, String required, String destination) {
@@ -134,14 +190,18 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     }
 
     private void requireAnyAuthority(Authentication auth, Set<String> allowed, String destination) {
-        if (auth == null || !auth.isAuthenticated()
-                || auth.getAuthorities().stream().noneMatch(a -> allowed.contains(a.getAuthority()))) {
+        if (!hasAnyAuthority(auth, allowed)) {
             throw new AccessDeniedException("Không có quyền subscribe kênh: " + destination);
         }
     }
 
+    private boolean hasAnyAuthority(Authentication auth, Set<String> allowed) {
+        return auth != null && auth.isAuthenticated()
+                && auth.getAuthorities().stream().anyMatch(a -> allowed.contains(a.getAuthority()));
+    }
+
     private UUID extractTableIdFromTopic(String destination) {
-        // /topic/table/{tableId}/cart hoặc /topic/table/{tableId}/orders
+        // /topic/table/{tableId}/cart hoặc /topic/tables/{tableId}/cart
         String[] parts = destination.split("/");
         if (parts.length < 4) {
             return null;

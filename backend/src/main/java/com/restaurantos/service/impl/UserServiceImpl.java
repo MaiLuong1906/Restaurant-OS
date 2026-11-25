@@ -180,6 +180,9 @@ public class UserServiceImpl implements UserService {
             user.setEmail(email);
         }
         if (request.getIsActive() != null) {
+            if (Boolean.FALSE.equals(request.getIsActive())) {
+                enforceNotSelfTarget(user, "Không thể tự khóa tài khoản đang đăng nhập của chính bạn");
+            }
             user.setIsActive(request.getIsActive());
         }
         if (request.getRoleCode() != null && !request.getRoleCode().isBlank()) {
@@ -189,6 +192,10 @@ public class UserServiceImpl implements UserService {
                             "Vai trò '" + request.getRoleCode() + "' không hợp lệ. Cho phép: "
                                     + Arrays.toString(UserRole.values())));
             enforceCanAssignOrManageRole(userRole.name());
+            String currentRoleCode = user.getRole() != null ? user.getRole().getCode() : null;
+            if (currentRoleCode == null || !currentRoleCode.equalsIgnoreCase(userRole.name())) {
+                enforceNotSelfTarget(user, "Không thể tự thay đổi vai trò của chính tài khoản đang đăng nhập");
+            }
             RoleEntity role = roleRepository.findByCode(userRole.name())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                             "Không tìm thấy vai trò: " + userRole.name()));
@@ -251,11 +258,12 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * Chống leo thang đặc quyền (Privilege Escalation):
-     * Nếu người thực hiện không phải OWNER (ví dụ MANAGER), cấm tạo/sửa/đổi PIN/khóa tài khoản OWNER.
+     * Chống leo thang đặc quyền (Vertical & Horizontal Privilege Escalation):
+     * Nếu người thực hiện không phải OWNER (ví dụ MANAGER), cấm tạo/sửa/đổi PIN/khóa
+     * tài khoản mang vai trò OWNER hoặc MANAGER (MANAGER chỉ được quản lý cấp dưới).
      */
     private void enforceCanAssignOrManageRole(String targetRoleCode) {
-        if (!"OWNER".equalsIgnoreCase(targetRoleCode)) {
+        if (!"OWNER".equalsIgnoreCase(targetRoleCode) && !"MANAGER".equalsIgnoreCase(targetRoleCode)) {
             return;
         }
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -267,7 +275,7 @@ public class UserServiceImpl implements UserService {
         if (!actorIsOwner) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Chỉ Chủ nhà hàng (OWNER) mới có quyền tạo hoặc chỉnh sửa tài khoản OWNER");
+                    "Chỉ Chủ nhà hàng (OWNER) mới có quyền tạo hoặc chỉnh sửa tài khoản OWNER / MANAGER");
         }
     }
 

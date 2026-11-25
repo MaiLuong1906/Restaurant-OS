@@ -1,13 +1,17 @@
 package com.restaurantos.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.repository.UserRepository;
 import com.restaurantos.security.JwtAuthenticationFilter;
 import com.restaurantos.security.JwtTokenProvider;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -38,11 +42,34 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             ObjectProvider<JwtTokenProvider> jwtTokenProvider,
-            ObjectProvider<UserRepository> userRepositoryProvider) throws Exception {
+            ObjectProvider<UserRepository> userRepositoryProvider,
+            ObjectProvider<ObjectMapper> objectMapperProvider) throws Exception {
+        ObjectMapper objectMapper = objectMapperProvider.getIfAvailable(ObjectMapper::new);
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(
+                                    response.getWriter(),
+                                    ApiResponse.error("UNAUTHORIZED", "Vui lòng đăng nhập để truy cập tài nguyên này.", null)
+                            );
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(
+                                    response.getWriter(),
+                                    ApiResponse.error("FORBIDDEN", "Bạn không có quyền thực hiện thao tác này.", null)
+                            );
+                        })
+                )
                 .authorizeHttpRequests(auth -> auth
                         // 1. Hạ tầng kiểm tra trạng thái sống/chết (Health checks) & Xử lý lỗi (Error
                         // dispatch)

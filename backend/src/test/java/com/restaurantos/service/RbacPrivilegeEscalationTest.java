@@ -1,6 +1,7 @@
 package com.restaurantos.service;
 
 import com.restaurantos.common.dto.user.CreateUserRequest;
+import com.restaurantos.common.dto.user.UpdateUserRequest;
 import com.restaurantos.entity.RoleEntity;
 import com.restaurantos.entity.UserEntity;
 import com.restaurantos.repository.RoleRepository;
@@ -124,6 +125,75 @@ class RbacPrivilegeEscalationTest {
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(ownerActor));
 
         assertThatThrownBy(() -> userService.deleteUser(ownerId.toString()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Chống Horizontal Privilege Escalation: MANAGER không được tạo hoặc khóa tài khoản MANAGER khác (403)")
+    void managerCannotCreateOrLockAnotherManager() {
+        UserEntity managerActor = UserEntity.builder()
+                .id(UUID.randomUUID())
+                .username("manager1")
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        managerActor, null, List.of(new SimpleGrantedAuthority("ROLE_MANAGER"))
+                )
+        );
+
+        CreateUserRequest createMgrReq = new CreateUserRequest();
+        createMgrReq.setFullName("Manager 2");
+        createMgrReq.setPhone("0919999999");
+        createMgrReq.setPassword("secret123");
+        createMgrReq.setRoleCode("MANAGER");
+
+        when(userRepository.existsByPhone("0919999999")).thenReturn(false);
+        when(userRepository.existsByUsername("0919999999")).thenReturn(false);
+
+        assertThatThrownBy(() -> userService.createUser(createMgrReq))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        UUID otherManagerId = UUID.randomUUID();
+        UserEntity otherManager = UserEntity.builder()
+                .id(otherManagerId)
+                .username("manager2")
+                .role(RoleEntity.builder().code("MANAGER").name("Quản lý ca").build())
+                .isActive(true)
+                .build();
+        when(userRepository.findById(otherManagerId)).thenReturn(Optional.of(otherManager));
+
+        assertThatThrownBy(() -> userService.toggleActiveStatus(otherManagerId.toString()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("Chống tự khóa qua updateUser: OWNER không thể tự set isActive = false trên chính mình (400)")
+    void ownerCannotSelfLockViaUpdateUser() {
+        UUID ownerId = UUID.randomUUID();
+        UserEntity ownerActor = UserEntity.builder()
+                .id(ownerId)
+                .username("owner")
+                .role(RoleEntity.builder().code("OWNER").name("Chủ nhà hàng").build())
+                .isActive(true)
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        ownerActor, null, List.of(new SimpleGrantedAuthority("ROLE_OWNER"))
+                )
+        );
+
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(ownerActor));
+
+        UpdateUserRequest req = new UpdateUserRequest();
+        req.setIsActive(false);
+
+        assertThatThrownBy(() -> userService.updateUser(ownerId.toString(), req))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);

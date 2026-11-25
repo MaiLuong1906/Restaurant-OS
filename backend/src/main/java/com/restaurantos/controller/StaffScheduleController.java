@@ -3,6 +3,7 @@ package com.restaurantos.controller;
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.common.dto.OpenShiftDto;
 import com.restaurantos.common.dto.ShiftRegistrationDto;
+import com.restaurantos.common.enums.Permission;
 import com.restaurantos.entity.UserEntity;
 import com.restaurantos.service.StaffScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -60,20 +62,22 @@ public class StaffScheduleController {
     @Operation(summary = "Huỷ đăng ký", description = "Xóa một đăng ký theo UUID (kiểm tra quyền sở hữu hoặc quyền quản lý ca)")
     public ResponseEntity<ApiResponse<Void>> cancelRegistration(
             @PathVariable UUID id,
-            @AuthenticationPrincipal UserEntity currentUser) {
+            @AuthenticationPrincipal UserEntity currentUser,
+            Authentication authentication) {
         if (currentUser == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập để hủy ca");
         }
-        boolean isManagerOrOwner = isManagerOrOwner(currentUser);
-        staffScheduleService.cancelRegistration(id, currentUser.getId(), isManagerOrOwner);
+        boolean canManageOthers = hasScheduleApproveAuthority(authentication);
+        staffScheduleService.cancelRegistration(id, currentUser.getId(), canManageOthers);
         return ResponseEntity.ok(ApiResponse.success(null, "Huỷ đăng ký thành công"));
     }
 
-    private boolean isManagerOrOwner(UserEntity currentUser) {
-        if (currentUser != null && currentUser.getRole() != null && currentUser.getRole().getCode() != null) {
-            String roleCode = currentUser.getRole().getCode();
-            return "OWNER".equalsIgnoreCase(roleCode) || "MANAGER".equalsIgnoreCase(roleCode);
+    private boolean hasScheduleApproveAuthority(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
         }
-        return false;
+        String required = Permission.HR_ROSTER_SHIFT_CREATE_APPROVE.getAuthority();
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> required.equals(a.getAuthority()));
     }
 }

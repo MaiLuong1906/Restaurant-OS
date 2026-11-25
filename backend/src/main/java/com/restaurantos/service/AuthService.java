@@ -10,6 +10,8 @@ import com.restaurantos.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService {
+
+    private static final List<String> KDS_PIN_ROLES = List.of("CHEF", "MANAGER", "OWNER");
+    private static final List<String> MANAGER_PIN_ROLES = List.of("MANAGER", "OWNER");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -72,15 +77,13 @@ public class AuthService {
     }
 
     /**
-     * Đăng nhập trạm KDS bằng mã PIN cá nhân (chỉ cho phép tài khoản có quyền AUTH:KDS_PIN:EXECUTE).
+     * Đăng nhập trạm KDS bằng mã PIN cá nhân (lọc sẵn tại DB chỉ lấy user active có PIN và thuộc nhóm role KDS).
      */
     @Transactional(readOnly = true)
     public KdsSessionResponse loginKdsPin(KdsPinLoginRequest request) {
-        List<UserEntity> activeUsers = userRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc();
+        List<UserEntity> candidates = userRepository.findActiveUsersWithPinByRoleCodes(KDS_PIN_ROLES);
 
-        UserEntity matchedUser = activeUsers.stream()
-                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
-                .filter(u -> u.getPinCodeHash() != null && !u.getPinCodeHash().isBlank())
+        UserEntity matchedUser = candidates.stream()
                 .filter(u -> resolveUserRole(u).hasPermission(Permission.AUTH_KDS_PIN_EXECUTE))
                 .filter(u -> matchesPin(request.pin(), u.getPinCodeHash()))
                 .findFirst()
@@ -119,14 +122,19 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public VerifyManagerPinResponse verifyManagerPin(VerifyManagerPinRequest request) {
-        Permission requiredPerm = Permission.fromAuthority(request.requiredPermission())
-                .orElse(Permission.AUTH_MANAGER_PIN_APPROVE);
+        Permission requiredPerm;
+        if (request.requiredPermission() == null || request.requiredPermission().isBlank()) {
+            requiredPerm = Permission.AUTH_MANAGER_PIN_APPROVE;
+        } else {
+            requiredPerm = Permission.fromAuthority(request.requiredPermission())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Mã quyền yêu cầu không hợp lệ: " + request.requiredPermission()));
+        }
 
-        List<UserEntity> activeUsers = userRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc();
+        List<UserEntity> candidates = userRepository.findActiveUsersWithPinByRoleCodes(MANAGER_PIN_ROLES);
 
-        UserEntity approver = activeUsers.stream()
-                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
-                .filter(u -> u.getPinCodeHash() != null && !u.getPinCodeHash().isBlank())
+        UserEntity approver = candidates.stream()
                 .filter(u -> resolveUserRole(u).hasPermission(Permission.AUTH_MANAGER_PIN_APPROVE))
                 .filter(u -> matchesPin(request.pin(), u.getPinCodeHash()))
                 .findFirst()
@@ -150,8 +158,10 @@ public class AuthService {
                             + ". Vui lòng yêu cầu Chủ nhà hàng duyệt.");
         }
 
-        String approvalToken = jwtTokenProvider.generateManagerApprovalToken(approver, approverRole);
-        log.info("Xác thực PIN duyệt ngoại lệ thành công: approver={}, role={}", approver.getUsername(), approverRole.name());
+        String approvalToken = jwtTokenProvider.generateManagerApprovalToken(
+                approver, approverRole, requiredPerm, request.requestedDiscountPercent());
+        log.info("Xác thực PIN duyệt ngoại lệ thành công: approver={}, role={}, perm={}",
+                approver.getUsername(), approverRole.name(), requiredPerm.getAuthority());
 
         return new VerifyManagerPinResponse(
                 true,
@@ -167,15 +177,24 @@ public class AuthService {
 
     /**
      * Lấy thông tin người dùng hiện tại từ phiên đăng nhập JWT.
+     * Trả về đúng tập quyền thực tế của phiên hiện hành (ví dụ phiên KDS_TABLET chỉ trả về quyền KDS, không lộ quyền OWNER/MANAGER).
      */
-    public LoginResponse getCurrentSessionInfo(UserEntity currentUser) {
+    public LoginResponse getCurrentSessionInfo(UserEntity currentUser, Authentication authentication) {
         if (currentUser == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập");
         }
-        UserRole role = resolveUserRole(currentUser);
-        Set<String> permissions = role.getPermissions().stream()
-                .map(Permission::getAuthority)
-                .collect(Collectors.toUnmodifiableSet());
+        Set<String> permissions;
+        if (authentication != null && authentication.getAuthorities() != null && !authentication.getAuthorities().isEmpty()) {
+            permissions = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .filter(a -> !a.startsWith("ROLE_"))
+                    .collect(Collectors.toUnmodifiableSet());
+        } else {
+            UserRole role = resolveUserRole(currentUser);
+            permissions = role.getPermissions().stream()
+                    .map(Permission::getAuthority)
+                    .collect(Collectors.toUnmodifiableSet());
+        }
         return new LoginResponse(
                 null,
                 "Bearer",
@@ -197,7 +216,6 @@ public class AuthService {
         if (storedHash.startsWith("$2a$") || storedHash.startsWith("$2b$") || storedHash.startsWith("$2y$")) {
             return passwordEncoder.matches(rawPin, storedHash);
         }
-        // Tương thích seed data V2 dùng SHA-256 hex (64 ký tự)
         if (storedHash.length() == 64) {
             return storedHash.equalsIgnoreCase(sha256Hex(rawPin));
         }

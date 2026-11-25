@@ -2,6 +2,7 @@ package com.restaurantos.security;
 
 import com.restaurantos.common.enums.Permission;
 import com.restaurantos.entity.TableEntity;
+import com.restaurantos.enums.TableStatus;
 import com.restaurantos.repository.TableRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -20,6 +23,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CustomerTableAuthService {
 
+    /**
+     * Allow-list các trạng thái bàn hợp lệ cho phép Khách hàng quét QR gửi đơn gọi món.
+     */
+    private static final Set<TableStatus> ORDERABLE_TABLE_STATUSES = EnumSet.of(
+            TableStatus.VACANT,
+            TableStatus.SERVING,
+            TableStatus.RESERVED
+    );
+
     private final TableRepository tableRepository;
 
     public void verifyCanCreateOrder(String rawTableId, String tableToken, Authentication auth) {
@@ -30,8 +42,8 @@ public class CustomerTableAuthService {
         UUID tableId = parseUuid(rawTableId);
         TableEntity table = verifyTableToken(tableId, tableToken);
 
-        // Chặn khách tự gửi thêm món khi bàn đang khóa thanh toán (BILLING) hoặc đang dọn (CLEANING)
-        if ("BILLING".equalsIgnoreCase(table.getStatus()) || "CLEANING".equalsIgnoreCase(table.getStatus())) {
+        TableStatus currentStatus = parseTableStatus(table.getStatus());
+        if (currentStatus == null || !ORDERABLE_TABLE_STATUSES.contains(currentStatus)) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Bàn hiện đang ở trạng thái " + table.getStatus() + ", không thể gọi thêm món lúc này.");
@@ -52,6 +64,17 @@ public class CustomerTableAuthService {
         return tableRepository.findById(tableId)
                 .map(t -> t.getQrCodeToken() != null && t.getQrCodeToken().equals(tableToken.trim()))
                 .orElse(false);
+    }
+
+    private TableStatus parseTableStatus(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank()) {
+            return null;
+        }
+        try {
+            return TableStatus.valueOf(rawStatus.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private TableEntity verifyTableToken(UUID tableId, String tableToken) {

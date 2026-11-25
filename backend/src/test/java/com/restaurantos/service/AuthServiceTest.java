@@ -13,6 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -92,12 +94,11 @@ class AuthServiceTest {
     @Test
     @DisplayName("Đăng nhập KDS PIN thành công cho CHEF và từ chối PIN của WAITER")
     void loginKdsPin_allowsChef_deniesWaiter() {
-        UserEntity waiterWithPin = buildUser("WAITER", "waiter1", "0901111111", "pass", "1111", true);
         UserEntity chefWithPin = buildUser("CHEF", "chef1", "0902222222", "pass", "2222", true);
-        when(userRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc())
-                .thenReturn(List.of(waiterWithPin, chefWithPin));
+        when(userRepository.findActiveUsersWithPinByRoleCodes(List.of("CHEF", "MANAGER", "OWNER")))
+                .thenReturn(List.of(chefWithPin));
 
-        // WAITER không có quyền AUTH:KDS_PIN:EXECUTE -> 401
+        // PIN sai hoặc không thuộc nhóm KDS -> 401
         assertThatThrownBy(() -> authService.loginKdsPin(new KdsPinLoginRequest("1111", "tablet-1")))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
@@ -115,7 +116,7 @@ class AuthServiceTest {
     void verifyManagerPin_enforcesDiscountCeiling() {
         UserEntity manager = buildUser("MANAGER", "mgr1", "0903333333", "pass", "8841", true);
         UserEntity owner = buildUser("OWNER", "owner1", "0904444444", "pass", "9999", true);
-        when(userRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc())
+        when(userRepository.findActiveUsersWithPinByRoleCodes(List.of("MANAGER", "OWNER")))
                 .thenReturn(List.of(manager, owner));
 
         // Manager duyệt 15% -> OK
@@ -124,6 +125,8 @@ class AuthServiceTest {
         assertThat(okRes.approved()).isTrue();
         assertThat(okRes.approverRole()).isEqualTo("MANAGER");
         assertThat(okRes.approvalToken()).isNotBlank();
+        assertThat(jwtTokenProvider.validateManagerApprovalToken(
+                okRes.approvalToken(), Permission.POS_DISCOUNT_OVERRIDE_APPROVE, 15)).isEqualTo(manager.getId());
 
         // Manager duyệt 30% (> trần 20%) -> 403
         assertThatThrownBy(() -> authService.verifyManagerPin(
@@ -137,5 +140,31 @@ class AuthServiceTest {
                 new VerifyManagerPinRequest("9999", Permission.POS_DISCOUNT_OVERRIDE_APPROVE.getAuthority(), 30));
         assertThat(ownerRes.approved()).isTrue();
         assertThat(ownerRes.approverRole()).isEqualTo("OWNER");
+    }
+
+    @Test
+    @DisplayName("Verify Manager PIN: trả 400 Bad Request nếu requiredPermission không tồn tại")
+    void verifyManagerPin_invalidPermission_throws400() {
+        assertThatThrownBy(() -> authService.verifyManagerPin(
+                new VerifyManagerPinRequest("8841", "INVALID:PERM:CODE", 10)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("GET /auth/me cho phiên KDS_TABLET của OWNER chỉ trả về quyền KDS, không lộ quyền quản trị")
+    void getCurrentSessionInfo_kdsSession_doesNotLeakOwnerPermissions() {
+        UserEntity owner = buildUser("OWNER", "owner1", "0904444444", "pass", "9999", true);
+        var kdsAuth = new UsernamePasswordAuthenticationToken(
+                owner,
+                null,
+                JwtTokenProvider.KDS_TABLET_AUTHORITIES.stream().map(SimpleGrantedAuthority::new).toList()
+        );
+
+        LoginResponse me = authService.getCurrentSessionInfo(owner, kdsAuth);
+        assertThat(me.permissions()).contains(Permission.KDS_COOKING_STATUS_UPDATE.getAuthority());
+        assertThat(me.permissions()).doesNotContain(Permission.USER_ACCOUNT_DELETE.getAuthority());
+        assertThat(me.permissions()).doesNotContain(Permission.REPORT_FINANCE_PNL_BCG_VIEW.getAuthority());
     }
 }

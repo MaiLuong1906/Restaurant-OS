@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,11 +49,12 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    @Operation(summary = "Lấy thông tin phiên đăng nhập hiện tại", description = "Trả về thông tin tài khoản và danh sách Permission từ JWT hiện hành")
+    @Operation(summary = "Lấy thông tin phiên đăng nhập hiện tại", description = "Trả về thông tin tài khoản và danh sách Permission thực tế của phiên JWT hiện hành")
     public ResponseEntity<ApiResponse<LoginResponse>> getCurrentUser(
-            @AuthenticationPrincipal UserEntity currentUser
+            @AuthenticationPrincipal UserEntity currentUser,
+            Authentication authentication
     ) {
-        LoginResponse response = authService.getCurrentSessionInfo(currentUser);
+        LoginResponse response = authService.getCurrentSessionInfo(currentUser, authentication);
         return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin phiên đăng nhập thành công"));
     }
 }
