@@ -15,6 +15,8 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { UserResponseDto } from '@/types/user';
+import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PERMISSIONS } from '@/lib/rbac';
 
 interface UserTableProps {
   users: UserResponseDto[];
@@ -194,15 +196,17 @@ export function UserTable({
                       )}
                     </button>
 
-                    {/* Nút Xóa Mềm */}
-                    <button
-                      onClick={() => onDeleteClick(u)}
-                      className="p-1 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                      title="Xóa tài khoản nhân sự"
-                      aria-label="Xóa tài khoản"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Nút Xóa Mềm (Chỉ OWNER mới có quyền USER:ACCOUNT:DELETE) */}
+                    <PermissionGate permission={PERMISSIONS.USER_ACCOUNT_DELETE}>
+                      <button
+                        onClick={() => onDeleteClick(u)}
+                        className="p-1 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                        title="Xóa tài khoản nhân sự"
+                        aria-label="Xóa tài khoản"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </PermissionGate>
                   </div>
                 </td>
               </tr>
