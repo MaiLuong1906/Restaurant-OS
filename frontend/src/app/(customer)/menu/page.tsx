@@ -254,12 +254,12 @@ function MenuCustomerContent() {
             className={`h-full w-full object-cover ${!isAvailable ? 'grayscale-[35%]' : ''}`}
           />
           {!isAvailable ? (
-            <span className="absolute top-1 left-1 flex items-center rounded-full bg-stone-700/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
+            <span className="absolute top-1.5 left-1.5 flex items-center rounded-md bg-stone-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs tracking-tight uppercase whitespace-nowrap z-10">
               Hết món
             </span>
           ) : dish.badge ? (
             <span
-              className={`absolute top-1 left-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
+              className={`absolute top-1.5 left-1.5 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-tight uppercase shadow-xs whitespace-nowrap z-10 ${
                 dish.badgeVariant === 'recommend'
                   ? 'bg-[#00873a] text-white'
                   : dish.badgeVariant === 'bestseller'
@@ -275,7 +275,10 @@ function MenuCustomerContent() {
               {dish.badgeVariant === 'recommend' && (
                 <Sparkles className="h-2.5 w-2.5" />
               )}
-              <span>{dish.badge}</span>
+              {dish.badgeVariant === 'special' && (
+                <Utensils className="h-2.5 w-2.5" />
+              )}
+              <span>{dish.badge?.toLowerCase().includes('combo') ? 'Combo' : dish.badge}</span>
             </span>
           ) : null}
         </div>

@@ -119,7 +119,7 @@ describe('customerMenuService & Mapper Test Suite', () => {
       };
 
       const result = mapDtoToCustomerDish(dto);
-      expect(result.badge).toBe('Combo Tiết Kiệm');
+      expect(result.badge).toBe('Combo');
       expect(result.badgeVariant).toBe('special');
       expect(result.description).toContain('2x Nem Rán Phố Cổ, 4x Bún Chả Than Hoa');
       expect(result.subCategory).toBe('MAIN');

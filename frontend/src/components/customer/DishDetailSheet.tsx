@@ -203,7 +203,7 @@ export function DishDetailSheet({
                     ? 'bg-amber-100 text-amber-800'
                     : 'bg-[#efe6e4] text-[#56423c]'
                 }`}>
-                  {dish.badge}
+                  {dish.badge?.toLowerCase().includes('combo') ? 'Combo' : dish.badge}
                 </span>
               ) : null}
             </div>

@@ -97,7 +97,7 @@ export function mapDtoToCustomerDish(dto: CustomerDishDto): CustomerDish {
   let badgeVariant: CustomerDish['badgeVariant'] = undefined;
 
   if (isCombo) {
-    badge = 'Combo Tiết Kiệm';
+    badge = 'Combo';
     badgeVariant = 'special';
   } else if (!dto.isAvailable) {
     badge = 'Tạm hết món';
