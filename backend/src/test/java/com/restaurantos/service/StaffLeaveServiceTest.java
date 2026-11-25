@@ -44,30 +44,36 @@ class StaffLeaveServiceTest {
     }
 
     @Test
-    @DisplayName("Tính đúng quỹ phép năm: totalDays = 12, trừ các đơn ANNUAL đã APPROVED")
-    void getLeaveBalance_calculatesCorrectly() {
+    @DisplayName("Tính đúng quỹ phép năm: totalDays = 12, remainingDays trừ cả đơn ANNUAL đã APPROVED và đang PENDING (Hold Pending Days)")
+    void getLeaveBalance_calculatesCorrectlyWithPendingHold() {
         LeaveRequestEntity approvedAnnual = new LeaveRequestEntity(
                 UUID.randomUUID(), staffId, "Nhân Viên A", "ANNUAL",
                 LocalDate.of(2026, 11, 10), LocalDate.of(2026, 11, 12),
                 "Việc gia đình", "APPROVED", "Quản lý", 3, 3, "idem-1",
                 OffsetDateTime.now(), OffsetDateTime.now()
         );
+        LeaveRequestEntity pendingAnnual = new LeaveRequestEntity(
+                UUID.randomUUID(), staffId, "Nhân Viên A", "ANNUAL",
+                LocalDate.of(2026, 11, 15), LocalDate.of(2026, 11, 16),
+                "Du lịch", "PENDING", null, 2, 2, "idem-2",
+                OffsetDateTime.now(), OffsetDateTime.now()
+        );
         LeaveRequestEntity pendingSick = new LeaveRequestEntity(
                 UUID.randomUUID(), staffId, "Nhân Viên A", "SICK",
                 LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 20),
-                "Khám bệnh", "PENDING", null, 1, 1, "idem-2",
+                "Khám bệnh", "PENDING", null, 1, 1, "idem-3",
                 OffsetDateTime.now(), OffsetDateTime.now()
         );
 
         when(leaveRequestRepository.findByStaffIdOrderByCreatedAtDesc(staffId))
-                .thenReturn(List.of(pendingSick, approvedAnnual));
+                .thenReturn(List.of(pendingSick, pendingAnnual, approvedAnnual));
 
         LeaveBalanceDto balance = staffLeaveService.getLeaveBalance(staffId);
 
         assertThat(balance.getTotalDays()).isEqualTo(12);
         assertThat(balance.getUsedDays()).isEqualTo(3);
-        assertThat(balance.getRemainingDays()).isEqualTo(9);
-        assertThat(balance.getPendingRequestsCount()).isEqualTo(1);
+        assertThat(balance.getRemainingDays()).isEqualTo(7); // 12 - 3 (APPROVED) - 2 (PENDING ANNUAL) = 7
+        assertThat(balance.getPendingRequestsCount()).isEqualTo(2);
     }
 
     @Test
@@ -119,25 +125,25 @@ class StaffLeaveServiceTest {
     }
 
     @Test
-    @DisplayName("Từ chối tạo đơn ANNUAL khi vượt quá số ngày phép năm còn lại")
-    void createLeaveRequest_throwsWhenExceedingAnnualQuota() {
-        LeaveRequestEntity used11Days = new LeaveRequestEntity(
+    @DisplayName("Chặn gửi liên tiếp 2 đơn PENDING vượt quá quỹ phép năm (Hold Pending Days)")
+    void createLeaveRequest_throwsWhenExceedingQuotaDueToPendingHold() {
+        LeaveRequestEntity pending10Days = new LeaveRequestEntity(
                 UUID.randomUUID(), staffId, "Nhân Viên A", "ANNUAL",
-                LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 11),
-                "Nghỉ hè", "APPROVED", "Quản lý", 11, 11, "idem-old",
+                LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 10),
+                "Đơn đang chờ duyệt 10 ngày", "PENDING", null, 10, 10, "idem-pending-10",
                 OffsetDateTime.now(), OffsetDateTime.now()
         );
-        when(leaveRequestRepository.findByStaffIdOrderByCreatedAtDesc(staffId)).thenReturn(List.of(used11Days));
+        when(leaveRequestRepository.findByStaffIdOrderByCreatedAtDesc(staffId)).thenReturn(List.of(pending10Days));
 
         CreateLeaveRequestDto req = new CreateLeaveRequestDto(
                 staffId, "Nhân Viên A", "ANNUAL",
                 LocalDate.of(2026, 11, 16), LocalDate.of(2026, 11, 18),
-                "Xin nghỉ 3 ngày", "idem-over"
+                "Xin nghỉ thêm 3 ngày khi chỉ còn 2 ngày khả dụng", "idem-over"
         );
 
         assertThatThrownBy(() -> staffLeaveService.createLeaveRequest(req))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("vượt quá quỹ phép năm");
+                .hasMessageContaining("vượt quá quỹ phép năm khả dụng");
     }
 
     @Test
@@ -175,5 +181,37 @@ class StaffLeaveServiceTest {
         assertThatThrownBy(() -> staffLeaveService.withdrawLeaveRequest(leaveId, attackerId, false))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    @DisplayName("Quản lý phê duyệt và từ chối đơn xin nghỉ thành công")
+    void approveAndRejectLeaveRequest_byManager() {
+        UUID approveId = UUID.randomUUID();
+        LeaveRequestEntity pending1 = new LeaveRequestEntity(
+                approveId, staffId, "Nhân Viên A", "ANNUAL",
+                LocalDate.of(2026, 11, 22), LocalDate.of(2026, 11, 23),
+                "Nghỉ phép", "PENDING", null, 2, 2, "idem-a1",
+                OffsetDateTime.now(), OffsetDateTime.now()
+        );
+        when(leaveRequestRepository.findById(approveId)).thenReturn(Optional.of(pending1));
+        when(leaveRequestRepository.save(pending1)).thenReturn(pending1);
+
+        LeaveRequestDto approved = staffLeaveService.approveLeaveRequest(approveId, "Trần Thị Mai");
+        assertThat(approved.getStatus()).isEqualTo("APPROVED");
+        assertThat(approved.getApprovedBy()).isEqualTo("Trần Thị Mai");
+
+        UUID rejectId = UUID.randomUUID();
+        LeaveRequestEntity pending2 = new LeaveRequestEntity(
+                rejectId, staffId, "Nhân Viên A", "ANNUAL",
+                LocalDate.of(2026, 11, 25), LocalDate.of(2026, 11, 26),
+                "Nghỉ phép", "PENDING", null, 2, 2, "idem-r1",
+                OffsetDateTime.now(), OffsetDateTime.now()
+        );
+        when(leaveRequestRepository.findById(rejectId)).thenReturn(Optional.of(pending2));
+        when(leaveRequestRepository.save(pending2)).thenReturn(pending2);
+
+        LeaveRequestDto rejected = staffLeaveService.rejectLeaveRequest(rejectId, "Trần Thị Mai");
+        assertThat(rejected.getStatus()).isEqualTo("REJECTED");
+        assertThat(rejected.getApprovedBy()).isEqualTo("Trần Thị Mai");
     }
 }

@@ -37,11 +37,17 @@ public class StaffLeaveService {
                 .mapToInt(r -> r.getCalendarDays() != null ? r.getCalendarDays() : 1)
                 .sum();
 
+        // Hold Pending Days: trừ tạm số ngày phép năm đang chờ duyệt để chống gửi trùng vượt quota
+        int pendingAnnualDays = requests.stream()
+                .filter(r -> "ANNUAL".equalsIgnoreCase(r.getType()) && "PENDING".equalsIgnoreCase(r.getStatus()))
+                .mapToInt(r -> r.getCalendarDays() != null ? r.getCalendarDays() : 1)
+                .sum();
+
         int pendingCount = (int) requests.stream()
                 .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
                 .count();
 
-        int remainingDays = Math.max(0, DEFAULT_ANNUAL_LEAVE_QUOTA - usedDays);
+        int remainingDays = Math.max(0, DEFAULT_ANNUAL_LEAVE_QUOTA - usedDays - pendingAnnualDays);
 
         return new LeaveBalanceDto(
                 staffId,
@@ -88,12 +94,12 @@ public class StaffLeaveService {
 
         int calendarDays = (int) ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
 
-        // 2. Nếu là phép năm (ANNUAL), kiểm tra số ngày còn lại trong quỹ phép
+        // 2. Nếu là phép năm (ANNUAL), kiểm tra số ngày khả dụng (đã trừ cả APPROVED và PENDING giữ chỗ)
         if ("ANNUAL".equalsIgnoreCase(request.getType())) {
             LeaveBalanceDto balance = getLeaveBalance(request.getStaffId());
             if (calendarDays > balance.getRemainingDays()) {
                 throw new IllegalArgumentException(
-                        String.format("Số ngày nghỉ (%d ngày) vượt quá quỹ phép năm còn lại (%d ngày)",
+                        String.format("Số ngày nghỉ (%d ngày) vượt quá quỹ phép năm khả dụng (%d ngày)",
                                 calendarDays, balance.getRemainingDays())
                 );
             }
@@ -141,6 +147,42 @@ public class StaffLeaveService {
         entity.setUpdatedAt(OffsetDateTime.now());
         LeaveRequestEntity saved = leaveRequestRepository.save(entity);
         return toDto(saved);
+    }
+
+    /**
+     * Phê duyệt đơn xin nghỉ phép (dành cho Quản lý / Chủ nhà hàng - UC_MGR_09).
+     */
+    @Transactional
+    public LeaveRequestDto approveLeaveRequest(UUID leaveId, String approverName) {
+        LeaveRequestEntity entity = leaveRequestRepository.findById(leaveId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn xin nghỉ"));
+
+        if (!"PENDING".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("Chỉ có thể phê duyệt đơn xin nghỉ đang ở trạng thái Chờ duyệt");
+        }
+
+        entity.setStatus("APPROVED");
+        entity.setApprovedBy(approverName != null && !approverName.isBlank() ? approverName : "Quản lý");
+        entity.setUpdatedAt(OffsetDateTime.now());
+        return toDto(leaveRequestRepository.save(entity));
+    }
+
+    /**
+     * Từ chối đơn xin nghỉ phép (dành cho Quản lý / Chủ nhà hàng - UC_MGR_09).
+     */
+    @Transactional
+    public LeaveRequestDto rejectLeaveRequest(UUID leaveId, String approverName) {
+        LeaveRequestEntity entity = leaveRequestRepository.findById(leaveId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn xin nghỉ"));
+
+        if (!"PENDING".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("Chỉ có thể từ chối đơn xin nghỉ đang ở trạng thái Chờ duyệt");
+        }
+
+        entity.setStatus("REJECTED");
+        entity.setApprovedBy(approverName != null && !approverName.isBlank() ? approverName : "Quản lý");
+        entity.setUpdatedAt(OffsetDateTime.now());
+        return toDto(leaveRequestRepository.save(entity));
     }
 
     private LeaveRequestDto toDto(LeaveRequestEntity e) {
