@@ -34,10 +34,20 @@ export default function AdminMenuBomPage() {
   // =========================================================================
   const [selectedDish, setSelectedDish] = React.useState<DishResponseDto | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  const activeRequestIdRef = React.useRef(0);
   const [selectedCategory, setSelectedCategory] = React.useState('ALL');
   const [availabilityFilter, setAvailabilityFilter] = React.useState('ALL');
   const [currentPage, setCurrentPage] = React.useState(0);
   const [pageSize, setPageSize] = React.useState(5);
+
+  // Debounce search query 300ms
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // =========================================================================
   // State: loading / error
@@ -64,10 +74,11 @@ export default function AdminMenuBomPage() {
   const { toastMsg, showToast, hideToast } = useAdminToast();
 
   // =========================================================================
-  // Fetch danh sách món ăn
+  // Fetch danh sách món ăn (kèm Race Condition & Sequence Guard)
   // =========================================================================
   const fetchDishes = React.useCallback(
-    async (page = 0, size = pageSize) => {
+    async (page = 0, size = pageSize, search = debouncedSearch) => {
+      const requestId = ++activeRequestIdRef.current;
       setIsLoading(true);
       setApiError(null);
 
@@ -77,11 +88,15 @@ export default function AdminMenuBomPage() {
           size,
         };
         if (selectedCategory !== 'ALL') params.category = selectedCategory;
-        if (searchQuery.trim()) params.search = searchQuery.trim();
+        if (search.trim()) params.search = search.trim();
         if (availabilityFilter === 'AVAILABLE') params.isAvailable = true;
         if (availabilityFilter === 'UNAVAILABLE') params.isAvailable = false;
 
         const result = await dishService.getAllDishesPaged(params);
+
+        // Bỏ qua nếu có request mới hơn đã được kích hoạt
+        if (requestId !== activeRequestIdRef.current) return;
+
         setPageData(result);
         setDishes(result.items);
 
@@ -92,13 +107,16 @@ export default function AdminMenuBomPage() {
           return still ?? result.items[0] ?? null;
         });
       } catch (err) {
+        if (requestId !== activeRequestIdRef.current) return;
         const msg = err instanceof ApiError ? err.message : 'Không thể tải danh sách món ăn';
         setApiError(msg);
       } finally {
-        setIsLoading(false);
+        if (requestId === activeRequestIdRef.current) {
+          setIsLoading(false);
+        }
       }
     },
-    [selectedCategory, searchQuery, availabilityFilter, pageSize]
+    [selectedCategory, debouncedSearch, availabilityFilter, pageSize]
   );
 
   // Fetch categories & non-combo dishes (for combo form) — chỉ 1 lần khi mount
@@ -107,11 +125,11 @@ export default function AdminMenuBomPage() {
     dishService.getNonComboDishes().then(setAvailableDishes).catch(() => {});
   }, []);
 
-  // Fetch khi filter thay đổi
+  // Fetch khi filter thay đổi (reset về trang 0)
   React.useEffect(() => {
     setCurrentPage(0);
-    fetchDishes(0);
-  }, [selectedCategory, searchQuery, availabilityFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchDishes(0, pageSize, debouncedSearch);
+  }, [selectedCategory, debouncedSearch, availabilityFilter, pageSize, fetchDishes]);
 
   // =========================================================================
   // Handlers: Toggle Availability (Optimistic Update — UC20)
@@ -171,7 +189,8 @@ export default function AdminMenuBomPage() {
       setShowCreateModal(false);
       showToast(`✅ Đã tạo món "${created.name}" thành công!`);
       // Refresh để lấy danh sách mới (có thể thay đổi phân trang)
-      await fetchDishes(0);
+      setCurrentPage(0);
+      await fetchDishes(0, pageSize, debouncedSearch);
       // Refresh non-combo list nếu tạo món lẻ mới
       if (!created.isCombo) {
         dishService.getNonComboDishes().then(setAvailableDishes).catch(() => {});
@@ -216,14 +235,20 @@ export default function AdminMenuBomPage() {
     setIsDeleting(true);
     try {
       await dishService.deleteDish(deleteDish.id);
-      setDishes((prev) => prev.filter((d) => d.id !== deleteDish.id));
-      if (selectedDish?.id === deleteDish.id) {
-        const remaining = dishes.filter((d) => d.id !== deleteDish.id);
-        setSelectedDish(remaining[0] ?? null);
-      }
-      setDeleteDish(null);
       showToast(`🗑 Đã xóa món "${deleteDish.name}"`);
-      // Refresh non-combo list
+
+      // Xử lý phân trang chuẩn xác sau khi xóa món:
+      // Nếu xóa món duy nhất còn lại trên trang (và không phải trang 0), lùi về trang trước đó
+      const isOnlyItemOnPage = dishes.length <= 1;
+      const targetPage = isOnlyItemOnPage && currentPage > 0 ? currentPage - 1 : currentPage;
+
+      if (targetPage !== currentPage) {
+        setCurrentPage(targetPage);
+      }
+      await fetchDishes(targetPage, pageSize, debouncedSearch);
+
+      setDeleteDish(null);
+      // Refresh non-combo list & categories
       dishService.getNonComboDishes().then(setAvailableDishes).catch(() => {});
       dishService.getCategories().then(setCategories).catch(() => {});
     } catch (err) {
@@ -239,7 +264,7 @@ export default function AdminMenuBomPage() {
   // =========================================================================
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    fetchDishes(page, pageSize);
+    fetchDishes(page, pageSize, debouncedSearch);
   };
 
   // =========================================================================
@@ -281,7 +306,7 @@ export default function AdminMenuBomPage() {
             <span>⚠️</span>
             <span>{apiError}</span>
             <button
-              onClick={() => fetchDishes(currentPage)}
+              onClick={() => fetchDishes(currentPage, pageSize, debouncedSearch)}
               className="ml-auto px-2.5 py-1 bg-rose-100 hover:bg-rose-200 rounded-lg cursor-pointer transition-colors font-bold"
             >
               Thử lại
@@ -344,14 +369,14 @@ export default function AdminMenuBomPage() {
                   </span>
 
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-stone-500">Mỗi trang:</span>
+                    <span className="text-xs text-stone-500">Mỗi trang:</span>
                     <select
                       value={pageSize}
                       onChange={(e) => {
                         const newSize = Number(e.target.value);
                         setPageSize(newSize);
                         setCurrentPage(0);
-                        fetchDishes(0, newSize);
+                        fetchDishes(0, newSize, debouncedSearch);
                       }}
                       className="px-2 py-0.5 bg-stone-50 border border-stone-200 rounded font-mono text-xs font-bold text-stone-700 focus:outline-none focus:border-ops-brand cursor-pointer"
                     >

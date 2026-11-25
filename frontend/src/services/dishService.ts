@@ -148,4 +148,19 @@ export const dishService = {
     }
     return { valid: true };
   },
+
+  /**
+   * Tính tổng giá gốc các món thành phần trong combo và số tiền khách tiết kiệm được
+   */
+  calculateComboFinancials(
+    comboPrice: number,
+    items: { dishPrice?: number; quantity: number }[]
+  ): { totalCost: number; savings: number } {
+    const totalCost = items.reduce(
+      (sum, item) => sum + (item.dishPrice ?? 0) * item.quantity,
+      0
+    );
+    const savings = Math.max(0, totalCost - comboPrice);
+    return { totalCost, savings };
+  },
 };

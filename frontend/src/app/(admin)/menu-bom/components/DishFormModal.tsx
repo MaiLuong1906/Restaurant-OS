@@ -271,7 +271,7 @@ export function DishFormModal({
       <form id="dish-form" onSubmit={handleSubmit} className="space-y-4 text-xs">
         {/* Tên */}
         <div>
-          <label className="font-mono text-[10px] uppercase font-bold text-stone-500 block mb-1">
+          <label className="font-mono text-xs uppercase font-bold text-stone-500 block mb-1">
             Tên Món Ăn *
           </label>
           <input
@@ -282,12 +282,12 @@ export function DishFormModal({
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:border-ops-brand font-medium transition-colors"
           />
-          {errors.name && <p className="text-rose-500 text-[10px] mt-1 font-semibold">{errors.name}</p>}
+          {errors.name && <p className="text-rose-500 text-xs mt-1 font-semibold">{errors.name}</p>}
         </div>
 
         {/* Mô tả */}
         <div>
-          <label className="font-mono text-[10px] uppercase font-bold text-stone-500 block mb-1">
+          <label className="font-mono text-xs uppercase font-bold text-stone-500 block mb-1">
             Mô Tả (tùy chọn)
           </label>
           <textarea
@@ -302,7 +302,7 @@ export function DishFormModal({
         {/* Giá + Danh mục */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="font-mono text-[10px] uppercase font-bold text-stone-500 block mb-1">
+            <label className="font-mono text-xs uppercase font-bold text-stone-500 block mb-1">
               Giá Bán (VND) *
             </label>
             <input
@@ -315,12 +315,12 @@ export function DishFormModal({
               className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:border-ops-brand font-mono font-bold transition-colors"
             />
             {errors.price && (
-              <p className="text-rose-500 text-[10px] mt-1 font-semibold">{errors.price}</p>
+              <p className="text-rose-500 text-xs mt-1 font-semibold">{errors.price}</p>
             )}
           </div>
 
           <div>
-            <label className="font-mono text-[10px] uppercase font-bold text-stone-500 block mb-1">
+            <label className="font-mono text-xs uppercase font-bold text-stone-500 block mb-1">
               Danh Mục
             </label>
             <select
@@ -342,7 +342,7 @@ export function DishFormModal({
 
         {/* Hình Ảnh Món Ăn (File Upload) */}
         <div>
-          <label className="font-mono text-[10px] uppercase font-bold text-stone-500 block mb-1">
+          <label className="font-mono text-xs uppercase font-bold text-stone-500 block mb-1">
             Hình Ảnh Món Ăn
           </label>
           <input
@@ -357,7 +357,7 @@ export function DishFormModal({
             <div className="flex flex-col items-center justify-center p-6 bg-stone-50 border border-stone-200 rounded-xl space-y-2">
               <Loader2 className="w-6 h-6 text-ops-brand animate-spin" />
               <p className="text-xs font-bold text-stone-700">Đang tối ưu &amp; lưu trữ ảnh...</p>
-              <p className="text-[10px] text-stone-500">Tự động kết nối Supabase Storage</p>
+              <p className="text-xs text-stone-500">Tự động kết nối Supabase Storage</p>
             </div>
           ) : form.imageUrl ? (
             <div className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
@@ -371,24 +371,24 @@ export function DishFormModal({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <p className="text-xs font-bold text-stone-900 truncate">Ảnh món ăn đã chọn</p>
                   {storageType === 'supabase' && (
-                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                    <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-mono font-bold">
                       ☁️ Supabase CDN
                     </span>
                   )}
                   {storageType === 'base64' && (
-                    <span className="text-[10px] bg-stone-100 text-stone-600 border border-stone-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                    <span className="text-xs bg-stone-100 text-stone-600 border border-stone-200 px-2 py-0.5 rounded font-mono font-bold">
                       📦 Base64
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] text-stone-500 mt-0.5">Định dạng PNG, JPG, WEBP</p>
+                <p className="text-xs text-stone-500 mt-0.5">Định dạng PNG, JPG, WEBP</p>
                 <div className="flex items-center gap-2 mt-2">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200 rounded-md font-mono text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200 rounded-md font-mono text-xs font-bold cursor-pointer transition-colors shadow-2xs"
                   >
-                    <Upload className="w-3 h-3 text-ops-brand" />
+                    <Upload className="w-3.5 h-3.5 text-ops-brand" />
                     Đổi ảnh khác
                   </button>
                   <button
@@ -397,9 +397,9 @@ export function DishFormModal({
                       setForm((p) => ({ ...p, imageUrl: '' }));
                       setStorageType(null);
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 border border-stone-200 hover:border-rose-200 rounded-md font-mono text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 border border-stone-200 hover:border-rose-200 rounded-md font-mono text-xs font-bold cursor-pointer transition-colors shadow-2xs"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-3.5 h-3.5" />
                     Xóa ảnh
                   </button>
                 </div>
@@ -431,13 +431,13 @@ export function DishFormModal({
               <p className="text-xs font-bold text-stone-800">
                 Nhấn để chọn ảnh hoặc kéo thả vào đây
               </p>
-              <p className="text-[10px] text-stone-500 mt-0.5">
+              <p className="text-xs text-stone-500 mt-0.5">
                 Hỗ trợ PNG, JPG, WEBP (Tối đa 5MB • Tự động tối ưu dung lượng)
               </p>
             </div>
           )}
           {errors.image && (
-            <p className="text-rose-500 text-[10px] mt-1 font-semibold">{errors.image}</p>
+            <p className="text-rose-500 text-xs mt-1 font-semibold">{errors.image}</p>
           )}
         </div>
 
@@ -490,22 +490,22 @@ export function DishFormModal({
         {form.isCombo && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase font-bold text-stone-500 tracking-wider">
+              <span className="font-mono text-xs uppercase font-bold text-stone-500 tracking-wider">
                 Thành Phần Combo *
               </span>
               <button
                 type="button"
                 onClick={handleAddComboItem}
                 disabled={form.comboItems.length >= availableDishes.length}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-[10px] font-bold uppercase cursor-pointer transition-colors disabled:opacity-40"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors disabled:opacity-40"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5" />
                 Thêm Món
               </button>
             </div>
 
             {errors.combo && (
-              <p className="text-rose-500 text-[10px] font-semibold">{errors.combo}</p>
+              <p className="text-rose-500 text-xs font-semibold">{errors.combo}</p>
             )}
 
             {form.comboItems.length === 0 && (
@@ -541,7 +541,7 @@ export function DishFormModal({
 
                     {/* Quantity */}
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="font-mono text-[10px] text-stone-500 font-bold">SL:</span>
+                      <span className="font-mono text-xs text-stone-500 font-bold">SL:</span>
                       <input
                         type="number"
                         min="1"
@@ -560,7 +560,7 @@ export function DishFormModal({
 
                     {/* Price preview */}
                     {selectedDish && (
-                      <span className="font-mono text-[10px] font-bold text-stone-500 shrink-0 w-20 text-right">
+                      <span className="font-mono text-xs font-bold text-stone-500 shrink-0 w-20 text-right">
                         {formatVND(selectedDish.price * item.quantity)}
                       </span>
                     )}
@@ -581,7 +581,7 @@ export function DishFormModal({
             {/* Combo total preview */}
             {form.comboItems.length > 0 && (
               <div className="flex items-center justify-between p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
-                <span className="font-mono text-[10px] uppercase font-bold text-amber-700 tracking-wider">
+                <span className="font-mono text-xs uppercase font-bold text-amber-700 tracking-wider">
                   Tổng Giá Vốn Thành Phần
                 </span>
                 <span className="font-mono text-sm font-extrabold text-amber-700">

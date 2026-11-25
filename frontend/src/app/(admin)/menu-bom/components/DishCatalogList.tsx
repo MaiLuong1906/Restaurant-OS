@@ -91,7 +91,7 @@ export function DishCatalogList({
                     {dish.name}
                   </strong>
                   {dish.isCombo && (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-mono text-[10px] font-extrabold uppercase border border-amber-200">
+                    <span className="shrink-0 px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-mono text-xs font-extrabold uppercase border border-amber-200">
                       COMBO
                     </span>
                   )}
@@ -125,7 +125,7 @@ export function DishCatalogList({
               }
             >
               <span
-                className={`text-[10px] font-bold transition-colors hidden sm:block ${
+                className={`text-xs font-bold transition-colors hidden sm:block ${
                   dish.isAvailable ? 'text-emerald-700' : 'text-stone-400'
                 }`}
               >

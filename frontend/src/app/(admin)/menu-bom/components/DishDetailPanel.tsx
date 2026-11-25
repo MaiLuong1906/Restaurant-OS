@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Edit2, Trash2, Package, ChevronRight, UtensilsCrossed } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
+import { dishService } from '@/services/dishService';
 import { DISH_CATEGORY_LABELS, DishCategory, DishResponseDto } from '@/types/dish';
 
 export interface DishDetailPanelProps {
@@ -29,9 +30,9 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
   const categoryLabel =
     DISH_CATEGORY_LABELS[dish.category as DishCategory] ?? dish.category;
 
-  const comboTotal = dish.comboItems.reduce(
-    (sum, item) => sum + item.dishPrice * item.quantity,
-    0
+  const { totalCost: comboTotal, savings: comboSavings } = dishService.calculateComboFinancials(
+    dish.price,
+    dish.comboItems
   );
 
   return (
@@ -47,7 +48,7 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
               </span>
             )}
             <span
-              className={`shrink-0 px-2 py-0.5 rounded font-mono text-[10px] font-bold uppercase border ${
+              className={`shrink-0 px-2 py-0.5 rounded font-mono text-xs font-bold uppercase border ${
                 dish.isAvailable
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-rose-50 text-rose-600 border-rose-200'
@@ -118,7 +119,7 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
                 Tiết Kiệm (Khách)
               </span>
               <span className="font-mono text-lg font-extrabold text-emerald-700 mt-1 block">
-                {formatVND(Math.max(0, comboTotal - dish.price))}
+                {formatVND(comboSavings)}
               </span>
             </div>
           </>
@@ -146,7 +147,7 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
           <div className="overflow-y-auto border border-stone-200 rounded-xl shadow-2xs bg-white flex-1 max-h-[300px]">
             <table className="w-full text-left text-xs border-collapse min-w-[480px]">
               <thead className="sticky top-0 z-10 bg-stone-100 shadow-2xs">
-                <tr className="border-b border-stone-200 text-stone-600 font-mono text-[10px] uppercase">
+                <tr className="border-b border-stone-200 text-stone-600 font-mono text-xs uppercase">
                   <th className="py-3 px-3 font-bold">Tên Món</th>
                   <th className="py-3 px-3 font-bold text-center">SL</th>
                   <th className="py-3 px-3 font-bold text-right">Đơn Giá</th>
@@ -174,7 +175,7 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
                           <strong className="text-stone-900 font-bold text-xs block">
                             {item.dishName}
                           </strong>
-                          <span className="text-stone-400 text-[10px]">
+                          <span className="text-stone-400 text-xs">
                             {DISH_CATEGORY_LABELS[item.dishCategory as DishCategory] ??
                               item.dishCategory}
                           </span>

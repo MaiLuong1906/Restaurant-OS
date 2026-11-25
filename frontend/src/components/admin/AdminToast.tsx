@@ -76,7 +76,7 @@ export function AdminToast({ message, type: explicitType, onClose }: AdminToastP
     <div
       role="status"
       aria-live="polite"
-      className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-stone-200/90 text-stone-900 min-w-[320px] max-w-md border-l-4 ${config.borderLeft} animate-in fade-in slide-in-from-bottom-4 duration-300`}
+      className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-stone-200/90 text-stone-900 min-w-[320px] max-w-md border-l-4 ${config.borderLeft} animate-in fade-in slide-in-from-bottom-4 duration-300`}
     >
       {/* Icon badge */}
       <div
@@ -87,7 +87,7 @@ export function AdminToast({ message, type: explicitType, onClose }: AdminToastP
 
       {/* Message content */}
       <div className="flex-1 min-w-0 pr-1">
-        <p className="font-mono text-[10px] uppercase font-bold text-stone-600 tracking-wider">
+        <p className="font-mono text-xs uppercase font-bold text-stone-600 tracking-wider">
           {config.title}
         </p>
         <p className="text-xs font-semibold text-stone-900 mt-0.5 leading-snug break-words">
