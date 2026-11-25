@@ -179,7 +179,9 @@ export function LeaveFormView({
                 <span className="text-[#7A6A58]">Quỹ phép sau khi được duyệt</span>
                 <span className="font-semibold text-[#141210]">
                   {selectedType === 'ANNUAL'
-                    ? `${quotaAfterApproval} ngày`
+                    ? quotaAfterApproval !== null
+                      ? `${quotaAfterApproval} ngày`
+                      : '—'
                     : 'Không trừ quỹ phép năm'}
                 </span>
               </div>

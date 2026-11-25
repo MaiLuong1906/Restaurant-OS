@@ -3,10 +3,19 @@
 import * as React from 'react';
 import { staffLeavePayrollService } from '@/services/staffLeavePayrollService';
 import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus } from '@/types';
-import { parseDateKey } from '@/lib/dateKey';
-import { generateIdempotencyKey } from '@/lib/utils';
+import { addDays, parseDateKey } from '@/lib/dateKey';
+import { formatIsoDate, generateIdempotencyKey } from '@/lib/utils';
 import { LeaveListView } from '@/components/staff/leave/LeaveListView';
 import { LeaveFormView } from '@/components/staff/leave/LeaveFormView';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+
+function getDefaultDateRange(): { start: string; end: string } {
+  const todayKey = formatIsoDate(new Date());
+  return {
+    start: todayKey,
+    end: addDays(todayKey, 1),
+  };
+}
 
 export default function LeavePage() {
   // Navigation / Views: 'B9' (Danh sách đơn) | 'B10' (Form xin nghỉ)
@@ -19,10 +28,18 @@ export default function LeavePage() {
   const [, setLoading] = React.useState<boolean>(true);
   const [, setError] = React.useState<string | null>(null);
 
-  // B10 Form states (3 bước)
+  // Modal xác nhận rút đơn & Toast thông báo
+  const [withdrawTargetId, setWithdrawTargetId] = React.useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = React.useState<boolean>(false);
+  const [toast, setToast] = React.useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  // B10 Form states (3 bước) — khởi tạo ngày mặc định theo ngày hiện tại
   const [selectedType, setSelectedType] = React.useState<LeaveType | null>(null);
-  const [startDate, setStartDate] = React.useState<string>('2026-11-16');
-  const [endDate, setEndDate] = React.useState<string>('2026-11-17');
+  const [startDate, setStartDate] = React.useState<string>(() => getDefaultDateRange().start);
+  const [endDate, setEndDate] = React.useState<string>(() => getDefaultDateRange().end);
   const [reason, setReason] = React.useState<string>('');
   const [leaveIdempotencyKey, setLeaveIdempotencyKey] = React.useState<string>(() =>
     generateIdempotencyKey()
@@ -30,6 +47,16 @@ export default function LeavePage() {
   const [submitting, setSubmitting] = React.useState<boolean>(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [successReq, setSuccessReq] = React.useState<LeaveRequest | null>(null);
+
+  const showToast = React.useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+  }, []);
+
+  React.useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const loadData = React.useCallback(async () => {
     try {
@@ -73,10 +100,11 @@ export default function LeavePage() {
 
   // Mở form B10: sinh idempotencyKey 1 lần cho phiên thao tác
   const handleOpenForm = () => {
+    const defaults = getDefaultDateRange();
     setView('B10');
     setSelectedType(null);
-    setStartDate('2026-11-16');
-    setEndDate('2026-11-17');
+    setStartDate(defaults.start);
+    setEndDate(defaults.end);
     setReason('');
     setFormError(null);
     setSuccessReq(null);
@@ -148,19 +176,48 @@ export default function LeavePage() {
     }
   };
 
-  const handleWithdraw = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn rút đơn xin nghỉ này?')) return;
+  const handleRequestWithdraw = (id: string) => {
+    setWithdrawTargetId(id);
+  };
+
+  const handleConfirmWithdraw = async () => {
+    if (!withdrawTargetId || withdrawing) return;
+    setWithdrawing(true);
     try {
-      await staffLeavePayrollService.withdrawLeaveRequest({ id });
+      await staffLeavePayrollService.withdrawLeaveRequest({ id: withdrawTargetId });
+      setWithdrawTargetId(null);
+      showToast('success', 'Đã rút đơn xin nghỉ thành công.');
       loadData();
     } catch (err) {
-      alert((err as Error).message || 'Không thể rút đơn xin nghỉ');
+      setWithdrawTargetId(null);
+      showToast('error', (err as Error).message || 'Không thể rút đơn xin nghỉ.');
+    } finally {
+      setWithdrawing(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F6F4F0] text-[#141210] pb-24">
       <div className="max-w-xl mx-auto px-4 py-4 space-y-4">
+        {/* Toast thông báo chuẩn UI */}
+        {toast && (
+          <div
+            role="status"
+            className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 shadow-xs ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-red-50 border-red-200 text-[#D14B3A]'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-[#D14B3A] shrink-0" />
+            )}
+            <span>{toast.message}</span>
+          </div>
+        )}
+
         {view === 'B9' && (
           <LeaveListView
             balance={balance}
@@ -168,7 +225,7 @@ export default function LeavePage() {
             filter={filter}
             onChangeFilter={setFilter}
             onOpenForm={handleOpenForm}
-            onWithdraw={handleWithdraw}
+            onWithdraw={handleRequestWithdraw}
           />
         )}
 
@@ -192,6 +249,46 @@ export default function LeavePage() {
             onSubmit={handleSubmitLeave}
             onResetForm={handleOpenForm}
           />
+        )}
+
+        {/* Modal xác nhận rút đơn chuẩn UI (thay thế confirm/alert trình duyệt) */}
+        {withdrawTargetId && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="withdraw-modal-title"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          >
+            <div className="w-full max-w-sm rounded-xl bg-white border border-[#E9E4DC] p-5 shadow-lg space-y-4">
+              <div>
+                <h2 id="withdraw-modal-title" className="text-base font-bold text-[#2B2118]">
+                  Xác nhận rút đơn xin nghỉ
+                </h2>
+                <p className="text-xs text-[#7A6A58] mt-1">
+                  Bạn có chắc chắn muốn rút đơn xin nghỉ này? Đơn sau khi rút sẽ chuyển sang trạng
+                  thái Đã rút đơn.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={withdrawing}
+                  onClick={() => setWithdrawTargetId(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-[#E9E4DC] bg-white text-[#2B2118] hover:bg-[#F6F4F0] min-h-[44px]"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  disabled={withdrawing}
+                  onClick={handleConfirmWithdraw}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-[#D14B3A] hover:bg-red-700 text-white min-h-[44px] disabled:opacity-50"
+                >
+                  {withdrawing ? 'Đang rút...' : 'Xác nhận rút đơn'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

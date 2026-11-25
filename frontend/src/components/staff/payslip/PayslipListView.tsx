@@ -18,6 +18,13 @@ export function PayslipListView({
   onOpenPayslipDetail,
   onOpenTipDetail,
 }: PayslipListViewProps) {
+  const latestTipDateLabel =
+    currentTipMonth?.dailyEntries && currentTipMonth.dailyEntries.length > 0
+      ? `Cập nhật đến ${currentTipMonth.dailyEntries[0].dateLabel}`
+      : currentTipMonth
+        ? `Kỳ ${currentTipMonth.monthKey}`
+        : '';
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between">
@@ -40,7 +47,7 @@ export function PayslipListView({
               </div>
               <div>
                 <h2 className="text-sm font-bold text-[#2B2118]">{currentTipMonth.monthLabel}</h2>
-                <p className="text-xs text-[#7A6A58]">Tính đến 05/11</p>
+                <p className="text-xs text-[#7A6A58]">{latestTipDateLabel}</p>
               </div>
             </div>
             <div className="text-right">

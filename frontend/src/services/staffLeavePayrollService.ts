@@ -12,8 +12,8 @@ import { generateIdempotencyKey } from '../lib/utils';
 import { useAuthStore } from '../stores/useAuthStore';
 import { staffService as mockStaffService } from './mock/mockStaffService';
 
-const DEFAULT_LOCAL_STAFF_UUID = '00000000-0000-4000-8000-000000000001';
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DEFAULT_LOCAL_STAFF_UUID = '00000000-0000-0000-0000-000000000021';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type ApiFetcher = <T>(endpoint: string, options?: RequestInit) => Promise<T>;
 
@@ -67,10 +67,7 @@ export class StaffLeavePayrollService {
       const data = await this.fetcher<LeaveRequest[]>(
         `/staff/leaves?staffId=${encodeURIComponent(staffId)}`
       );
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
-      }
-      return mockStaffService.getLeaveRequests();
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
         return mockStaffService.getLeaveRequests();
@@ -146,10 +143,7 @@ export class StaffLeavePayrollService {
 
     try {
       const data = await this.fetcher<Payslip[]>(`/staff/payroll/payslips?${query.toString()}`);
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
-      }
-      return mockStaffService.getPayslips(params);
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
         return mockStaffService.getPayslips(params);
@@ -177,10 +171,7 @@ export class StaffLeavePayrollService {
       const data = await this.fetcher<TipMonthSummary[]>(
         `/staff/payroll/tips/months?staffId=${encodeURIComponent(staffId)}`
       );
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
-      }
-      return mockStaffService.getTipMonths();
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
         return mockStaffService.getTipMonths();
@@ -197,10 +188,7 @@ export class StaffLeavePayrollService {
 
     try {
       const data = await this.fetcher<TipRecord[]>(`/staff/payroll/tips?${query.toString()}`);
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
-      }
-      return mockStaffService.getTips(params);
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
         return mockStaffService.getTips(params);

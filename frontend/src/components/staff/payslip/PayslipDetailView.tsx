@@ -13,7 +13,9 @@ export interface PayslipDetailViewProps {
 export function PayslipDetailView({ payslip, onBack }: PayslipDetailViewProps) {
   const incomeTotal =
     payslip.workedHours * payslip.hourlyRate + payslip.allowance + payslip.bonus;
-  const deductionTotal = (payslip.bhxhAmount || 0) + (payslip.advanceAmount || 0);
+  const bhxhAmount = payslip.bhxhAmount ?? 0;
+  const advanceAmount = payslip.advanceAmount ?? 0;
+  const deductionTotal = bhxhAmount + advanceAmount;
 
   return (
     <div className="space-y-4">
@@ -46,8 +48,9 @@ export function PayslipDetailView({ payslip, onBack }: PayslipDetailViewProps) {
         <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg flex items-start gap-2">
           <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <div>
-            <b>Phiếu tạm tính</b> — tính theo lịch ca đã xếp cả tháng (100 giờ × 40.000đ), chưa
-            phải giờ làm thực tế. Số liệu sẽ thay đổi khi hết tháng.
+            <b>Phiếu tạm tính</b> — tính theo lịch ca đã xếp cả tháng ({payslip.workedHours} giờ ×{' '}
+            {formatVnd(payslip.hourlyRate)}), chưa phải giờ làm thực tế. Số liệu sẽ thay đổi khi hết
+            tháng.
           </div>
         </div>
       )}
@@ -102,13 +105,13 @@ export function PayslipDetailView({ payslip, onBack }: PayslipDetailViewProps) {
         <div className="flex justify-between py-1">
           <span className="text-[#7A6A58]">Bảo hiểm xã hội</span>
           <span className="font-semibold text-[#D14B3A] tabular-nums">
-            -{formatVnd(payslip.bhxhAmount || 200000)}
+            -{formatVnd(bhxhAmount)}
           </span>
         </div>
         <div className="flex justify-between py-1 border-t border-[#F6F4F0]">
           <span className="text-[#7A6A58]">Tạm ứng</span>
           <span className="font-semibold text-[#D14B3A] tabular-nums">
-            -{formatVnd(payslip.advanceAmount || 50000)}
+            -{formatVnd(advanceAmount)}
           </span>
         </div>
         <div className="flex justify-between pt-2 border-t border-[#E9E4DC] font-bold text-[#2B2118]">
@@ -134,7 +137,7 @@ export function PayslipDetailView({ payslip, onBack }: PayslipDetailViewProps) {
         <div className="flex justify-between py-1 border-t border-[#F6F4F0]">
           <span className="text-[#7A6A58]">Ngày thanh toán</span>
           <span className="font-semibold text-[#141210]">
-            {payslip.paymentDateLabel || '10/12/2026'}
+            {payslip.paymentDateLabel || '—'}
           </span>
         </div>
       </div>

@@ -12,6 +12,15 @@ export interface TipDetailViewProps {
 }
 
 export function TipDetailView({ currentTipMonth, tipMonths, onBack }: TipDetailViewProps) {
+  const summaryHeading = currentTipMonth.monthLabel
+    ? `Tổng ${currentTipMonth.monthLabel.toLowerCase()}`
+    : `Tổng tip kỳ ${currentTipMonth.monthKey}`;
+
+  const latestTipDateLabel =
+    currentTipMonth.dailyEntries && currentTipMonth.dailyEntries.length > 0
+      ? `Cập nhật đến ${currentTipMonth.dailyEntries[0].dateLabel}`
+      : `Kỳ ${currentTipMonth.monthKey}`;
+
   return (
     <div className="space-y-4">
       <button
@@ -33,12 +42,12 @@ export function TipDetailView({ currentTipMonth, tipMonths, onBack }: TipDetailV
       {/* Tổng tip card */}
       <div className="bg-white rounded-lg border border-[#E9E4DC] p-4 shadow-xs space-y-2">
         <h2 className="text-xs font-semibold text-[#7A6A58] uppercase tracking-wider">
-          Tổng tip tháng 11
+          {summaryHeading}
         </h2>
         <div className="text-3xl font-bold text-[#8C1D2C] tabular-nums">
           {formatVnd(currentTipMonth.totalAmount)}
         </div>
-        <p className="text-xs text-[#7A6A58]">Tính đến 05/11</p>
+        <p className="text-xs text-[#7A6A58]">{latestTipDateLabel}</p>
         <div>
           <span className="inline-block px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-[#7A6A58] rounded">
             {currentTipMonth.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'}

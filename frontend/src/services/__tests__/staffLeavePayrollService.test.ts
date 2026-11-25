@@ -29,7 +29,7 @@ describe('StaffLeavePayrollService', () => {
 
   it('getLeaveBalance gọi GET /staff/leaves/balance và chuẩn hóa kết quả', async () => {
     nextResolver = async () => ({
-      staffId: '00000000-0000-4000-8000-000000000001',
+      staffId: '00000000-0000-0000-0000-000000000021',
       totalDays: 12,
       usedDays: 4,
       remainingDays: 8,
@@ -44,10 +44,24 @@ describe('StaffLeavePayrollService', () => {
     expect(balance.remainingDays).toBe(8);
   });
 
+  it('bảo toàn Empty State: trả về đúng mảng rỗng [] khi backend trả [] mà không ghi đè bằng mock', async () => {
+    nextResolver = async () => [];
+
+    const leaves = await service.getLeaveRequests();
+    const payslips = await service.getPayslips();
+    const tipMonths = await service.getTipMonths();
+    const tips = await service.getTips();
+
+    expect(leaves).toEqual([]);
+    expect(payslips).toEqual([]);
+    expect(tipMonths).toEqual([]);
+    expect(tips).toEqual([]);
+  });
+
   it('createLeaveRequest gửi POST /staff/leaves kèm header Idempotency-Key', async () => {
     nextResolver = async () => ({
       id: 'leave-uuid-1',
-      staffId: '00000000-0000-4000-8000-000000000001',
+      staffId: '00000000-0000-0000-0000-000000000021',
       staffName: 'Nhân Viên Vận Hành',
       type: 'ANNUAL',
       startDate: '2026-11-16',
