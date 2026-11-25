@@ -104,8 +104,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").authenticated()
                         .requestMatchers("/api/v1/admin/dishes", "/api/v1/admin/dishes/**").authenticated()
 
-                        // 8. Quản lý ca mở & Đăng ký ca làm việc (kết hợp @PreAuthorize & chống IDOR)
-                        .requestMatchers("/api/v1/staff/schedule/**").authenticated()
+                        // 8. Quản lý ca mở, Đơn xin nghỉ phép & Phiếu lương/Tip nhân viên (kết hợp @PreAuthorize & chống IDOR)
+                        .requestMatchers("/api/v1/staff/schedule/**", "/api/v1/staff/leaves/**", "/api/v1/staff/payroll/**", "/api/v1/admin/leaves/**").authenticated()
 
                         // 9. Đặt bàn & Check-in POS (kết hợp @PreAuthorize chi tiết theo từng method)
                         .requestMatchers("/api/v1/reservations/**").authenticated()
