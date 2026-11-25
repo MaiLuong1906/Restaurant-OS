@@ -129,23 +129,29 @@ def run_live_evaluation(live: bool = True) -> int:
     valid_vouchers = {"PHOCO10", "WELCOME15"}
     mock_valid_tables = {"TB-01", "TB-02", "TB-03"}
 
-    # Chuẩn bị trước cho case 38 nếu ở real backend: tạo 1 đặt bàn thật trước để case 38 hủy
-    if is_real_backend:
-        try:
-            pre_booking = engine.tool_executor.adapter.create_booking(
-                name="Test Eval",
-                phone="0999888777",
-                date="2026-11-26",
-                time="19:00",
-                party_size=2,
-                table_id="",
-                note="Đặt bàn test để hủy ở case 38"
-            )
-            if pre_booking.get("status") == "success":
-                engine._last_created_booking_code = pre_booking["booking"]["booking_code"]
+    # Chuẩn bị trước cho case 38: tạo 1 đặt bàn trước bằng adapter để case 38 ("Hủy bàn vừa đặt giúp mình") có mã hủy
+    try:
+        pre_table_id = "" if is_real_backend else "TB-01"
+        if is_real_backend:
+            avail = engine.tool_executor.adapter.check_table_availability("2026-11-26", "19:00", 2)
+            avail_tables = avail.get("available_tables", [])
+            if avail_tables:
+                pre_table_id = avail_tables[0]["table_id"]
+        pre_booking = engine.tool_executor.adapter.create_booking(
+            name="Test Eval",
+            phone="0999888777",
+            date="2026-11-26",
+            time="19:00",
+            party_size=2,
+            table_id=pre_table_id,
+            note="Đặt bàn test để hủy ở case 38"
+        )
+        if pre_booking.get("status") == "success":
+            engine._last_created_booking_code = pre_booking["booking"]["booking_code"]
+            if is_real_backend:
                 print(f"[SETUP] Đã tạo đặt bàn test cho case 38: UUID = {engine._last_created_booking_code}")
-        except Exception as e:
-            print(f"[SETUP WARNING] Không thể tạo pre-booking cho case 38: {e}")
+    except Exception as e:
+        print(f"[SETUP WARNING] Không thể tạo pre-booking cho case 38: {e}")
 
     for case in GOLDEN_QUESTIONS:
         session_id = str(uuid.uuid4())
@@ -195,8 +201,13 @@ def run_live_evaluation(live: bool = True) -> int:
         if case["category"] == "booking":
             booking_cases += 1
             if case["expected_tool"] == "create_booking":
-                if "booking_card" in event_names and intent_ok:
-                    booking_pass += 1
+                has_explicit_table = bool(re.search(r'\bTB-\d+\b', case["query"], re.IGNORECASE))
+                if has_explicit_table:
+                    if "booking_card" in event_names and intent_ok:
+                        booking_pass += 1
+                else:
+                    if ("booking_card" in event_names or len(full_text.strip()) > 10) and intent_ok:
+                        booking_pass += 1
             else:
                 if intent_ok and len(full_text.strip()) > 10:
                     booking_pass += 1

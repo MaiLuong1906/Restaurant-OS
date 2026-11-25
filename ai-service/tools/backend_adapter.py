@@ -52,6 +52,22 @@ class MockBackendAdapter:
         }
 
     def create_booking(self, name: str, phone: str, date: str, time: str, party_size: int, table_id: str, note: Optional[str] = None, idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        if not table_id:
+            avail = self.check_table_availability(date, time, party_size)
+            tables = avail.get("available_tables", [])
+            if not tables:
+                return {
+                    "is_mock": True,
+                    "status": "failed",
+                    "message": "Rất tiếc vào khung giờ này nhà hàng không còn bàn trống phù hợp ạ."
+                }
+            return {
+                "is_mock": True,
+                "status": "needs_table_selection",
+                "available_tables": tables,
+                "message": f"Hiện có {len(tables)} bàn trống, bạn muốn chọn bàn nào?"
+            }
+
         # Deduplication check by (phone, date, time)
         dedup_key = f"{phone}_{date}_{time}"
         if dedup_key in self._bookings:
@@ -70,7 +86,7 @@ class MockBackendAdapter:
             "date": date,
             "time": time,
             "party_size": party_size,
-            "table_id": table_id or "TB-01",
+            "table_id": table_id,
             "note": note or "",
             "status": "CONFIRMED",
             "idempotency_key": idempotency_key or str(uuid.uuid4())

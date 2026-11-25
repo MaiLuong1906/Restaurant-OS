@@ -158,3 +158,34 @@ def test_multi_turn_menu_history_carry_over():
     assert "assistant" in roles
     assert any("Phở bò tái giá bao nhiêu?" in m["content"] for m in turn2_llm_messages if m["role"] == "user")
     assert any(e["event"] == "dish_card" for e in events_turn2)
+
+def test_mock_create_booking_without_table_id_returns_needs_table_selection():
+    adapter = MockBackendAdapter()
+    res = adapter.create_booking(
+        name="Huy",
+        phone="0912345678",
+        date="2026-11-25",
+        time="19:00",
+        party_size=2,
+        table_id=""
+    )
+    assert res["status"] == "needs_table_selection"
+    assert len(res["available_tables"]) >= 1
+    assert "booking" not in res
+
+def test_single_turn_booking_without_table_id_asks_for_table_selection():
+    adapter = MockBackendAdapter()
+    executor = ToolExecutor(adapter=adapter)
+    engine = ChatEngine(tool_executor=executor, force_mock_llm=True)
+    session_id = str(uuid.uuid4())
+
+    events = list(
+        engine.process_chat_stream(
+            session_id,
+            "Đặt bàn 2 người tối nay lúc 19h, tên Huy, SĐT 0912345678"
+        )
+    )
+    event_names = [e["event"] for e in events]
+    assert "booking_card" not in event_names, "Không được phát booking_card khi khách chưa chọn bàn"
+    full_text = "\n".join(e["data"] for e in events if e["event"] == "text")
+    assert "bàn trống" in full_text.lower() or "chọn bàn" in full_text.lower()
