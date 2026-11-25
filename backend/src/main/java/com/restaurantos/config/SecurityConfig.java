@@ -99,13 +99,14 @@ public class SecurityConfig {
                         // 6. KDS Bếp chính (non-local; profile local dùng KdsLocalSecurityConfig @Order(1))
                         .requestMatchers(HttpMethod.GET, "/api/v1/kds/**").hasAuthority("KDS:QUEUE:VIEW")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/kds/**").hasAuthority("KDS:COOKING_STATUS:UPDATE")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/kds/batches/complete").hasAuthority("KDS:COOKING_STATUS:UPDATE")
 
                         // 7. Quản trị nhân sự & thực đơn (kết hợp @PreAuthorize chi tiết theo từng method)
                         .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").authenticated()
                         .requestMatchers("/api/v1/admin/dishes", "/api/v1/admin/dishes/**").authenticated()
 
-                        // 8. Quản lý ca mở & Đăng ký ca làm việc (kết hợp @PreAuthorize & chống IDOR)
-                        .requestMatchers("/api/v1/staff/schedule/**").authenticated()
+                        // 8. Quản lý ca mở, Đơn xin nghỉ phép & Phiếu lương/Tip nhân viên (kết hợp @PreAuthorize & chống IDOR)
+                        .requestMatchers("/api/v1/staff/schedule/**", "/api/v1/staff/leaves/**", "/api/v1/staff/payroll/**", "/api/v1/admin/leaves/**").authenticated()
 
                         // 9. Đặt bàn & Check-in POS (kết hợp @PreAuthorize chi tiết theo từng method)
                         .requestMatchers("/api/v1/reservations/**").authenticated()
