@@ -9,6 +9,7 @@ import {
   FALLBACK_DISH_IMAGE,
   triggerHaptic,
 } from '@/lib/customer-menu-data';
+import { customerMenuService } from '@/services/customerMenuService';
 import { formatVND } from '@/lib/utils';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import {
@@ -106,6 +107,44 @@ function MenuCustomerContent() {
     useState<CustomerDish | null>(null);
   const [isCallStaffOpen, setIsCallStaffOpen] = useState(false);
 
+  // Danh sách thực đơn kết nối API thật từ Backend
+  const [dishes, setDishes] = useState<CustomerDish[]>(PHO_CO_DISHES);
+  const [loadingDishes, setLoadingDishes] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const fetchDishes = async () => {
+    try {
+      const data = await customerMenuService.getPublicDishes();
+      if (data && data.length > 0) {
+        setDishes(data);
+      }
+    } catch {
+      // Fallback tự động giữ PHO_CO_DISHES nếu offline
+    } finally {
+      setLoadingDishes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDishes();
+
+    // Reconnect sync khi user quay lại tab hoặc kết nối mạng phục hồi
+    const handleSync = () => {
+      fetchDishes();
+    };
+
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('online', handleSync);
+    return () => {
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('online', handleSync);
+    };
+  }, []);
+
   useEffect(() => {
     if (urlTab === 'search') {
       setActiveTab('search');
@@ -124,10 +163,10 @@ function MenuCustomerContent() {
     getPlacedItemCount,
   } = useCartStore();
 
-  const displayTable = tableNumber || 'Bàn 04';
-  const cartCount = getTotalItemCount();
-  const cartTotal = getTotalAmount();
-  const placedCount = getPlacedItemCount();
+  const displayTable = mounted ? (tableNumber || 'Bàn 04') : 'Bàn 04';
+  const cartCount = mounted ? getTotalItemCount() : 0;
+  const cartTotal = mounted ? getTotalAmount() : 0;
+  const placedCount = mounted ? getPlacedItemCount() : 0;
 
   const handleTabChange = (tab: CustomerTabKey) => {
     setActiveTab(tab);
@@ -139,7 +178,7 @@ function MenuCustomerContent() {
   };
 
   // Filter dishes for Menu view
-  const menuDishes = PHO_CO_DISHES.filter((dish) => {
+  const menuDishes = dishes.filter((dish) => {
     if (activeCategory !== 'ALL' && dish.subCategory !== activeCategory) {
       return false;
     }
@@ -154,7 +193,7 @@ function MenuCustomerContent() {
   });
 
   // Filter dishes for Search & Discovery view
-  const searchResults = PHO_CO_DISHES.filter((dish) => {
+  const searchResults = dishes.filter((dish) => {
     if (activeMood === 'VEG' && !dish.isVegetarian) return false;
     if (activeMood === 'SPICY' && !dish.isSpicy) return false;
     if (activeMood === 'HOT_SOUP' && !dish.isHotSoup) return false;
@@ -187,16 +226,19 @@ function MenuCustomerContent() {
   };
 
   const renderDishCard = (dish: CustomerDish) => {
-    const qtyInCart = getDishQuantityInCart(dish.id);
+    const qtyInCart = mounted ? getDishQuantityInCart(dish.id) : 0;
+    const isAvailable = dish.isAvailable !== false;
 
     return (
       <article
         key={dish.id}
         onClick={() => setSelectedDishForDetail(dish)}
-        className={`gpu-accelerated cursor-pointer rounded-2xl bg-white p-3 shadow-[0_2px_8px_-2px_rgba(41,37,36,0.06)] transition-all flex gap-3 items-center border ${
-          qtyInCart > 0
-            ? 'border-[#9a401c]/50 ring-1 ring-[#9a401c]/20'
-            : 'border-[#dcc1b8]/40 hover:border-[#9a401c]/30'
+        className={`gpu-accelerated cursor-pointer rounded-2xl p-3 transition-all flex gap-3 items-center border ${
+          !isAvailable
+            ? 'bg-stone-50/80 border-stone-200 opacity-65'
+            : qtyInCart > 0
+              ? 'bg-white border-[#9a401c]/50 ring-1 ring-[#9a401c]/20 shadow-[0_2px_8px_-2px_rgba(41,37,36,0.06)]'
+              : 'bg-white border-[#dcc1b8]/40 hover:border-[#9a401c]/30 shadow-[0_2px_8px_-2px_rgba(41,37,36,0.06)]'
         }`}
       >
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-[#f5ecea]">
@@ -209,9 +251,13 @@ function MenuCustomerContent() {
             onError={(e) => {
               e.currentTarget.src = FALLBACK_DISH_IMAGE;
             }}
-            className="h-full w-full object-cover"
+            className={`h-full w-full object-cover ${!isAvailable ? 'grayscale-[35%]' : ''}`}
           />
-          {dish.badge ? (
+          {!isAvailable ? (
+            <span className="absolute top-1 left-1 flex items-center rounded-full bg-stone-700/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
+              Hết món
+            </span>
+          ) : dish.badge ? (
             <span
               className={`absolute top-1 left-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
                 dish.badgeVariant === 'recommend'
@@ -234,9 +280,9 @@ function MenuCustomerContent() {
           ) : null}
         </div>
 
-        <div className="flex h-24 min-w-0 flex-1 flex-col justify-between py-0.5">
+        <div className="flex min-h-[96px] min-w-0 flex-1 flex-col justify-between py-0.5">
           <div>
-            <h3 className="truncate font-display text-sm font-bold text-[#1e1b1a]">
+            <h3 className={`line-clamp-2 leading-snug font-display text-sm font-bold ${!isAvailable ? 'text-stone-500 line-through' : 'text-[#1e1b1a]'}`}>
               {dish.name}
             </h3>
             <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-[#56423c]">
@@ -245,11 +291,15 @@ function MenuCustomerContent() {
           </div>
 
           <div className="mt-auto flex items-center justify-between pt-1">
-            <span className="ops-nums font-display text-sm font-extrabold text-[#9a401c]">
+            <span className={`ops-nums font-display text-sm font-extrabold ${!isAvailable ? 'text-stone-500' : 'text-[#9a401c]'}`}>
               {formatVND(dish.price)}
             </span>
 
-            {qtyInCart > 0 ? (
+            {!isAvailable ? (
+              <span className="inline-flex min-h-[30px] items-center rounded-full bg-stone-200 px-2.5 py-1 text-[10px] font-semibold text-stone-600">
+                Tạm hết
+              </span>
+            ) : qtyInCart > 0 ? (
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="flex items-center rounded-full bg-[#efe6e4] p-0.5 shadow-inner"
@@ -336,8 +386,10 @@ function MenuCustomerContent() {
                   <span>Đang phục vụ {displayTable} • Tầng 1</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#00873a]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#00873a]" />
-                  <span>Bếp sẵn sàng</span>
+                  <span className={`h-1.5 w-1.5 rounded-full ${loadingDishes ? 'bg-amber-500 animate-pulse' : 'bg-[#00873a]'}`} />
+                  <span className={loadingDishes ? 'text-amber-700' : 'text-[#00873a]'}>
+                    {loadingDishes ? 'Đang đồng bộ thực đơn...' : 'Bếp sẵn sàng'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -349,13 +401,13 @@ function MenuCustomerContent() {
                   {
                     id: 'ALL',
                     label: 'Tất cả',
-                    count: PHO_CO_DISHES.length,
+                    count: dishes.length,
                     icon: Utensils,
                   },
                   {
                     id: 'APPETIZER',
                     label: 'Khai vị',
-                    count: PHO_CO_DISHES.filter(
+                    count: dishes.filter(
                       (d) => d.subCategory === 'APPETIZER'
                     ).length,
                     icon: Sparkles,
@@ -363,21 +415,21 @@ function MenuCustomerContent() {
                   {
                     id: 'MAIN',
                     label: 'Món chính',
-                    count: PHO_CO_DISHES.filter((d) => d.subCategory === 'MAIN')
+                    count: dishes.filter((d) => d.subCategory === 'MAIN')
                       .length,
                     icon: Flame,
                   },
                   {
                     id: 'SOUP',
                     label: 'Món Nước & Lẩu',
-                    count: PHO_CO_DISHES.filter((d) => d.subCategory === 'SOUP')
+                    count: dishes.filter((d) => d.subCategory === 'SOUP')
                       .length,
                     icon: Soup,
                   },
                   {
                     id: 'DESSERT',
                     label: 'Tráng miệng',
-                    count: PHO_CO_DISHES.filter(
+                    count: dishes.filter(
                       (d) => d.subCategory === 'DESSERT'
                     ).length,
                     icon: Cake,
@@ -385,7 +437,7 @@ function MenuCustomerContent() {
                   {
                     id: 'DRINK',
                     label: 'Thức uống',
-                    count: PHO_CO_DISHES.filter(
+                    count: dishes.filter(
                       (d) => d.subCategory === 'DRINK'
                     ).length,
                     icon: Coffee,
@@ -477,6 +529,27 @@ function MenuCustomerContent() {
                 </section>
               );
             })}
+
+            {menuDishes.length === 0 && (
+              <div className="py-12 px-4 text-center space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f5ecea] text-[#9a401c]">
+                  <Utensils className="h-6 w-6" />
+                </div>
+                <h3 className="font-display text-base font-bold text-[#1e1b1a]">Không tìm thấy món phù hợp</h3>
+                <p className="text-xs text-[#56423c] max-w-xs mx-auto">
+                  Vui lòng thử tìm từ khóa khác hoặc đổi danh mục thực đơn.
+                </p>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="text-xs font-bold text-[#9a401c] underline"
+                  >
+                    Xóa tìm kiếm
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Reassurance & Custom Taste Note Banner */}
             <div className="px-4 pt-4 pb-2">

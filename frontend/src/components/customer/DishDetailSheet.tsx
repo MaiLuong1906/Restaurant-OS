@@ -70,6 +70,7 @@ export function DishDetailSheet({
 
   const portionOptions = dish.portionSizes ?? [];
   const addonOptions = dish.addons ?? [];
+  const isAvailable = dish.isAvailable !== false;
 
   const activePortion =
     portionOptions.find((p) => p.id === selectedPortionId) || portionOptions[0];
@@ -197,7 +198,11 @@ export function DishDetailSheet({
                 {formatVND(dish.price)}
               </span>
               {dish.badge ? (
-                <span className="rounded-full bg-[#efe6e4] px-2.5 py-0.5 text-[11px] font-semibold text-[#56423c]">
+                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                  !isAvailable
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-[#efe6e4] text-[#56423c]'
+                }`}>
                   {dish.badge}
                 </span>
               ) : null}
@@ -206,6 +211,15 @@ export function DishDetailSheet({
               {dish.description}
             </p>
           </div>
+
+          {!isAvailable && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200/80 p-3 text-xs text-amber-900 flex items-center gap-2.5">
+              <Info className="h-4 w-4 shrink-0 text-amber-700" />
+              <span>
+                Món ăn này hiện đang tạm hết phục vụ tại bếp. Quý khách vui lòng tham khảo các món ăn khác trong thực đơn.
+              </span>
+            </div>
+          )}
 
           {/* Group 1: Portion Size (Radio) - Chỉ hiển thị khi món có dữ liệu portionSizes */}
           {portionOptions.length > 0 && (
@@ -355,59 +369,69 @@ export function DishDetailSheet({
 
         {/* Sticky Bottom Add-to-Cart Bar */}
         <div className="shrink-0 border-t border-[#dcc1b8]/50 bg-[#fff8f6] px-4 py-3.5 shadow-[0_-6px_24px_-6px_rgba(41,37,36,0.12)]">
-          <div className="flex items-center gap-3">
-            {/* Stepper */}
-            <div className="flex shrink-0 items-center justify-between rounded-full bg-[#efe6e4] px-1.5 py-1 min-w-[110px]">
+          {isAvailable ? (
+            <div className="flex items-center gap-3">
+              {/* Stepper */}
+              <div className="flex shrink-0 items-center justify-between rounded-full bg-[#efe6e4] px-1.5 py-1 min-w-[110px]">
+                <button
+                  type="button"
+                  disabled={quantity <= 1}
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  aria-label="Giảm số lượng"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff8f6] text-[#1e1b1a] shadow-xs active:scale-90 transition-transform disabled:opacity-40"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="ops-nums px-2 text-sm font-bold text-[#1e1b1a]">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => q + 1)}
+                  aria-label="Tăng số lượng"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff8f6] text-[#1e1b1a] shadow-xs active:scale-90 transition-transform"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Add CTA */}
               <button
                 type="button"
-                disabled={quantity <= 1}
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                aria-label="Giảm số lượng"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff8f6] text-[#1e1b1a] shadow-xs active:scale-90 transition-transform disabled:opacity-40"
+                onClick={handleConfirmAdd}
+                className={`flex min-h-[48px] flex-1 items-center justify-between rounded-full px-4 text-xs font-bold text-white shadow-md transition-all active:scale-[0.98] ${
+                  addedSuccess
+                    ? 'bg-[#00873a]'
+                    : 'bg-[#9a401c] hover:bg-[#ba5831]'
+                }`}
               >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="ops-nums px-2 text-sm font-bold text-[#1e1b1a]">
-                {quantity}
-              </span>
-              <button
-                type="button"
-                onClick={() => setQuantity((q) => q + 1)}
-                aria-label="Tăng số lượng"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff8f6] text-[#1e1b1a] shadow-xs active:scale-90 transition-transform"
-              >
-                <Plus className="h-4 w-4" />
+                {addedSuccess ? (
+                  <span className="flex w-full items-center justify-center gap-1.5">
+                    <Check className="h-4 w-4" />
+                    <span>Đã thêm vào giỏ!</span>
+                  </span>
+                ) : (
+                  <>
+                    <span className="flex items-center gap-1.5">
+                      <Utensils className="h-4 w-4" />
+                      <span>Thêm vào giỏ</span>
+                    </span>
+                    <span className="ops-nums text-sm font-extrabold">
+                      {formatVND(totalAmount)}
+                    </span>
+                  </>
+                )}
               </button>
             </div>
-
-            {/* Add CTA */}
+          ) : (
             <button
               type="button"
-              onClick={handleConfirmAdd}
-              className={`flex min-h-[48px] flex-1 items-center justify-between rounded-full px-4 text-xs font-bold text-white shadow-md transition-all active:scale-[0.98] ${
-                addedSuccess
-                  ? 'bg-[#00873a]'
-                  : 'bg-[#9a401c] hover:bg-[#ba5831]'
-              }`}
+              disabled
+              className="flex min-h-[48px] w-full items-center justify-center rounded-full px-4 text-xs font-bold text-stone-500 bg-stone-200 cursor-not-allowed"
             >
-              {addedSuccess ? (
-                <span className="flex w-full items-center justify-center gap-1.5">
-                  <Check className="h-4 w-4" />
-                  <span>Đã thêm vào giỏ!</span>
-                </span>
-              ) : (
-                <>
-                  <span className="flex items-center gap-1.5">
-                    <Utensils className="h-4 w-4" />
-                    <span>Thêm vào giỏ</span>
-                  </span>
-                  <span className="ops-nums text-sm font-extrabold">
-                    {formatVND(totalAmount)}
-                  </span>
-                </>
-              )}
+              Món ăn tạm hết • Không thể đặt
             </button>
-          </div>
+          )}
         </div>
       </div>
     </div>
