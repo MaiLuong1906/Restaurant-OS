@@ -28,9 +28,19 @@ export function WaiterOrderTracking() {
   const isSoundAlertEnabled = useWaiterStore((s) => s.isSoundAlertEnabled);
   const toggleSoundAlert = useWaiterStore((s) => s.toggleSoundAlert);
   const confirmItemServed = useWaiterStore((s) => s.confirmItemServed);
+  const servingItemIds = useWaiterStore((s) => s.servingItemIds);
+  const syncFromBackend = useWaiterStore((s) => s.syncFromBackend);
   const pingKitchenItem = useWaiterStore((s) => s.pingKitchenItem);
   const setActiveTab = useWaiterStore((s) => s.setActiveTab);
   const showToast = useWaiterStore((s) => s.showToast);
+
+  React.useEffect(() => {
+    void syncFromBackend();
+    const timer = setInterval(() => {
+      void syncFromBackend();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [syncFromBackend]);
 
   const tableList = React.useMemo(() => Object.values(tables), [tables]);
 
@@ -53,7 +63,7 @@ export function WaiterOrderTracking() {
   const pendingItems = filteredDishes.filter((d) => d.status === 'sent' || d.status === 'pending');
   const cookingItems = filteredDishes.filter((d) => d.status === 'cooking');
   const readyItems = filteredDishes.filter((d) => d.status === 'ready');
-  const delayedItems = filteredDishes.filter((d) => d.status === 'delayed');
+  const delayedItems = filteredDishes.filter((d) => d.status === 'delayed' || d.status === 'rejected');
 
   // Filter allergy alerts by tracking table filter
   const filteredAllergies = React.useMemo(() => {
@@ -127,7 +137,10 @@ export function WaiterOrderTracking() {
 
           <button
             type="button"
-            onClick={() => showToast('Đang kết nối lại trạm KDS... Dữ liệu đã đồng bộ mới nhất')}
+            onClick={() => {
+              void syncFromBackend();
+              showToast('Đang đồng bộ tiến độ món mới nhất từ Bếp KDS...');
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-bold transition-colors shadow-xs"
           >
             <RefreshCw className="h-4 w-4" />
@@ -211,7 +224,7 @@ export function WaiterOrderTracking() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="px-2 py-0.5 rounded bg-ops-brand-light text-ops-brand text-[11px] font-bold">
-                      Bàn {item.tableId}
+                      {tables[item.tableId]?.name || `Bàn ${item.tableId}`}
                     </span>
                     <span className="text-[11px] text-ops-muted flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -260,7 +273,7 @@ export function WaiterOrderTracking() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="px-2 py-0.5 rounded bg-ops-brand-light text-ops-brand text-[11px] font-bold">
-                      Bàn {item.tableId}
+                      {tables[item.tableId]?.name || `Bàn ${item.tableId}`}
                     </span>
                     <span className="text-[11px] text-amber-700 font-semibold flex items-center gap-1">
                       <Clock className="h-3 w-3 animate-spin" />
@@ -322,7 +335,7 @@ export function WaiterOrderTracking() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[11px] font-bold">
-                      Bàn {item.tableId}
+                      {tables[item.tableId]?.name || `Bàn ${item.tableId}`}
                     </span>
                     <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -338,14 +351,14 @@ export function WaiterOrderTracking() {
                   <div className="pt-2 border-t border-ops-border/50">
                     <button
                       type="button"
+                      disabled={Boolean(servingItemIds[item.id])}
                       onClick={() => {
-                        confirmItemServed(item.tableId, item.id);
-                        showToast(`Đã xác nhận phục vụ ${item.name} cho Bàn ${item.tableId}!`);
+                        void confirmItemServed(item.tableId, item.id);
                       }}
-                      className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                      className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
                     >
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>Xác nhận lên món</span>
+                      <span>{servingItemIds[item.id] ? 'Đang cập nhật...' : 'Xác nhận lên món'}</span>
                     </button>
                   </div>
                 </div>
@@ -379,7 +392,7 @@ export function WaiterOrderTracking() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="px-2 py-0.5 rounded bg-rose-50 text-ops-alert text-[11px] font-bold">
-                      Bàn {item.tableId}
+                      {tables[item.tableId]?.name || `Bàn ${item.tableId}`}
                     </span>
                     <span className="text-[11px] text-ops-alert font-bold flex items-center gap-1">
                       <AlertTriangle className="h-3.5 w-3.5" />

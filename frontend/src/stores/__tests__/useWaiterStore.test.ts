@@ -1,155 +1,303 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useWaiterStore, removeVietnameseTones, INITIAL_TABLES } from '../useWaiterStore';
-import { WaiterMenuItem } from '@/types/waiter';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useWaiterStore } from '../useWaiterStore';
+import { waiterApi } from '../../services/waiter/waiterApi';
 
-describe('useWaiterStore', () => {
-  const sampleMenuItem: WaiterMenuItem = {
-    id: 'test-m1',
-    sku: 'TEST01',
-    name: 'Phở Bò Thăn Áp Chảo',
-    category: 'Món chính',
-    price: 125000,
-    description: 'Thơm ngon bổ dưỡng',
-    station: 'Bếp nóng',
-    isAvailable: true,
-  };
+vi.mock('../../services/waiter/waiterApi', () => ({
+  waiterApi: {
+    fetchTables: vi.fn(),
+    fetchActiveOrders: vi.fn(),
+    createOrder: vi.fn(),
+    serveOrderItem: vi.fn(),
+    updateTableStatus: vi.fn(),
+    fetchDishes: vi.fn().mockResolvedValue([]),
+  },
+}));
 
+describe('useWaiterStore — Serve Items & Table Tracking', () => {
   beforeEach(() => {
-    // Reset store to fresh initial state
+    vi.clearAllMocks();
     useWaiterStore.setState({
-      selectedTableId: '04',
-      activeTab: 'floor',
-      activeZoneFilter: 'all',
-      trackingTableFilter: 'all',
-      tables: JSON.parse(JSON.stringify(INITIAL_TABLES)),
-      isSendKitchenModalOpen: false,
+      isSyncing: false,
+      hasSyncedBackend: false,
+      syncError: null,
+      servingItemIds: {},
       toastMessage: null,
     });
   });
 
-  it('removeVietnameseTones loại bỏ chính xác dấu tiếng Việt', () => {
-    expect(removeVietnameseTones('Phở Bò Thăn Áp Chảo')).toBe('pho bo than ap chao');
-    expect(removeVietnameseTones('Gỏi ngó sen tôm thịt')).toBe('goi ngo sen tom thit');
-    expect(removeVietnameseTones('Đậu phộng')).toBe('dau phong');
-    expect(removeVietnameseTones('')).toBe('');
+  it('1. syncFromBackend tải dữ liệu bàn và đơn hàng thật từ API và map đúng trạng thái', async () => {
+    const tableId = '11111111-1111-1111-1111-111111111111';
+    const orderId = '22222222-2222-2222-2222-222222222222';
+    vi.mocked(waiterApi.fetchTables).mockResolvedValueOnce([
+      { id: tableId, tableNumber: 'B01', capacity: 4, status: 'SERVING', currentOrderId: orderId },
+    ]);
+    vi.mocked(waiterApi.fetchActiveOrders).mockResolvedValueOnce([
+      {
+        id: orderId,
+        tableId,
+        orderCode: 'ORD-1001',
+        status: 'PLACED',
+        totalAmount: 210000,
+        customerNotes: null,
+        openedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        items: [
+          {
+            id: 'item-ready',
+            dishId: 'dish-1',
+            dishNameSnapshot: 'Phở Bò',
+            portionId: 'p-1',
+            portionNameSnapshot: 'Tô lớn',
+            quantity: 1,
+            unitPrice: 125000,
+            status: 'READY',
+            notes: null,
+            allergyNote: null,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 'item-waiting',
+            dishId: 'dish-2',
+            dishNameSnapshot: 'Nem Rán',
+            portionId: 'p-2',
+            portionNameSnapshot: 'Đĩa',
+            quantity: 1,
+            unitPrice: 85000,
+            status: 'WAITING',
+            notes: null,
+            allergyNote: null,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      },
+    ]);
+
+    await useWaiterStore.getState().syncFromBackend();
+
+    const state = useWaiterStore.getState();
+    expect(state.hasSyncedBackend).toBe(true);
+    expect(state.tables[tableId]).toBeDefined();
+    expect(state.tables[tableId].status).toBe('serving');
+    expect(state.tables[tableId].orderCode).toBe('ORD-1001');
+    expect(state.tables[tableId].confirmedItems).toHaveLength(2);
+    expect(state.tables[tableId].confirmedItems[0].status).toBe('ready');
+    expect(state.tables[tableId].confirmedItems[1].status).toBe('sent');
   });
 
-  it('setSelectedTable cập nhật mã bàn và chuẩn hóa 2 chữ số', () => {
-    const store = useWaiterStore.getState();
-    store.setSelectedTable('11');
-    expect(useWaiterStore.getState().selectedTableId).toBe('11');
+  it('2. confirmItemServed gọi API giao món thành công cho món READY và cập nhật sang served', async () => {
+    const tableId = '11111111-1111-1111-1111-111111111111';
+    useWaiterStore.setState({
+      tables: {
+        [tableId]: {
+          id: tableId,
+          name: 'Bàn B01',
+          seats: 4,
+          guests: 4,
+          zone: 'Sảnh chính',
+          status: 'serving',
+          statusText: 'Đang dùng bữa',
+          server: 'Phục vụ',
+          timeIn: '12:00',
+          elapsed: '10 phút',
+          pendingItems: [],
+          confirmedItems: [
+            {
+              id: 'item-ready',
+              dishId: 'dish-1',
+              name: 'Phở Bò',
+              sku: 'STD',
+              price: 125000,
+              qty: 1,
+              category: 'Thực đơn',
+              station: 'Bếp KDS',
+              status: 'ready',
+              statusText: 'Bếp xong — Chờ giao',
+              tableId,
+            },
+          ],
+        },
+      },
+    });
 
-    store.setSelectedTable('4');
-    expect(useWaiterStore.getState().selectedTableId).toBe('04');
+    vi.mocked(waiterApi.serveOrderItem).mockResolvedValueOnce({
+      id: 'item-ready',
+      dishId: 'dish-1',
+      dishNameSnapshot: 'Phở Bò',
+      portionId: 'p-1',
+      portionNameSnapshot: 'STD',
+      quantity: 1,
+      unitPrice: 125000,
+      status: 'SERVED',
+      notes: null,
+      allergyNote: null,
+    });
+
+    const ok = await useWaiterStore.getState().confirmItemServed(tableId, 'item-ready');
+    expect(ok).toBe(true);
+    expect(waiterApi.serveOrderItem).toHaveBeenCalledWith('item-ready');
+    expect(useWaiterStore.getState().tables[tableId].confirmedItems[0].status).toBe('served');
   });
 
-  it('addItemToOrder thêm món vào pendingItems của đúng bàn', () => {
-    const store = useWaiterStore.getState();
-    store.addItemToOrder('04', sampleMenuItem, 'Ít ớt');
+  it('3. confirmItemServed chặn giao món đang chờ bếp (sent/WAITING) và không gọi API', async () => {
+    const tableId = '11111111-1111-1111-1111-111111111111';
+    useWaiterStore.setState({
+      tables: {
+        [tableId]: {
+          id: tableId,
+          name: 'Bàn B01',
+          seats: 4,
+          guests: 4,
+          zone: 'Sảnh chính',
+          status: 'serving',
+          statusText: 'Đang dùng bữa',
+          server: 'Phục vụ',
+          timeIn: '12:00',
+          elapsed: '10 phút',
+          pendingItems: [],
+          confirmedItems: [
+            {
+              id: 'item-waiting',
+              dishId: 'dish-2',
+              name: 'Nem Rán',
+              sku: 'STD',
+              price: 85000,
+              qty: 1,
+              category: 'Thực đơn',
+              station: 'Bếp KDS',
+              status: 'sent',
+              statusText: 'Chờ bếp / Đang nấu',
+              tableId,
+            },
+          ],
+        },
+      },
+    });
 
-    const table04 = useWaiterStore.getState().tables['04'];
-    expect(table04.pendingItems).toHaveLength(1);
-    expect(table04.pendingItems[0].name).toBe('Phở Bò Thăn Áp Chảo');
-    expect(table04.pendingItems[0].qty).toBe(1);
-    expect(table04.pendingItems[0].note).toBe('Ít ớt');
-
-    // Thêm lần 2 cùng ghi chú -> tăng qty
-    store.addItemToOrder('04', sampleMenuItem, 'Ít ớt');
-    const table04Updated = useWaiterStore.getState().tables['04'];
-    expect(table04Updated.pendingItems).toHaveLength(1);
-    expect(table04Updated.pendingItems[0].qty).toBe(2);
-
-    // Bàn 11 không bị ảnh hưởng
-    const table11 = useWaiterStore.getState().tables['11'];
-    expect(table11.pendingItems).toHaveLength(0);
+    const ok = await useWaiterStore.getState().confirmItemServed(tableId, 'item-waiting');
+    expect(ok).toBe(false);
+    expect(waiterApi.serveOrderItem).not.toHaveBeenCalled();
   });
 
-  it('updateItemQty tăng giảm số lượng món và xóa khi về 0', () => {
-    const store = useWaiterStore.getState();
-    store.addItemToOrder('04', sampleMenuItem);
-    const itemId = useWaiterStore.getState().tables['04'].pendingItems[0].id;
+  it('4. confirmItemServed xử lý lỗi 409 từ Backend (giao trùng) mà không fake trạng thái UI', async () => {
+    const tableId = '11111111-1111-1111-1111-111111111111';
+    useWaiterStore.setState({
+      tables: {
+        [tableId]: {
+          id: tableId,
+          name: 'Bàn B01',
+          seats: 4,
+          guests: 4,
+          zone: 'Sảnh chính',
+          status: 'serving',
+          statusText: 'Đang dùng bữa',
+          server: 'Phục vụ',
+          timeIn: '12:00',
+          elapsed: '10 phút',
+          pendingItems: [],
+          confirmedItems: [
+            {
+              id: 'item-ready',
+              dishId: 'dish-1',
+              name: 'Phở Bò',
+              sku: 'STD',
+              price: 125000,
+              qty: 1,
+              category: 'Thực đơn',
+              station: 'Bếp KDS',
+              status: 'ready',
+              statusText: 'Bếp xong — Chờ giao',
+              tableId,
+            },
+          ],
+        },
+      },
+    });
 
-    store.updateItemQty('04', itemId, 2);
-    expect(useWaiterStore.getState().tables['04'].pendingItems[0].qty).toBe(3);
+    vi.mocked(waiterApi.serveOrderItem).mockRejectedValueOnce(new Error('Món đã được giao trước đó'));
 
-    store.updateItemQty('04', itemId, -3);
-    expect(useWaiterStore.getState().tables['04'].pendingItems).toHaveLength(0);
+    const ok = await useWaiterStore.getState().confirmItemServed(tableId, 'item-ready');
+    expect(ok).toBe(false);
+    expect(useWaiterStore.getState().tables[tableId].confirmedItems[0].status).toBe('ready');
+    expect(useWaiterStore.getState().toastMessage).toContain('Món đã được giao trước đó');
   });
 
-  it('openSendKitchenModal chỉ mở khi có pendingItems', () => {
-    const store = useWaiterStore.getState();
-    store.setSelectedTable('04');
-
-    // Chưa có món mới
-    const openedEmpty = store.openSendKitchenModal();
-    expect(openedEmpty).toBe(false);
-    expect(useWaiterStore.getState().isSendKitchenModalOpen).toBe(false);
-
-    // Đã có món mới
-    store.addItemToOrder('04', sampleMenuItem);
-    const openedWithItem = store.openSendKitchenModal();
-    expect(openedWithItem).toBe(true);
-    expect(useWaiterStore.getState().isSendKitchenModalOpen).toBe(true);
-  });
-
-  it('sendPendingOrderToKitchen chuyển pending sang confirmed và đổi status bàn', () => {
-    const store = useWaiterStore.getState();
-    store.addItemToOrder('10', sampleMenuItem); // Bàn 10 vốn đang vacant
-
-    expect(useWaiterStore.getState().tables['10'].status).toBe('vacant');
-    expect(useWaiterStore.getState().tables['10'].pendingItems).toHaveLength(1);
-
-    const sentCount = store.sendPendingOrderToKitchen('10', 'Bàn VIP ngoài trời');
-    expect(sentCount).toBe(1);
-
-    const table10 = useWaiterStore.getState().tables['10'];
-    expect(table10.status).toBe('serving');
-    expect(table10.pendingItems).toHaveLength(0);
-    expect(table10.confirmedItems).toHaveLength(1);
-    expect(table10.confirmedItems[0].name).toBe('Phở Bò Thăn Áp Chảo');
-    expect(table10.confirmedItems[0].status).toBe('sent');
-    expect(useWaiterStore.getState().isSendKitchenModalOpen).toBe(false);
-  });
-
-  it('confirmItemServed cập nhật trạng thái món đã lên', () => {
-    const store = useWaiterStore.getState();
-    const table04 = useWaiterStore.getState().tables['04'];
-    const targetItem = table04.confirmedItems.find((i) => i.status === 'cooking');
-    expect(targetItem).toBeDefined();
-
-    store.confirmItemServed('04', targetItem!.id);
-    const updatedItem = useWaiterStore.getState().tables['04'].confirmedItems.find(
-      (i) => i.id === targetItem!.id
+  it('5. updateTableStatusApi báo lỗi khi Backend chặn giải phóng bàn còn món chưa phục vụ', async () => {
+    const tableId = '11111111-1111-1111-1111-111111111111';
+    vi.mocked(waiterApi.updateTableStatus).mockRejectedValueOnce(
+      new Error('Không thể giải phóng bàn khi vẫn còn món đang chờ bếp hoặc chưa phục vụ.')
     );
-    expect(updatedItem?.status).toBe('served');
-    expect(updatedItem?.statusText).toBe('Đã lên món');
+
+    const ok = await useWaiterStore.getState().updateTableStatusApi(tableId, 'VACANT');
+    expect(ok).toBe(false);
+    expect(useWaiterStore.getState().toastMessage).toContain('Không thể giải phóng bàn');
   });
 
-  it('tiến độ món giữa Bàn 11 và Bàn 04 hoàn toàn độc lập', () => {
-    const table04 = useWaiterStore.getState().tables['04'];
-    const table11 = useWaiterStore.getState().tables['11'];
+  it('6. sendPendingOrderToKitchen gọi POST /orders thật và đồng bộ lại từ Backend', async () => {
+    const tableId = '11111111-1111-1111-1111-111111111111';
+    useWaiterStore.setState({
+      tables: {
+        [tableId]: {
+          id: tableId,
+          name: 'Bàn 01',
+          seats: 4,
+          guests: 2,
+          zone: 'Sảnh chính',
+          status: 'vacant',
+          statusText: 'Bàn trống',
+          server: 'Phục vụ',
+          timeIn: '--:--',
+          elapsed: '0 phút',
+          pendingItems: [
+            {
+              id: 'p-1',
+              dishId: '1596b966-2cb9-444e-be8d-da3161779887',
+              name: 'Phở Bò Đặc Biệt',
+              sku: 'PB01',
+              price: 75000,
+              qty: 2,
+              category: 'Món chính',
+              station: 'Bếp nóng',
+              status: 'pending',
+              statusText: 'Chờ gửi bếp',
+              tableId,
+            },
+          ],
+          confirmedItems: [],
+        },
+      },
+    });
 
-    expect(table04.confirmedItems.some((i) => i.name.includes('Lẩu Riêu Cua'))).toBe(true);
-    expect(table11.confirmedItems.some((i) => i.name.includes('Lẩu Riêu Cua'))).toBe(false);
+    vi.mocked(waiterApi.createOrder).mockResolvedValueOnce({
+      id: 'order-new',
+      tableId,
+      orderCode: 'ORD-NEW',
+      status: 'PLACED',
+      totalAmount: 150000,
+      customerNotes: null,
+      openedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      items: [],
+    });
+    vi.mocked(waiterApi.fetchTables).mockResolvedValueOnce([
+      { id: tableId, tableNumber: '01', capacity: 4, status: 'SERVING', currentOrderId: 'order-new' },
+    ]);
+    vi.mocked(waiterApi.fetchActiveOrders).mockResolvedValueOnce([]);
+    vi.mocked(waiterApi.fetchDishes).mockResolvedValueOnce([]);
 
-    // Bàn 11 có Nem rán bị delayed
-    const delayed11 = table11.confirmedItems.find((i) => i.status === 'delayed');
-    expect(delayed11).toBeDefined();
-    expect(delayed11?.name).toContain('Nem Rán');
-  });
-
-  it('transferTable chuyển toàn bộ order sang bàn mới và đặt bàn cũ thành vacant', () => {
-    const store = useWaiterStore.getState();
-    store.transferTable('04', '10');
-
-    const table04 = useWaiterStore.getState().tables['04'];
-    const table10 = useWaiterStore.getState().tables['10'];
-
-    expect(table04.status).toBe('vacant');
-    expect(table04.confirmedItems).toHaveLength(0);
-
-    expect(table10.status).toBe('serving');
-    expect(table10.confirmedItems.length).toBeGreaterThan(0);
-    expect(useWaiterStore.getState().selectedTableId).toBe('10');
+    const sent = await useWaiterStore.getState().sendPendingOrderToKitchen(tableId, 'Ít hành');
+    expect(sent).toBe(1);
+    expect(waiterApi.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tableId,
+        customerNotes: 'Ít hành',
+        items: [
+          expect.objectContaining({
+            dishId: '1596b966-2cb9-444e-be8d-da3161779887',
+            quantity: 2,
+          }),
+        ],
+      })
+    );
+    expect(useWaiterStore.getState().tables[tableId].pendingItems).toHaveLength(0);
   });
 });
