@@ -2,6 +2,7 @@ package com.restaurantos.service;
 
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.CompleteBatchRequest;
 import com.restaurantos.dto.CompleteTicketRequest;
 import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.entity.DishEntity;
@@ -14,9 +15,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
@@ -28,7 +33,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +48,9 @@ class KdsServiceTest {
 
     @Mock
     private OrderItemRepository orderItemRepository;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private KdsService kdsService;
@@ -350,11 +361,192 @@ class KdsServiceTest {
         verify(orderItemRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("K5 completeBatch: batch of 2 WAITING items across 2 tickets converts both to READY and returns 2 tickets")
+    void testCompleteBatch_twoWaitingItemsAcrossTwoTickets_updatesBothAndReturnsTwoTickets() {
+        OrderEntity order2 = OrderEntity.builder()
+                .id(UUID.randomUUID())
+                .tableId(table.getId())
+                .table(table)
+                .status("PLACED")
+                .totalAmount(75000L)
+                .idempotencyKey("test-key-2")
+                .openedAt(now)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+
+        OrderItemEntity item1 = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemEntity item2 = createItemForOrder(order2, "WAITING", null, now.plus(Duration.ofMinutes(12)));
+
+        List<UUID> itemIds = List.of(item1.getId(), item2.getId());
+        when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(item1, item2));
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1));
+        when(orderRepository.findById(order2.getId())).thenReturn(Optional.of(order2));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order2.getId())).thenReturn(List.of(item2));
+
+        Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
+
+        assertThat(result).isPresent();
+        assertThat(result.get()).hasSize(2);
+        assertThat(item1.getStatus()).isEqualTo("READY");
+        assertThat(item2.getStatus()).isEqualTo("READY");
+        verify(orderItemRepository).saveAll(List.of(item1, item2));
+
+        ArgumentCaptor<KdsService.KdsOrderEvent> eventCaptor = ArgumentCaptor.forClass(KdsService.KdsOrderEvent.class);
+        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/kds/orders"), eventCaptor.capture());
+        List<KdsService.KdsOrderEvent> sentEvents = eventCaptor.getAllValues();
+        assertThat(sentEvents).hasSize(2);
+        assertThat(sentEvents.get(0).action()).isEqualTo("UPDATE_STATUS");
+        assertThat(sentEvents.get(0).data().id()).isEqualTo(item1.getId());
+        assertThat(sentEvents.get(0).data().status()).isEqualTo("READY");
+        assertThat(sentEvents.get(1).action()).isEqualTo("UPDATE_STATUS");
+        assertThat(sentEvents.get(1).data().id()).isEqualTo(item2.getId());
+        assertThat(sentEvents.get(1).data().status()).isEqualTo("READY");
+    }
+
+    @Test
+    @DisplayName("K5 completeBatch idempotent: calling again with already READY items returns 200 without calling saveAll")
+    void testCompleteBatch_idempotentWhenAlreadyReady_doesNotCallSaveAll() {
+        OrderItemEntity item1 = createItem("READY", null, now.plus(Duration.ofMinutes(10)));
+        List<UUID> itemIds = List.of(item1.getId());
+
+        when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(item1));
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1));
+
+        Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
+
+        assertThat(result).isPresent();
+        assertThat(result.get()).hasSize(1);
+        assertThat(result.get().get(0).status()).isEqualTo("READY");
+        verify(orderItemRepository, never()).saveAll(any());
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("K5 completeBatch: list containing a REJECTED item throws 409 Conflict and does not modify WAITING items")
+    void testCompleteBatch_containsRejectedItem_throws409AndDoesNotSave() {
+        OrderItemEntity waitingItem = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemEntity rejectedItem = createItem("REJECTED", null, null);
+        List<UUID> itemIds = List.of(waitingItem.getId(), rejectedItem.getId());
+
+        when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(waitingItem, rejectedItem));
+
+        assertThatThrownBy(() -> kdsService.completeBatch(new CompleteBatchRequest(itemIds)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT")
+                .hasMessageContaining("REJECTED");
+
+        assertThat(waitingItem.getStatus()).isEqualTo("WAITING");
+        verify(orderItemRepository, never()).saveAll(any());
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("K5 completeBatch: list containing a SERVED item throws 409 Conflict and does not call saveAll")
+    void testCompleteBatch_containsServedItem_throws409AndDoesNotSave() {
+        OrderItemEntity waitingItem = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemEntity servedItem = createItem("SERVED", null, null);
+        List<UUID> itemIds = List.of(waitingItem.getId(), servedItem.getId());
+
+        when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(waitingItem, servedItem));
+
+        assertThatThrownBy(() -> kdsService.completeBatch(new CompleteBatchRequest(itemIds)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT")
+                .hasMessageContaining("SERVED");
+
+        assertThat(waitingItem.getStatus()).isEqualTo("WAITING");
+        verify(orderItemRepository, never()).saveAll(any());
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("K5 completeBatch: missing itemId returns Optional.empty() (404)")
+    void testCompleteBatch_missingItemId_returnsEmpty() {
+        OrderItemEntity existingItem = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        UUID missingId = UUID.randomUUID();
+        List<UUID> itemIds = List.of(existingItem.getId(), missingId);
+
+        when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(existingItem));
+
+        Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
+
+        assertThat(result).isEmpty();
+        assertThat(existingItem.getStatus()).isEqualTo("WAITING");
+        verify(orderItemRepository, never()).saveAll(any());
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("K5 completeBatch: mixed WAITING + READY items converts only WAITING and broadcasts STOMP only for transitioned item")
+    void testCompleteBatch_mixedWaitingAndReady_updatesOnlyWaitingAndReturnsTickets() {
+        Instant originalUpdatedAt = now.minus(Duration.ofMinutes(5));
+        OrderItemEntity waitingItem = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemEntity readyItem = createItem("READY", null, now.plus(Duration.ofMinutes(8)));
+        readyItem.setUpdatedAt(originalUpdatedAt);
+
+        List<UUID> itemIds = List.of(waitingItem.getId(), readyItem.getId());
+        when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(waitingItem, readyItem));
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(waitingItem, readyItem));
+
+        Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
+
+        assertThat(result).isPresent();
+        assertThat(result.get()).hasSize(1);
+        assertThat(waitingItem.getStatus()).isEqualTo("READY");
+        assertThat(readyItem.getStatus()).isEqualTo("READY");
+        assertThat(readyItem.getUpdatedAt()).isEqualTo(originalUpdatedAt);
+        verify(orderItemRepository).saveAll(List.of(waitingItem, readyItem));
+
+        ArgumentCaptor<KdsService.KdsOrderEvent> eventCaptor = ArgumentCaptor.forClass(KdsService.KdsOrderEvent.class);
+        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/kds/orders"), eventCaptor.capture());
+        assertThat(eventCaptor.getValue().action()).isEqualTo("UPDATE_STATUS");
+        assertThat(eventCaptor.getValue().data().id()).isEqualTo(waitingItem.getId());
+        assertThat(eventCaptor.getValue().data().status()).isEqualTo("READY");
+    }
+
+    @Test
+    @DisplayName("K5 completeBatch STOMP afterCommit: registers synchronization and publishes only on afterCommit, swallowing broker errors")
+    void testCompleteBatch_afterCommitAndBrokerFailureDoesNotFailRequest() {
+        OrderItemEntity waitingItem = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        List<UUID> itemIds = List.of(waitingItem.getId());
+
+        when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(waitingItem));
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(waitingItem));
+        doThrow(new RuntimeException("Broker unavailable"))
+                .when(messagingTemplate).convertAndSend(eq("/topic/kds/orders"), any(KdsService.KdsOrderEvent.class));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
+
+            assertThat(result).isPresent();
+            verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+
+            List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
+            assertThat(syncs).hasSize(1);
+            syncs.get(0).afterCommit();
+
+            verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/kds/orders"), any(KdsService.KdsOrderEvent.class));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
     private OrderItemEntity createItem(String status, String allergyNote, Instant slaDeadline) {
+        return createItemForOrder(order, status, allergyNote, slaDeadline);
+    }
+
+    private OrderItemEntity createItemForOrder(OrderEntity targetOrder, String status, String allergyNote, Instant slaDeadline) {
         return OrderItemEntity.builder()
                 .id(UUID.randomUUID())
-                .orderId(order.getId())
-                .order(order)
+                .orderId(targetOrder.getId())
+                .order(targetOrder)
                 .dishId(dish.getId())
                 .portionId(UUID.randomUUID())
                 .dishNameSnapshot("Phở Bò Đặc Biệt")
