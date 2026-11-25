@@ -312,23 +312,27 @@ export const ROUTE_REQUIRED_PERMISSIONS: { prefix: string; anyOf: PermissionCode
   { prefix: '/staff', anyOf: [PERMISSIONS.HR_SCHEDULE_OPEN_VIEW] },
 ];
 
+const PUBLIC_PREFIXES = [
+  '/login',
+  '/kds/login',
+  '/qr',
+  '/menu',
+  '/cart',
+  '/orders',
+  '/checkout',
+  '/payment-success',
+];
+
 export function canAccessRoute(
   pathname: string,
   role?: string | null,
   isKdsAuthenticated = false,
   explicitPermissions?: readonly string[],
 ): boolean {
-  // Public routes (Login, KDS Login, Customer QR)
+  // Public routes (Login, KDS Login, Customer QR) — khớp chính xác segment để tránh /menu-bom khớp nhầm /menu
   if (
     pathname === '/' ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/kds/login') ||
-    pathname.startsWith('/qr') ||
-    pathname.startsWith('/menu') ||
-    pathname.startsWith('/cart') ||
-    pathname.startsWith('/orders') ||
-    pathname.startsWith('/checkout') ||
-    pathname.startsWith('/payment-success')
+    PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
   ) {
     return true;
   }

@@ -2,12 +2,13 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ShieldAlert, Lock } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
-import type { PermissionCode } from '@/lib/rbac';
+import { canAccessRoute, type PermissionCode } from '@/lib/rbac';
 
 interface RoleGuardProps {
-  requiredPermissions: readonly PermissionCode[];
+  requiredPermissions?: readonly PermissionCode[];
   allowKdsSession?: boolean;
   loginHref?: string;
   children: React.ReactNode;
@@ -15,15 +16,18 @@ interface RoleGuardProps {
 
 /**
  * Client-side Route Guard đồng bộ với RBAC Backend.
+ * - Tự động kiểm tra quyền chi tiết theo từng route (pathname) qua canAccessRoute().
  * - Khi chưa bật NEXT_PUBLIC_ENABLE_ROUTE_GUARD=true và chưa đăng nhập: giữ tương thích chế độ demo preview.
- * - Khi đã đăng nhập hoặc bật strict guard: kiểm tra chính xác Permission và hiển thị 403 nếu không đủ quyền.
  */
 export function RoleGuard({
-  requiredPermissions,
+  requiredPermissions = [],
   allowKdsSession = false,
   loginHref = '/login',
   children,
 }: RoleGuardProps) {
+  const pathname = usePathname();
+  const staffUser = useAuthStore((s) => s.staffUser);
+  const permissions = useAuthStore((s) => s.permissions);
   const isStaffAuthenticated = useAuthStore((s) => s.isStaffAuthenticated);
   const isKdsAuthenticated = useAuthStore((s) => s.isKdsAuthenticated);
   const hasAnyPermission = useAuthStore((s) => s.hasAnyPermission);
@@ -59,7 +63,16 @@ export function RoleGuard({
     );
   }
 
-  if (requiredPermissions.length > 0 && !hasAnyPermission(requiredPermissions)) {
+  const allowedByRoute = canAccessRoute(
+    pathname,
+    staffUser?.role ?? null,
+    allowKdsSession && isKdsAuthenticated,
+    permissions,
+  );
+  const allowedByProps =
+    requiredPermissions.length === 0 || hasAnyPermission(requiredPermissions);
+
+  if (!allowedByRoute || !allowedByProps) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white border border-rose-200 rounded-2xl p-6 text-center space-y-4 shadow-sm">

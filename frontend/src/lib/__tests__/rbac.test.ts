@@ -53,10 +53,13 @@ describe('Frontend RBAC Permission Catalog & Route Guards', () => {
     expect(canAccessRoute('/menu', null)).toBe(true);
     expect(canAccessRoute('/login', null)).toBe(true);
 
-    // Owner-only routes
+    // Owner-only routes (bao gồm /menu-bom không bị khớp nhầm public /menu)
     expect(canAccessRoute('/pnl', 'OWNER')).toBe(true);
     expect(canAccessRoute('/pnl', 'MANAGER')).toBe(false);
     expect(canAccessRoute('/payroll', 'MANAGER')).toBe(false);
+    expect(canAccessRoute('/menu-bom', 'OWNER')).toBe(true);
+    expect(canAccessRoute('/menu-bom', 'MANAGER')).toBe(false);
+    expect(canAccessRoute('/menu-bom', null)).toBe(false);
 
     // Manager routes
     expect(canAccessRoute('/dashboard', 'MANAGER')).toBe(true);

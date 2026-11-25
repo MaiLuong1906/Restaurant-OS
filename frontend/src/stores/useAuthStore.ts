@@ -175,6 +175,14 @@ export const useAuthStore = create<AuthState>()(
         kdsSession: state.kdsSession,
         isKdsAuthenticated: state.isKdsAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          syncAuthCookies(
+            state.isStaffAuthenticated ? (state.staffUser?.role ?? null) : null,
+            state.isKdsAuthenticated,
+          );
+        }
+      },
     },
   ),
 );
