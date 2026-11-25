@@ -34,10 +34,30 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
     expect(payable).toBe(772000);
   });
 
-  it('UC1 & UC2: phải kiểm tra bàn trống, tạo đặt bàn có thu cọc và check-in thành công', () => {
+  it('UC1 & UC2: phải khởi tạo không có đơn đặt bàn mock, chặn tạo đơn khi chưa đồng bộ UUID bàn, và tạo/check-in thành công', () => {
     const store = usePosStore.getState();
+    expect(store.reservations).toHaveLength(0);
     const available = store.checkAvailableTables('Sảnh Tầng 1', 4);
     expect(available.some((t) => t.id === 't1')).toBe(true);
+    expect(available.some((t) => t.id === 't5')).toBe(true);
+
+    // Nếu bàn chưa có UUID (chưa sync với BE) và không bật allowLocalOnly thì phải từ chối, không ghi tiền cọc vào ca
+    const initialDepositCash = store.shift.depositCashCollected;
+    const blockedRes = store.createReservation({
+      customerName: 'Phạm Hoàng Long',
+      phone: '0912345678',
+      partySize: 4,
+      reservedTime: '19:00',
+      reservedDate: '08/11/2026',
+      area: 'Sảnh Tầng 1',
+      tableId: 't1',
+      depositAmount: 300000,
+      depositMethod: 'CASH',
+      note: 'Bàn gia đình',
+    });
+    expect(blockedRes).toBeNull();
+    expect(usePosStore.getState().shift.depositCashCollected).toBe(initialDepositCash);
+    expect(usePosStore.getState().tables.find((t) => t.id === 't1')?.status).toBe('IDLE');
 
     const newRes = store.createReservation({
       customerName: 'Phạm Hoàng Long',
@@ -50,17 +70,21 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
       depositAmount: 300000,
       depositMethod: 'CASH',
       note: 'Bàn gia đình',
+      allowLocalOnly: true,
     });
+    expect(newRes).not.toBeNull();
+    if (!newRes) return;
 
     const table1Reserved = usePosStore.getState().tables.find((t) => t.id === 't1');
     expect(table1Reserved?.status).toBe('RESERVED');
     expect(table1Reserved?.depositAmount).toBe(300000);
 
-    // Check-in bàn đặt
+    // Check-in bàn đặt (không tự chèn món mock vào bill)
     usePosStore.getState().checkInReservation(newRes.id);
     const table1Occupied = usePosStore.getState().tables.find((t) => t.id === 't1');
     expect(table1Occupied?.status).toBe('OCCUPIED');
     expect(table1Occupied?.depositAmount).toBe(300000);
+    expect(table1Occupied?.items).toHaveLength(0);
   });
 
   it('UC3: phải gộp nhiều bàn (giữ trạng thái Đang phục vụ) và tách các bàn đã gộp chuẩn số nguyên VND', () => {
