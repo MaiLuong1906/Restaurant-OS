@@ -66,6 +66,13 @@ public class CustomerTableAuthService {
                 .orElse(false);
     }
 
+    public boolean isValidAnyTableToken(String tableToken) {
+        if (tableToken == null || tableToken.isBlank()) {
+            return false;
+        }
+        return tableRepository.existsByQrCodeToken(tableToken.trim());
+    }
+
     private TableStatus parseTableStatus(String rawStatus) {
         if (rawStatus == null || rawStatus.isBlank()) {
             return null;

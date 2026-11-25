@@ -156,14 +156,14 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             throw new AccessDeniedException("Không được phép gửi trực tiếp STOMP SEND vào kênh broadcast: " + destination);
         }
 
-        // Các destination /app/** yêu cầu đã xác thực Staff hoặc có X-Table-Token hợp lệ
+        // Các destination /app/** yêu cầu đã xác thực Staff hoặc có X-Table-Token tồn tại hợp lệ trong DB
         if (destination.startsWith("/app/")) {
             if (auth != null && auth.isAuthenticated()) {
                 return;
             }
             String tableToken = extractSessionTableToken(accessor);
-            if (tableToken == null || tableToken.isBlank()) {
-                throw new AccessDeniedException("Yêu cầu xác thực khi gửi STOMP SEND tới: " + destination);
+            if (!customerTableAuthService.isValidAnyTableToken(tableToken)) {
+                throw new AccessDeniedException("Yêu cầu xác thực hợp lệ khi gửi STOMP SEND tới: " + destination);
             }
         }
     }

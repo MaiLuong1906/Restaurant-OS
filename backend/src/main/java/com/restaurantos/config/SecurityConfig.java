@@ -44,7 +44,8 @@ public class SecurityConfig {
             ObjectProvider<JwtTokenProvider> jwtTokenProvider,
             ObjectProvider<UserRepository> userRepositoryProvider,
             ObjectProvider<ObjectMapper> objectMapperProvider) throws Exception {
-        ObjectMapper objectMapper = objectMapperProvider.getIfAvailable(ObjectMapper::new);
+        ObjectMapper objectMapper = objectMapperProvider.getIfAvailable(
+                () -> new ObjectMapper().findAndRegisterModules());
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
