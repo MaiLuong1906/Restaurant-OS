@@ -33,7 +33,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE OrderItemEntity oi
-        SET oi.status = 'SERVED', oi.updatedAt = :updatedAt
+        SET oi.status = 'SERVED', oi.servedAt = :updatedAt, oi.updatedAt = :updatedAt
         WHERE oi.id = :itemId AND UPPER(oi.status) = 'READY'
         """)
     int markAsServedIfReady(@Param("itemId") UUID itemId, @Param("updatedAt") Instant updatedAt);

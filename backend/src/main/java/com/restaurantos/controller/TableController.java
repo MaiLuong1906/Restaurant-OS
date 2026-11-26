@@ -3,6 +3,7 @@ package com.restaurantos.controller;
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.dto.OrderDtos;
 import com.restaurantos.service.TableService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,17 +57,13 @@ public class TableController {
     @PreAuthorize("hasAuthority('TABLE:STATE:UPDATE')")
     public ResponseEntity<ApiResponse<OrderDtos.TableResponse>> updateTableStatus(
             @PathVariable String id,
-            @RequestBody OrderDtos.UpdateTableStatusRequest request) {
+            @Valid @RequestBody OrderDtos.UpdateTableStatusRequest request) {
         UUID tableId;
         try {
             tableId = UUID.fromString(id);
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("BAD_REQUEST", "Table ID không hợp lệ: " + id, null));
-        }
-        if (request == null || request.status() == null || request.status().isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("BAD_REQUEST", "Trạng thái bàn không được để trống", null));
         }
         OrderDtos.TableResponse updated = tableService.updateTableStatus(tableId, request.status());
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái bàn thành công"));

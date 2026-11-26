@@ -1,5 +1,7 @@
 package com.restaurantos.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -64,6 +66,7 @@ public final class OrderDtos {
     // ─── Table Request / Response ─────────────────────────────────────────────
 
     public record UpdateTableStatusRequest(
+            @NotBlank(message = "Trạng thái bàn không được để trống")
             String status
     ) {}
 

@@ -110,13 +110,15 @@ public class SecurityConfig {
                         // 9. Đặt bàn & Check-in POS (kết hợp @PreAuthorize chi tiết theo từng method)
                         .requestMatchers("/api/v1/reservations/**").authenticated()
 
-                        // 10. Đơn hàng: /active bắt buộc đăng nhập; POST /orders & GET /orders/{id} sẽ gắn Customer QR Token ở Giai đoạn 4
+                        // 10. Đơn hàng: /active & /items/*/serve bắt buộc đăng nhập đúng quyền; POST /orders & GET /orders/{id} hỗ trợ thêm Customer QR Token
                         .requestMatchers(HttpMethod.GET, "/api/v1/orders/active").hasAuthority("ORDER:ACTIVE:VIEW")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/items/*/serve").hasAuthority("ORDER:ITEM_SERVE_EXPEDITE:UPDATE")
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
 
-                        // 11. Danh sách bàn: GET /api/v1/tables bắt buộc đăng nhập; GET /api/v1/tables/{id} mở cho QR bàn
+                        // 11. Danh sách bàn: GET /api/v1/tables & PATCH /api/v1/tables/*/status bắt buộc đăng nhập đúng quyền; GET /api/v1/tables/{id} mở cho QR bàn
                         .requestMatchers(HttpMethod.GET, "/api/v1/tables").hasAuthority("TABLE:FLOOR_PLAN:VIEW")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/tables/*/status").hasAuthority("TABLE:STATE:UPDATE")
                         .requestMatchers(HttpMethod.GET, "/api/v1/tables/*").permitAll()
 
                         // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token

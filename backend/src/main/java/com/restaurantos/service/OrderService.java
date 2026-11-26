@@ -4,19 +4,27 @@ import com.restaurantos.dto.OrderDtos;
 import com.restaurantos.entity.*;
 import com.restaurantos.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderService {
 
     private final OrderRepository orderRepository;
@@ -24,6 +32,7 @@ public class OrderService {
     private final TableRepository tableRepository;
     private final DishRepository dishRepository;
     private final DishPortionRepository dishPortionRepository;
+    private final ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
 
     /**
      * Tạo đơn hàng mới. Idempotent nếu FE truyền idempotencyKey.
@@ -45,10 +54,26 @@ public class OrderService {
         TableEntity table = tableRepository.findById(tableUuid)
                 .orElseThrow(() -> new IllegalArgumentException("Bàn không tồn tại: " + req.tableId()));
 
+        // Chặn mở đơn trên bàn đang dọn dẹp (CLEANING)
+        if ("CLEANING".equalsIgnoreCase(table.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Bàn '" + table.getTableNumber() + "' đang dọn dẹp, chưa thể tạo đơn mới.");
+        }
+
         // Cập nhật trạng thái bàn sang SERVING nếu đang VACANT hoặc RESERVED
         if ("VACANT".equalsIgnoreCase(table.getStatus()) || "RESERVED".equalsIgnoreCase(table.getStatus())) {
+            Instant tableNow = Instant.now();
             table.setStatus("SERVING");
+            table.setOccupiedAt(tableNow);
+            table.setUpdatedAt(tableNow);
             tableRepository.save(table);
+            publishRealtimeEventAfterCommit(TableService.POS_TABLES_TOPIC, Map.of(
+                    "eventType", "TABLE_STATUS_UPDATED",
+                    "tableId", table.getId(),
+                    "tableNumber", table.getTableNumber(),
+                    "status", "SERVING",
+                    "timestamp", tableNow
+            ));
         }
 
         // 3. Validate items
@@ -138,6 +163,9 @@ public class OrderService {
             }
 
             order.setTotalAmount(order.getTotalAmount() + totalAmount);
+            if ("SERVED".equalsIgnoreCase(order.getStatus())) {
+                order.setStatus("PLACED"); // Có món mới WAITING nên không còn ở trạng thái đã phục vụ hết
+            }
             if (req.idempotencyKey() != null && !req.idempotencyKey().isBlank()) {
                 order.setIdempotencyKey(req.idempotencyKey()); // Lưu idempotency key của lượt gọi thêm này
             }
@@ -248,6 +276,7 @@ public class OrderService {
         }
 
         item.setStatus("SERVED");
+        item.setServedAt(now);
         item.setUpdatedAt(now);
 
         // Đồng bộ trạng thái Order sang SERVED nếu tất cả món không bị REJECTED đều đã SERVED
@@ -268,10 +297,44 @@ public class OrderService {
             }
         }
 
+        Map<String, Object> servedEvent = new LinkedHashMap<>();
+        servedEvent.put("eventType", "ORDER_ITEM_SERVED");
+        servedEvent.put("orderId", item.getOrderId());
+        servedEvent.put("itemId", item.getId());
+        servedEvent.put("status", "SERVED");
+        servedEvent.put("servedAt", now);
+        publishRealtimeEventAfterCommit(TableService.POS_TABLES_TOPIC, servedEvent);
+
         return toOrderItemResponse(item);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private void publishRealtimeEventAfterCommit(String topic, Map<String, Object> payload) {
+        SimpMessagingTemplate template = messagingTemplateProvider != null
+                ? messagingTemplateProvider.getIfAvailable()
+                : null;
+        if (template == null) {
+            return;
+        }
+        Runnable sendAction = () -> {
+            try {
+                template.convertAndSend(topic, payload);
+            } catch (Exception ex) {
+                log.warn("Không thể gửi STOMP event tới {}: {}", topic, ex.getMessage());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendAction.run();
+                }
+            });
+        } else {
+            sendAction.run();
+        }
+    }
 
     private UUID parseUuid(String value, String field) {
         try {

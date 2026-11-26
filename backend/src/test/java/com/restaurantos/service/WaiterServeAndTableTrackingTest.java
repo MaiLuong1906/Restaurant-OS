@@ -182,7 +182,7 @@ class WaiterServeAndTableTrackingTest {
                     assertThat(rse.getReason()).contains("món");
                 });
 
-        verify(tableRepository, never()).updateStatusIfMatches(any(), any(), any());
+        verify(tableRepository, never()).updateStatusIfMatches(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -194,14 +194,14 @@ class WaiterServeAndTableTrackingTest {
 
         when(tableRepository.findById(tableId)).thenReturn(Optional.of(table));
         when(orderRepository.findByTableIdAndStatusIn(eq(tableId), any())).thenReturn(List.of());
-        when(tableRepository.updateStatusIfMatches(tableId, "SERVING", "BILLING")).thenReturn(1);
+        when(tableRepository.updateStatusIfMatches(eq(tableId), eq("SERVING"), eq("BILLING"), any(), any(Instant.class))).thenReturn(1);
 
         OrderDtos.TableResponse response = tableService.updateTableStatus(tableId, "BILLING");
         assertThat(response.status()).isEqualTo("BILLING");
 
         // Concurrent update returns 0 rows -> 409 CONFLICT
         table.setStatus("SERVING");
-        when(tableRepository.updateStatusIfMatches(tableId, "SERVING", "BILLING")).thenReturn(0);
+        when(tableRepository.updateStatusIfMatches(eq(tableId), eq("SERVING"), eq("BILLING"), any(), any(Instant.class))).thenReturn(0);
         assertThatThrownBy(() -> tableService.updateTableStatus(tableId, "BILLING"))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
@@ -234,5 +234,42 @@ class WaiterServeAndTableTrackingTest {
         assertThat(UserRole.STAFF.getPermissions()).doesNotContain(
                 Permission.ORDER_ITEM_SERVE_EXPEDITE_UPDATE,
                 Permission.TABLE_STATE_UPDATE);
+    }
+
+    @Test
+    @DisplayName("9. Table State Machine: chặn CLEANING khi còn đơn active, chặn RESERVED từ SERVING, chặn SERVING từ CLEANING")
+    void updateTableStatus_invalidTransitions_throwConflict() {
+        UUID tableId = UUID.randomUUID();
+        TableEntity servingTable = TableEntity.builder()
+                .id(tableId).tableNumber("B03").capacity(4).status("SERVING").zoneId(UUID.randomUUID()).build();
+        OrderEntity activeOrder = OrderEntity.builder()
+                .id(UUID.randomUUID()).tableId(tableId).status("SERVED").build();
+
+        when(tableRepository.findById(tableId)).thenReturn(Optional.of(servingTable));
+        when(orderRepository.findByTableIdAndStatusIn(eq(tableId), any())).thenReturn(List.of(activeOrder));
+        when(orderItemRepository.findByOrderIdIn(any())).thenReturn(List.of());
+
+        // Chặn chuyển CLEANING khi còn đơn active chưa thanh toán
+        assertThatThrownBy(() -> tableService.updateTableStatus(tableId, "CLEANING"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+
+        // Chặn chuyển RESERVED từ bàn đang SERVING
+        assertThatThrownBy(() -> tableService.updateTableStatus(tableId, "RESERVED"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+
+        // Chặn chuyển SERVING trực tiếp từ bàn đang CLEANING
+        TableEntity cleaningTable = TableEntity.builder()
+                .id(tableId).tableNumber("B03").capacity(4).status("CLEANING").zoneId(UUID.randomUUID()).build();
+        when(tableRepository.findById(tableId)).thenReturn(Optional.of(cleaningTable));
+        when(orderRepository.findByTableIdAndStatusIn(eq(tableId), any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> tableService.updateTableStatus(tableId, "SERVING"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
     }
 }

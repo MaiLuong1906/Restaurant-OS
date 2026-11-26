@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Repository
@@ -16,11 +17,13 @@ public interface TableRepository extends JpaRepository<TableEntity, UUID> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE TableEntity t
-        SET t.status = :newStatus
+        SET t.status = :newStatus, t.occupiedAt = :occupiedAt, t.updatedAt = :updatedAt
         WHERE t.id = :tableId AND UPPER(t.status) = UPPER(:expectedStatus)
         """)
     int updateStatusIfMatches(
             @Param("tableId") UUID tableId,
             @Param("expectedStatus") String expectedStatus,
-            @Param("newStatus") String newStatus);
+            @Param("newStatus") String newStatus,
+            @Param("occupiedAt") Instant occupiedAt,
+            @Param("updatedAt") Instant updatedAt);
 }
