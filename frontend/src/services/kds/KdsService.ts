@@ -20,6 +20,7 @@ export interface KdsService {
     idempotencyKey: string,
     reason?: string
   ): Promise<Ticket>;
+  completeBatch(itemIds: string[], idempotencyKey: string): Promise<Ticket[]>;
   getPendingOrderChanges(): Promise<OrderChangeAlertData[]>;
   acknowledgeOrderChange(alertId: string, idempotencyKey?: string): Promise<{ alert: OrderChangeAlertData; ticket: Ticket }>;
   deferOrderChange(alertId: string): Promise<void>;
