@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Ticket } from '../../../../types';
 import {
   applyKdsOrderStatusEvent,
+  deriveTicketStatus,
   filterActiveTickets,
   sortKdsTickets,
 } from '../../../../services/kds';
@@ -244,5 +245,16 @@ describe('KDS Ticket Ordering & Active Filter', () => {
 
     const unknown = applyKdsOrderStatusEvent(afterReject, 'non-existent-id', 'READY');
     expect(unknown).toBe(afterReject);
+  });
+
+  it('deriveTicketStatus khi hoàn tất mẻ: giữ WAITING nếu ticket còn món WAITING, chuyển READY khi hết món WAITING', () => {
+    const partialBatchItems: Ticket['items'] = [
+      { id: 'i-1', orderId: 't-1', dishId: 'd-1', dishName: 'Bún Chả', quantity: 1, unitPrice: 65000, modifiers: [], status: 'READY', createdAt: '2026-11-26T10:00:00Z' },
+      { id: 'i-2', orderId: 't-1', dishId: 'd-2', dishName: 'Cà Phê', quantity: 1, unitPrice: 35000, modifiers: [], status: 'WAITING', createdAt: '2026-11-26T10:00:00Z' },
+    ];
+    expect(deriveTicketStatus(partialBatchItems)).toBe('WAITING');
+
+    const fullBatchItems: Ticket['items'] = partialBatchItems.map((i) => ({ ...i, status: 'READY' }));
+    expect(deriveTicketStatus(fullBatchItems)).toBe('READY');
   });
 });

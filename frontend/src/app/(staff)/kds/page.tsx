@@ -8,6 +8,7 @@ import {
   ApiKdsService,
   KdsService,
   applyKdsOrderStatusEvent,
+  deriveTicketStatus,
   filterActiveTickets,
   sortKdsTickets,
 } from '@/services/kds';
@@ -355,10 +356,16 @@ export default function KitchenDisplayScreen() {
 
     // Optimistic Update
     setTickets((prev) =>
-      prev.map((t) => ({
-        ...t,
-        items: t.items.map((i) => (affectedItemIds.has(i.id) ? { ...i, status: 'READY' } : i)),
-      }))
+      prev.map((t) => {
+        const nextItems = t.items.map((i) =>
+          affectedItemIds.has(i.id) ? { ...i, status: 'READY' as const } : i
+        );
+        return {
+          ...t,
+          items: nextItems,
+          status: deriveTicketStatus(nextItems),
+        };
+      })
     );
 
     if (undoTimeoutRef.current) {
