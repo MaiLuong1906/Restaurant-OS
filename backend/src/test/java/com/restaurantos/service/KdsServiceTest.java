@@ -381,10 +381,9 @@ class KdsServiceTest {
 
         List<UUID> itemIds = List.of(item1.getId(), item2.getId());
         when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(item1, item2));
-        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1));
-        when(orderRepository.findById(order2.getId())).thenReturn(Optional.of(order2));
-        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order2.getId())).thenReturn(List.of(item2));
+        when(orderRepository.findAllById(List.of(order.getId(), order2.getId()))).thenReturn(List.of(order, order2));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId(), order2.getId())))
+                .thenReturn(List.of(item1, item2));
 
         Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
 
@@ -413,8 +412,8 @@ class KdsServiceTest {
         List<UUID> itemIds = List.of(item1.getId());
 
         when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(item1));
-        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1));
+        when(orderRepository.findAllById(List.of(order.getId()))).thenReturn(List.of(order));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(item1));
 
         Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
 
@@ -490,8 +489,9 @@ class KdsServiceTest {
 
         List<UUID> itemIds = List.of(waitingItem.getId(), readyItem.getId());
         when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(waitingItem, readyItem));
-        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(waitingItem, readyItem));
+        when(orderRepository.findAllById(List.of(order.getId()))).thenReturn(List.of(order));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId())))
+                .thenReturn(List.of(waitingItem, readyItem));
 
         Optional<List<KdsTicketDto>> result = kdsService.completeBatch(new CompleteBatchRequest(itemIds));
 
@@ -516,8 +516,8 @@ class KdsServiceTest {
         List<UUID> itemIds = List.of(waitingItem.getId());
 
         when(orderItemRepository.findAllById(itemIds)).thenReturn(List.of(waitingItem));
-        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(waitingItem));
+        when(orderRepository.findAllById(List.of(order.getId()))).thenReturn(List.of(order));
+        when(orderItemRepository.findByOrderIdInOrderByCreatedAtAsc(List.of(order.getId()))).thenReturn(List.of(waitingItem));
         doThrow(new RuntimeException("Broker unavailable"))
                 .when(messagingTemplate).convertAndSend(eq("/topic/kds/orders"), any(KdsService.KdsOrderEvent.class));
 

@@ -237,9 +237,19 @@ public class KdsService {
                 .distinct()
                 .toList();
 
+        Map<UUID, OrderEntity> ordersById = orderRepository.findAllById(distinctOrderIds).stream()
+                .collect(java.util.stream.Collectors.toMap(OrderEntity::getId, java.util.function.Function.identity()));
+        Map<UUID, List<OrderItemEntity>> itemsByOrderId = orderItemRepository
+                .findByOrderIdInOrderByCreatedAtAsc(distinctOrderIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(OrderItemEntity::getOrderId));
+
         List<KdsTicketDto> updatedTickets = distinctOrderIds.stream()
-                .map(this::getTicketById)
-                .flatMap(Optional::stream)
+                .map(ordersById::get)
+                .filter(Objects::nonNull)
+                .map(order -> mapToTicketDto(
+                        order,
+                        itemsByOrderId.getOrDefault(order.getId(), List.of())
+                ))
                 .toList();
 
         return Optional.of(updatedTickets);
