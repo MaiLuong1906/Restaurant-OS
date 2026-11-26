@@ -98,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       case 'OWNER':
         return 'Chủ Nhà Hàng';
       case 'MANAGER':
-        return 'Quản Lý';
+        return 'Quản Lý Ca';
       case 'CASHIER':
         return 'Thu Ngân';
       case 'CHEF':
@@ -127,12 +127,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pinInput, setPinInput] = React.useState('');
   const [pinVerifying, setPinVerifying] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
-  const [changePasswordModalOpen, setChangePasswordModalOpen] = React.useState(false);
-  const [currentPassword, setCurrentPassword] = React.useState('');
-  const [newPassword, setNewPassword] = React.useState('');
-  const [confirmPassword, setConfirmPassword] = React.useState('');
-  const [passwordError, setPasswordError] = React.useState<string | null>(null);
-  const [isSubmittingPassword, setIsSubmittingPassword] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement | null>(null);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
   const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -184,7 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const res = await authService.verifyManagerPin({ pin: pinInput });
         showToast(`Mã PIN hợp lệ! Xác thực bởi ${res.approverName} (${res.approverRole}): ${pinPurpose}`);
       } else {
-        if (pinInput === '8841' || pinInput === '9999' || pinInput.length >= 4) {
+        if (pinInput === '8841' || pinInput === '9999') {
           showToast(`[Mock] Mã PIN hợp lệ! Đã xác thực: ${pinPurpose}`);
         } else {
           showToast('Mã PIN không đúng! Vui lòng thử lại.');
@@ -206,32 +200,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/login');
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordError(null);
-    if (!currentPassword) {
-      setPasswordError('Vui lòng nhập mật khẩu hiện tại');
-      return;
-    }
-    if (!newPassword || newPassword.length < 6) {
-      setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Mật khẩu xác nhận không trùng khớp');
-      return;
-    }
-    setIsSubmittingPassword(true);
-    setTimeout(() => {
-      setIsSubmittingPassword(false);
-      setChangePasswordModalOpen(false);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      showToast('Đổi mật khẩu thành công!');
-    }, 400);
-  };
-
   // Close mobile sidebar & user menu on route change
   React.useEffect(() => {
     setMobileMenuOpen(false);
@@ -245,7 +213,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         setMobileMenuOpen(false);
         setPinModalOpen(false);
         setUserMenuOpen(false);
-        setChangePasswordModalOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -490,21 +457,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       </Link>
                     )}
 
-                    {/* 3. Đổi mật khẩu */}
+                    {/* 3. Đổi mật khẩu (Tạm vô hiệu hóa - chờ Backend cung cấp API ở Sprint tới) */}
                     <button
                       type="button"
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        setPasswordError(null);
-                        setCurrentPassword('');
-                        setNewPassword('');
-                        setConfirmPassword('');
-                        setChangePasswordModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-stone-700 hover:text-stone-950 hover:bg-stone-100 rounded-lg transition-colors text-left cursor-pointer"
+                      disabled
+                      title="Chức năng đổi mật khẩu đang được phát triển ở Sprint tiếp theo"
+                      className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium text-stone-400 bg-stone-50/50 rounded-lg cursor-not-allowed text-left opacity-70 select-none"
                     >
-                      <KeyRound className="h-4 w-4 text-stone-500" />
-                      <span>Đổi mật khẩu</span>
+                      <div className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4 text-stone-400" />
+                        <span>Đổi mật khẩu</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-200/80 text-stone-600 font-semibold">
+                        Sắp có
+                      </span>
                     </button>
                   </div>
 
@@ -616,98 +582,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       )}
 
-      {/* ===================================================================== */}
-      {/* GLOBAL CHANGE PASSWORD MODAL                                          */}
-      {/* ===================================================================== */}
-      {changePasswordModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Đổi Mật Khẩu Cá Nhân"
-          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs"
-        >
-          <div className="bg-white border border-ops-border rounded-xl shadow-2xl w-full max-w-sm p-5 sm:p-6 max-h-[90vh] overflow-y-auto flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-ops-border">
-              <div className="flex items-center gap-2.5">
-                <KeyRound className="h-5 w-5 text-ops-brand" />
-                <h3 className="font-ops text-base font-bold text-ops-ink">Đổi Mật Khẩu</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setChangePasswordModalOpen(false)}
-                className="w-8 h-8 rounded-lg border border-ops-border hover:bg-ops-bg flex items-center justify-center text-ops-muted cursor-pointer"
-                aria-label="Đóng"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleChangePassword} className="space-y-3.5">
-              {passwordError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
-                  {passwordError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Mật khẩu hiện tại
-                </label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu đang dùng"
-                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Mật khẩu mới
-                </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Tối thiểu 6 ký tự"
-                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Xác nhận mật khẩu mới
-                </label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Nhập lại mật khẩu mới"
-                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center gap-2 border-t border-stone-100">
-                <button
-                  type="button"
-                  onClick={() => setChangePasswordModalOpen(false)}
-                  className="flex-1 py-2.5 border border-ops-border hover:bg-stone-50 text-stone-700 rounded-lg font-mono text-xs uppercase font-semibold cursor-pointer"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingPassword}
-                  className="flex-1 py-2.5 bg-ops-brand hover:bg-ops-brand-dark disabled:opacity-50 text-white rounded-lg font-mono text-xs uppercase font-bold shadow-xs cursor-pointer"
-                >
-                  {isSubmittingPassword ? 'Đang Lưu...' : 'Cập Nhật'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ===================================================================== */}
       {/* GLOBAL TOAST NOTIFICATION CONTAINER                                  */}

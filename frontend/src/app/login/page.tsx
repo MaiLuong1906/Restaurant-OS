@@ -87,7 +87,6 @@ export default function StaffLoginPage() {
     try {
       const res = await authService.loginStaff({
         identifier: cleanIdentifier,
-        phoneNumber: cleanIdentifier,
         password,
       });
       setLoggedInUser(res.user);
@@ -96,9 +95,14 @@ export default function StaffLoginPage() {
     } catch (err: unknown) {
       const apiErr = err instanceof ApiError ? err : null;
 
-      // Xử lý tài khoản bị tạm khóa (HTTP 403 Forbidden)
-      if (apiErr?.status === 403 || apiErr?.message?.toLowerCase().includes('khóa')) {
-        setGeneralError(apiErr.message || 'Tài khoản đang bị tạm khóa. Vui lòng liên hệ Quản lý.');
+      // Xử lý tài khoản bị tạm khóa (HTTP 403 Forbidden hoặc mã lỗi ACCOUNT_LOCKED)
+      if (
+        apiErr?.status === 403 ||
+        apiErr?.code === 'ACCOUNT_LOCKED' ||
+        apiErr?.code === 'USER_SUSPENDED' ||
+        apiErr?.message?.toLowerCase().includes('khóa')
+      ) {
+        setGeneralError('Tài khoản đang bị tạm khóa. Vui lòng liên hệ Quản lý.');
         return;
       }
 
@@ -110,7 +114,6 @@ export default function StaffLoginPage() {
       } else {
         const remaining = 3 - nextFailed;
         setGeneralError(
-          apiErr?.message ||
           `Thông tin đăng nhập không chính xác. Còn ${remaining} lần thử trước khi tài khoản bị khóa tạm thời.`
         );
       }
