@@ -806,6 +806,7 @@ interface WaiterState {
   lastSyncedAt: string | null;
   syncError: string | null;
   servingItemIds: Record<string, boolean>;
+  pendingIdempotencyKeys: Record<string, string>;
 
   // Actions
   syncFromBackend: () => Promise<void>;
@@ -867,6 +868,7 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
     lastSyncedAt: null,
     syncError: null,
     servingItemIds: {},
+    pendingIdempotencyKeys: {},
 
     syncFromBackend: async () => {
       if (get().isSyncing) return;
@@ -880,10 +882,12 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
 
         const nowMs = Date.now();
         const prevTables = get().tables;
-        const ordersByTableId = new Map<string, BackendOrderDto>();
+        const ordersByTableId = new Map<string, BackendOrderDto[]>();
         for (const order of activeOrders) {
           if (order.tableId) {
-            ordersByTableId.set(order.tableId, order);
+            const list = ordersByTableId.get(order.tableId) || [];
+            list.push(order);
+            ordersByTableId.set(order.tableId, list);
           }
         }
 
@@ -891,47 +895,57 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
         const nextAllergies: AllergyAlert[] = [];
 
         backendTables.forEach((t: BackendTableDto) => {
-          const order = ordersByTableId.get(t.id);
+          const tableOrders = ordersByTableId.get(t.id) || [];
+          const primaryOrder = tableOrders[0];
           const mappedStatus = mapBackendTableStatus(t.status);
           const existingLocal = prevTables[t.id];
-          const elapsedMin = order ? calcElapsedMinutes(order.openedAt || order.createdAt, nowMs) : 0;
+          const elapsedMin = primaryOrder
+            ? calcElapsedMinutes(primaryOrder.openedAt || primaryOrder.createdAt, nowMs)
+            : 0;
 
-          const confirmedItems: WaiterOrderItem[] = (order?.items || []).map((item) => {
-            const st = mapBackendItemStatus(item, nowMs);
-            if (item.allergyNote) {
-              nextAllergies.push({
-                id: `alg-${item.id}`,
-                tableId: t.tableNumber || t.id,
-                title: `Dị ứng — ${item.dishNameSnapshot}`,
-                details: item.allergyNote,
-                severity: 'strict',
-                time: formatTimeHHmm(item.createdAt),
-                status: 'acknowledged',
-                stationRecipient: 'Bếp KDS',
-              });
-            }
-            return {
-              id: item.id,
-              dishId: item.dishId,
-              name: item.dishNameSnapshot,
-              sku: item.portionNameSnapshot || 'STD',
-              price: item.unitPrice,
-              qty: item.quantity,
-              category: 'Thực đơn',
-              station: 'Bếp KDS',
-              status: st.status,
-              statusText: st.text,
-              note: item.notes || undefined,
-              allergyNote: item.allergyNote || undefined,
-              waitMinutes: calcElapsedMinutes(item.createdAt, nowMs),
-              isUrgent: st.isUrgent,
-              tableId: t.id,
-              orderId: order?.id,
-              orderCode: order?.orderCode,
-              sentAt: formatTimeHHmm(item.createdAt),
-              slaDeadline: item.slaDeadline || undefined,
-            };
-          });
+          const confirmedItems: WaiterOrderItem[] = tableOrders.flatMap((order) =>
+            (order.items || []).map((item) => {
+              const st = mapBackendItemStatus(item, nowMs);
+              if (item.allergyNote) {
+                nextAllergies.push({
+                  id: `alg-${item.id}`,
+                  tableId: t.id,
+                  title: `Dị ứng — ${item.dishNameSnapshot}`,
+                  details: item.allergyNote,
+                  severity: 'strict',
+                  time: formatTimeHHmm(item.createdAt),
+                  status: 'acknowledged',
+                  stationRecipient: 'Bếp KDS',
+                });
+              }
+              return {
+                id: item.id,
+                dishId: item.dishId,
+                name: item.dishNameSnapshot,
+                sku: item.portionNameSnapshot || 'STD',
+                price: item.unitPrice,
+                qty: item.quantity,
+                category: 'Thực đơn',
+                station: 'Bếp KDS',
+                status: st.status,
+                statusText: st.text,
+                note: item.notes || undefined,
+                allergyNote: item.allergyNote || undefined,
+                waitMinutes: calcElapsedMinutes(item.createdAt, nowMs),
+                isUrgent: st.isUrgent,
+                tableId: t.id,
+                orderId: order.id,
+                orderCode: order.orderCode,
+                sentAt: formatTimeHHmm(item.createdAt),
+                slaDeadline: item.slaDeadline || undefined,
+              };
+            })
+          );
+
+          const mergedNotes = tableOrders
+            .map((o) => o.customerNotes)
+            .filter(Boolean)
+            .join(' | ');
 
           nextTables[t.id] = {
             id: t.id,
@@ -942,14 +956,14 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
             status: mappedStatus.status,
             statusText: mappedStatus.text,
             server: existingLocal?.server || 'Phục vụ',
-            timeIn: order ? formatTimeHHmm(order.openedAt || order.createdAt) : '--:--',
-            elapsed: order ? `${elapsedMin} phút` : '0 phút',
-            orderId: order?.id ?? t.currentOrderId ?? null,
-            orderCode: order?.orderCode ?? null,
-            orderStatus: order?.status ?? null,
+            timeIn: primaryOrder ? formatTimeHHmm(primaryOrder.openedAt || primaryOrder.createdAt) : '--:--',
+            elapsed: primaryOrder ? `${elapsedMin} phút` : '0 phút',
+            orderId: primaryOrder?.id ?? t.currentOrderId ?? null,
+            orderCode: primaryOrder?.orderCode ?? null,
+            orderStatus: primaryOrder?.status ?? null,
             pendingItems: existingLocal?.pendingItems || [],
             confirmedItems,
-            generalNote: order?.customerNotes || existingLocal?.generalNote,
+            generalNote: mergedNotes || existingLocal?.generalNote,
           };
         });
 
@@ -1161,8 +1175,11 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
       set((state) => {
         const table = state.tables[tableId];
         if (!table) return state;
+        const nextKeys = { ...state.pendingIdempotencyKeys };
+        delete nextKeys[tableId];
 
         return {
+          pendingIdempotencyKeys: nextKeys,
           tables: {
             ...state.tables,
             [tableId]: {
@@ -1178,8 +1195,11 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
       set((state) => {
         const table = state.tables[tableId];
         if (!table) return state;
+        const nextKeys = { ...state.pendingIdempotencyKeys };
+        delete nextKeys[tableId];
 
         return {
+          pendingIdempotencyKeys: nextKeys,
           tables: {
             ...state.tables,
             [tableId]: {
@@ -1217,14 +1237,25 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
 
       const pendingCount = table.pendingItems.length;
       const totalQty = table.pendingItems.reduce((acc, i) => acc + i.qty, 0);
-      set({ isSendingOrder: true });
 
-      try {
-        const idempotencyKey =
+      // Tái sử dụng idempotencyKey theo giỏ hiện tại của bàn để chống tạo đơn trùng khi retry mạng lỗi
+      let idempotencyKey = state.pendingIdempotencyKeys[tableId];
+      if (!idempotencyKey) {
+        idempotencyKey =
           typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
             ? `waiter-ord-${crypto.randomUUID()}`
             : `waiter-ord-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
 
+      set((s) => ({
+        isSendingOrder: true,
+        pendingIdempotencyKeys: {
+          ...s.pendingIdempotencyKeys,
+          [tableId]: idempotencyKey,
+        },
+      }));
+
+      try {
         await waiterApi.createOrder({
           tableId,
           items: table.pendingItems.map((p) => ({
@@ -1239,18 +1270,21 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
 
         set((s) => {
           const current = s.tables[tableId];
+          const nextKeys = { ...s.pendingIdempotencyKeys };
+          delete nextKeys[tableId];
           return {
             isSendingOrder: false,
             isSendKitchenModalOpen: false,
+            pendingIdempotencyKeys: nextKeys,
             tables: current
               ? {
-                  ...s.tables,
-                  [tableId]: {
-                    ...current,
-                    pendingItems: [],
-                    generalNote: note?.trim() || current.generalNote,
-                  },
-                }
+                ...s.tables,
+                [tableId]: {
+                  ...current,
+                  pendingItems: [],
+                  generalNote: note?.trim() || current.generalNote,
+                },
+              }
               : s.tables,
           };
         });

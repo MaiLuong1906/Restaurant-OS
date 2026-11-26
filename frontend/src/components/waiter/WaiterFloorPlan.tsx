@@ -44,6 +44,7 @@ export function WaiterFloorPlan() {
       all: tableList.length,
       serving: tableList.filter((t) => t.status === 'serving').length,
       vacant: tableList.filter((t) => t.status === 'vacant').length,
+      reserved: tableList.filter((t) => t.status === 'reserved').length,
       billing: tableList.filter((t) => t.status === 'billing').length,
       cleaning: tableList.filter((t) => t.status === 'cleaning').length,
     };
@@ -208,6 +209,28 @@ export function WaiterFloorPlan() {
               {counts.cleaning}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setZoneFilter('reserved')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5 shadow-xs',
+              activeZoneFilter === 'reserved'
+                ? 'bg-ops-ink text-white border-ops-ink'
+                : 'bg-white text-ops-muted border-ops-border hover:bg-ops-bg'
+            )}
+          >
+            <span className="w-2 h-2 rounded-full bg-violet-500" />
+            <span>Đã đặt trước</span>
+            <span
+              className={cn(
+                'text-[10px] px-1.5 py-0.2 rounded-full font-bold',
+                activeZoneFilter === 'reserved' ? 'bg-white/20 text-white' : 'bg-sand-100 text-ops-muted'
+              )}
+            >
+              {counts.reserved}
+            </span>
+          </button>
         </div>
 
         {/* TABLE CARDS GRID */}
@@ -219,9 +242,11 @@ export function WaiterFloorPlan() {
               const isBilling = table.status === 'billing';
               const isCleaning = table.status === 'cleaning';
               const isVacant = table.status === 'vacant';
+              const isReserved = table.status === 'reserved';
 
               let borderStyle = 'border-ops-border hover:border-sand-400';
               if (isBilling) borderStyle = 'border-amber-300 hover:border-amber-400';
+              if (isReserved) borderStyle = 'border-violet-300 hover:border-violet-400';
               if (isSelected) {
                 borderStyle = 'border-2 border-ops-brand ring-2 ring-ops-brand/10 shadow-xs';
               }
@@ -254,6 +279,7 @@ export function WaiterFloorPlan() {
                           'w-1.5 h-1.5 rounded-full',
                           isServing && 'bg-ops-ink',
                           isVacant && 'bg-emerald-500',
+                          isReserved && 'bg-violet-500',
                           isBilling && 'bg-amber-500',
                           isCleaning && 'bg-sand-400'
                         )}
@@ -301,6 +327,7 @@ export function WaiterFloorPlan() {
                 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border',
                 selectedTable.status === 'serving' && 'border-sand-300 bg-sand-100 text-ink',
                 selectedTable.status === 'billing' && 'border-amber-200 bg-amber-50 text-amber-800',
+                selectedTable.status === 'reserved' && 'border-violet-200 bg-violet-50 text-violet-800',
                 selectedTable.status === 'cleaning' && 'border-sand-300 bg-ops-bg text-ops-muted',
                 selectedTable.status === 'vacant' && 'border-emerald-200 bg-emerald-50 text-emerald-800'
               )}
@@ -310,6 +337,7 @@ export function WaiterFloorPlan() {
                   'w-2 h-2 rounded-full',
                   selectedTable.status === 'serving' && 'bg-ops-ink',
                   selectedTable.status === 'billing' && 'bg-amber-500',
+                  selectedTable.status === 'reserved' && 'bg-violet-500',
                   selectedTable.status === 'cleaning' && 'bg-sand-400',
                   selectedTable.status === 'vacant' && 'bg-emerald-500'
                 )}

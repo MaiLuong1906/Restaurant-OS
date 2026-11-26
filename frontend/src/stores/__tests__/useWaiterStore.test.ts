@@ -300,4 +300,134 @@ describe('useWaiterStore — Serve Items & Table Tracking', () => {
     );
     expect(useWaiterStore.getState().tables[tableId].pendingItems).toHaveLength(0);
   });
+
+  it('7. syncFromBackend gom toàn bộ món từ nhiều đơn active của cùng 1 bàn và gán AllergyAlert.tableId bằng UUID', async () => {
+    const tableId = '33333333-3333-3333-3333-333333333333';
+    vi.mocked(waiterApi.fetchTables).mockResolvedValueOnce([
+      { id: tableId, tableNumber: 'Bàn 05', capacity: 4, status: 'SERVING', currentOrderId: 'ord-1' },
+    ]);
+    vi.mocked(waiterApi.fetchActiveOrders).mockResolvedValueOnce([
+      {
+        id: 'ord-1',
+        tableId,
+        orderCode: 'ORD-01',
+        status: 'PLACED',
+        totalAmount: 75000,
+        customerNotes: null,
+        openedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        items: [
+          {
+            id: 'item-1',
+            dishId: 'd-1',
+            dishNameSnapshot: 'Phở Bò',
+            portionId: 'p-1',
+            portionNameSnapshot: 'STD',
+            quantity: 1,
+            unitPrice: 75000,
+            status: 'READY',
+            notes: null,
+            allergyNote: 'Dị ứng đậu phộng',
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      },
+      {
+        id: 'ord-2',
+        tableId,
+        orderCode: 'ORD-02',
+        status: 'PLACED',
+        totalAmount: 35000,
+        customerNotes: null,
+        openedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        items: [
+          {
+            id: 'item-2',
+            dishId: 'd-2',
+            dishNameSnapshot: 'Cà Phê Muối',
+            portionId: 'p-2',
+            portionNameSnapshot: 'STD',
+            quantity: 1,
+            unitPrice: 35000,
+            status: 'WAITING',
+            notes: null,
+            allergyNote: null,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      },
+    ]);
+    vi.mocked(waiterApi.fetchDishes).mockResolvedValueOnce([]);
+
+    await useWaiterStore.getState().syncFromBackend();
+
+    const state = useWaiterStore.getState();
+    expect(state.tables[tableId].confirmedItems).toHaveLength(2);
+    expect(state.allergyAlerts).toHaveLength(1);
+    expect(state.allergyAlerts[0].tableId).toBe(tableId);
+  });
+
+  it('8. sendPendingOrderToKitchen tái sử dụng cùng 1 idempotencyKey khi retry sau lỗi mạng', async () => {
+    const tableId = '44444444-4444-4444-4444-444444444444';
+    useWaiterStore.setState({
+      pendingIdempotencyKeys: {},
+      tables: {
+        [tableId]: {
+          id: tableId,
+          name: 'Bàn 06',
+          seats: 4,
+          guests: 2,
+          zone: 'Sảnh chính',
+          status: 'vacant',
+          statusText: 'Bàn trống',
+          server: 'Phục vụ',
+          timeIn: '--:--',
+          elapsed: '0 phút',
+          pendingItems: [
+            {
+              id: 'p-retry',
+              dishId: '1596b966-2cb9-444e-be8d-da3161779887',
+              name: 'Phở Bò',
+              sku: 'PB01',
+              price: 75000,
+              qty: 1,
+              category: 'Món chính',
+              station: 'Bếp nóng',
+              status: 'pending',
+              statusText: 'Chờ gửi bếp',
+              tableId,
+            },
+          ],
+          confirmedItems: [],
+        },
+      },
+    });
+
+    vi.mocked(waiterApi.createOrder)
+      .mockRejectedValueOnce(new Error('Network timeout'))
+      .mockResolvedValueOnce({
+        id: 'ord-retry',
+        tableId,
+        orderCode: 'ORD-RETRY',
+        status: 'PLACED',
+        totalAmount: 75000,
+        customerNotes: null,
+        openedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        items: [],
+      });
+    vi.mocked(waiterApi.fetchTables).mockResolvedValueOnce([]);
+    vi.mocked(waiterApi.fetchActiveOrders).mockResolvedValueOnce([]);
+    vi.mocked(waiterApi.fetchDishes).mockResolvedValueOnce([]);
+
+    const first = await useWaiterStore.getState().sendPendingOrderToKitchen(tableId);
+    expect(first).toBe(0);
+    const second = await useWaiterStore.getState().sendPendingOrderToKitchen(tableId);
+    expect(second).toBe(1);
+
+    const calls = vi.mocked(waiterApi.createOrder).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].idempotencyKey).toBe(calls[1][0].idempotencyKey);
+  });
 });
