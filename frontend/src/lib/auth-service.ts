@@ -49,8 +49,9 @@ export const authService = {
    * - Mock mode: giữ nguyên tương thích unit test cục bộ
    */
   async loginStaff(req: LoginRequest): Promise<LoginResponse> {
-    if (!req.phoneNumber?.trim()) {
-      throw new ApiError('VALIDATION_ERROR', 'Số điện thoại không được để trống', 400);
+    const rawIdentifier = (req.identifier || req.phoneNumber || '').trim();
+    if (!rawIdentifier) {
+      throw new ApiError('VALIDATION_ERROR', 'Vui lòng nhập số điện thoại hoặc tên đăng nhập', 400);
     }
     if (!req.password || req.password.length < 4) {
       throw new ApiError('VALIDATION_ERROR', 'Mật khẩu không hợp lệ', 400);
@@ -60,7 +61,7 @@ export const authService = {
       const data = await fetchApi<BackendLoginPayload>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
-          identifier: req.phoneNumber.trim(),
+          identifier: rawIdentifier,
           password: req.password,
         }),
       });
@@ -90,7 +91,7 @@ export const authService = {
       user: {
         id: `usr-${crypto.randomUUID().slice(0, 8)}`,
         fullName: 'Nhân Viên Vận Hành',
-        phoneNumber: req.phoneNumber,
+        phoneNumber: rawIdentifier,
         role: 'STAFF',
         isActive: true,
       },

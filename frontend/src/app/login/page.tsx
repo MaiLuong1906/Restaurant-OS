@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/lib/auth-service';
+import { ApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { StaffUser } from '@/types';
 import {
@@ -21,7 +22,7 @@ export default function StaffLoginPage() {
   const router = useRouter();
   const staffUser = useAuthStore((s) => s.staffUser);
 
-  const [phoneNumber, setPhoneNumber] = React.useState<string>('');
+  const [identifier, setIdentifier] = React.useState<string>('');
   const [password, setPassword] = React.useState<string>('');
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
   const [rememberMe, setRememberMe] = React.useState<boolean>(false);
@@ -30,7 +31,7 @@ export default function StaffLoginPage() {
   const [authState, setAuthState] = React.useState<'FORM' | 'LOCKED' | 'SUCCESS'>('FORM');
   const [failedAttempts, setFailedAttempts] = React.useState<number>(0);
   const [loading, setLoading] = React.useState<boolean>(false);
-  const [phoneError, setPhoneError] = React.useState<string | null>(null);
+  const [identifierError, setIdentifierError] = React.useState<string | null>(null);
   const [passwordError, setPasswordError] = React.useState<string | null>(null);
   const [generalError, setGeneralError] = React.useState<string | null>(null);
   const [showForgotHint, setShowForgotHint] = React.useState<boolean>(false);
@@ -51,17 +52,24 @@ export default function StaffLoginPage() {
     if (loading || authState === 'LOCKED') return;
 
     // Reset error
-    setPhoneError(null);
+    setIdentifierError(null);
     setPasswordError(null);
     setGeneralError(null);
 
-    const cleanPhone = phoneNumber.trim();
-    if (!cleanPhone) {
-      setPhoneError('Vui lòng nhập số điện thoại');
+    const cleanIdentifier = identifier.trim();
+    if (!cleanIdentifier) {
+      setIdentifierError('Vui lòng nhập số điện thoại hoặc tên đăng nhập');
       return;
     }
-    if (!/^0\d{9}$/.test(cleanPhone)) {
-      setPhoneError('Nhập số điện thoại 10 số, bắt đầu bằng 0.');
+
+    // Nếu toàn số -> kiểm tra định dạng SĐT Việt Nam (10 số, bắt đầu bằng 0)
+    if (/^\d+$/.test(cleanIdentifier)) {
+      if (!/^0\d{9}$/.test(cleanIdentifier)) {
+        setIdentifierError('Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0.');
+        return;
+      }
+    } else if (cleanIdentifier.length < 3) {
+      setIdentifierError('Tên đăng nhập phải có ít nhất 3 ký tự.');
       return;
     }
 
@@ -78,13 +86,22 @@ export default function StaffLoginPage() {
 
     try {
       const res = await authService.loginStaff({
-        phoneNumber: cleanPhone,
+        identifier: cleanIdentifier,
+        phoneNumber: cleanIdentifier,
         password,
       });
       setLoggedInUser(res.user);
       setFailedAttempts(0);
       setAuthState('SUCCESS');
-    } catch {
+    } catch (err: unknown) {
+      const apiErr = err instanceof ApiError ? err : null;
+
+      // Xử lý tài khoản bị tạm khóa (HTTP 403 Forbidden)
+      if (apiErr?.status === 403 || apiErr?.message?.toLowerCase().includes('khóa')) {
+        setGeneralError(apiErr.message || 'Tài khoản đang bị tạm khóa. Vui lòng liên hệ Quản lý.');
+        return;
+      }
+
       const nextFailed = failedAttempts + 1;
       setFailedAttempts(nextFailed);
 
@@ -93,6 +110,7 @@ export default function StaffLoginPage() {
       } else {
         const remaining = 3 - nextFailed;
         setGeneralError(
+          apiErr?.message ||
           `Thông tin đăng nhập không chính xác. Còn ${remaining} lần thử trước khi tài khoản bị khóa tạm thời.`
         );
       }
@@ -174,33 +192,33 @@ export default function StaffLoginPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Số điện thoại */}
+                {/* Số điện thoại hoặc Tên đăng nhập */}
                 <div>
                   <label
-                    htmlFor="phone-input"
+                    htmlFor="identifier-input"
                     className="block text-xs font-semibold text-[#7A6A58] uppercase tracking-wider mb-1"
                   >
-                    Số điện thoại
+                    Số điện thoại hoặc Tên đăng nhập
                   </label>
                   <input
-                    id="phone-input"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    value={phoneNumber}
+                    id="identifier-input"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="username"
+                    value={identifier}
                     onChange={(e) => {
-                      setPhoneNumber(e.target.value);
-                      if (phoneError) setPhoneError(null);
+                      setIdentifier(e.target.value);
+                      if (identifierError) setIdentifierError(null);
                     }}
-                    placeholder="Nhập số điện thoại"
+                    placeholder="0912 345 678 hoặc admin"
                     className={`w-full p-3 bg-[#F6F4F0] border rounded-lg text-sm text-[#141210] focus:outline-none focus:bg-white min-h-[48px] ${
-                      phoneError
+                      identifierError
                         ? 'border-[#D14B3A]'
                         : 'border-[#E9E4DC] focus:border-[#8C1D2C]'
                     }`}
                   />
-                  {phoneError && (
-                    <p className="text-xs text-[#D14B3A] mt-1">{phoneError}</p>
+                  {identifierError && (
+                    <p className="text-xs text-[#D14B3A] mt-1">{identifierError}</p>
                   )}
                 </div>
 

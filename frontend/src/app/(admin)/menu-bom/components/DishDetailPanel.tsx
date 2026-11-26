@@ -10,6 +10,7 @@ export interface DishDetailPanelProps {
   dish: DishResponseDto | null;
   onEdit: (dish: DishResponseDto) => void;
   onDelete: (dish: DishResponseDto) => void;
+  canEdit?: boolean;
 }
 
 /**
@@ -17,7 +18,7 @@ export interface DishDetailPanelProps {
  * - Nếu isCombo: hiển thị danh sách comboItems
  * - Nếu không: hiển thị BOM placeholder (Coming Soon)
  */
-export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps) {
+export function DishDetailPanel({ dish, onEdit, onDelete, canEdit = true }: DishDetailPanelProps) {
   if (!dish) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-20 text-stone-300">
@@ -74,24 +75,30 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => onEdit(dish)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-            Sửa
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(dish)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Xóa
-          </button>
-        </div>
+        {canEdit ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onEdit(dish)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Sửa
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(dish)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Xóa
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-stone-100 border border-stone-200 rounded-lg text-stone-500 font-mono text-xs font-bold uppercase">
+            <span>Chế độ Xem &amp; Báo Hết</span>
+          </div>
+        )}
       </div>
 
       {/* Financial Summary */}

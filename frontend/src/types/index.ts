@@ -102,7 +102,8 @@ export interface StaffUser {
 }
 
 export interface LoginRequest {
-  phoneNumber: string;
+  identifier?: string;
+  phoneNumber?: string;
   password?: string;
 }
 

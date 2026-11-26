@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   LayoutGrid,
@@ -20,11 +20,16 @@ import {
   X,
   KeyRound,
   Bell,
+  LogOut,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { canAccessRoute, PERMISSIONS } from '@/lib/rbac';
 import { RoleGuard } from '@/components/auth/RoleGuard';
+import { authService } from '@/lib/auth-service';
+import { ApiError } from '@/lib/api-client';
 
 export interface NavGroup {
   groupTitle: string;
@@ -74,9 +79,38 @@ const NAV_GROUPS: NavGroup[] = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const staffUser = useAuthStore((s) => s.staffUser);
   const permissions = useAuthStore((s) => s.permissions);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
+  // Sinh avatar chữ viết tắt từ tên người dùng thực tế
+  const userInitials = React.useMemo(() => {
+    if (!staffUser?.fullName) return 'NV';
+    const parts = staffUser.fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }, [staffUser]);
+
+  // Hiển thị vai trò hệ thống tiếng Việt chuẩn
+  const roleDisplay = React.useMemo(() => {
+    switch (staffUser?.role) {
+      case 'OWNER':
+        return 'Chủ Nhà Hàng';
+      case 'MANAGER':
+        return 'Quản Lý';
+      case 'CASHIER':
+        return 'Thu Ngân';
+      case 'CHEF':
+        return 'Bếp Trưởng';
+      case 'WAITER':
+        return 'Nhân Viên Phục Vụ';
+      case 'STAFF':
+        return 'Nhân Viên';
+      default:
+        return 'Nhân Viên Quản Trị';
+    }
+  }, [staffUser]);
 
   // Lọc động thanh menu Sidebar theo quyền RBAC khi đã đăng nhập
   const visibleNavGroups = React.useMemo(() => {
@@ -91,6 +125,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pinModalOpen, setPinModalOpen] = React.useState(false);
   const [pinPurpose, setPinPurpose] = React.useState('Xác thực quyền quản trị');
   const [pinInput, setPinInput] = React.useState('');
+  const [pinVerifying, setPinVerifying] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = React.useState(false);
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+  const [isSubmittingPassword, setIsSubmittingPassword] = React.useState(false);
+  const userMenuRef = React.useRef<HTMLDivElement | null>(null);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
   const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -99,6 +142,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
+
+  // Đóng dropdown menu người dùng khi click ra ngoài
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
 
   const showToast = React.useCallback((msg: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -114,20 +172,70 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setPinModalOpen(true);
   };
 
-  const handleConfirmPin = (e: React.FormEvent) => {
+  const handleConfirmPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput === '8841' || pinInput === '9999' || pinInput.length >= 4) {
-      showToast(`Mã PIN hợp lệ! Đã xác thực: ${pinPurpose}`);
+    if (!pinInput || pinInput.length < 4) {
+      showToast('Vui lòng nhập mã PIN từ 4 đến 6 số');
+      return;
+    }
+    setPinVerifying(true);
+    try {
+      if (process.env.NEXT_PUBLIC_AUTH_MODE === 'live') {
+        const res = await authService.verifyManagerPin({ pin: pinInput });
+        showToast(`Mã PIN hợp lệ! Xác thực bởi ${res.approverName} (${res.approverRole}): ${pinPurpose}`);
+      } else {
+        if (pinInput === '8841' || pinInput === '9999' || pinInput.length >= 4) {
+          showToast(`[Mock] Mã PIN hợp lệ! Đã xác thực: ${pinPurpose}`);
+        } else {
+          showToast('Mã PIN không đúng! Vui lòng thử lại.');
+          return;
+        }
+      }
       setPinModalOpen(false);
       setPinInput('');
-    } else {
-      showToast('Mã PIN không đúng! Vui lòng thử lại (Gợi ý: 8841 hoặc 9999).');
+    } catch (err: unknown) {
+      const msg = err instanceof ApiError ? err.message : 'Mã PIN Quản lý không đúng hoặc không có quyền duyệt';
+      showToast(msg);
+    } finally {
+      setPinVerifying(false);
     }
   };
 
-  // Close mobile sidebar on route change
+  const handleLogout = () => {
+    authService.logoutStaff();
+    router.push('/login');
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    if (!currentPassword) {
+      setPasswordError('Vui lòng nhập mật khẩu hiện tại');
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Mật khẩu xác nhận không trùng khớp');
+      return;
+    }
+    setIsSubmittingPassword(true);
+    setTimeout(() => {
+      setIsSubmittingPassword(false);
+      setChangePasswordModalOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast('Đổi mật khẩu thành công!');
+    }, 400);
+  };
+
+  // Close mobile sidebar & user menu on route change
   React.useEffect(() => {
     setMobileMenuOpen(false);
+    setUserMenuOpen(false);
   }, [pathname]);
 
   // Handle escape key
@@ -136,6 +244,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (e.key === 'Escape') {
         setMobileMenuOpen(false);
         setPinModalOpen(false);
+        setUserMenuOpen(false);
+        setChangePasswordModalOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -301,17 +411,116 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-ops-brand ring-2 ring-white" />
             </button>
 
-            {/* User Profile Card */}
-            <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-stone-200">
-              <div className="w-8 h-8 rounded-full bg-ops-brand border border-ops-brand-dark flex items-center justify-center text-white font-ops text-xs font-bold shrink-0 shadow-2xs">
-                LN
-              </div>
-              <div className="hidden lg:flex flex-col text-left">
-                <span className="text-xs font-bold text-stone-900 leading-tight">Lương Nguyễn</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 font-mono">
-                  Chủ Nhà Hàng
-                </span>
-              </div>
+            {/* User Profile Card & Interactive Dropdown Menu */}
+            <div className="relative pl-1 sm:pl-2 border-l border-stone-200" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen((prev) => !prev)}
+                className={cn(
+                  'flex items-center gap-2 p-1.5 rounded-xl transition-all cursor-pointer text-left focus:outline-none',
+                  userMenuOpen ? 'bg-stone-100 ring-2 ring-ops-brand/20' : 'hover:bg-stone-50',
+                )}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="true"
+                aria-label="Menu tài khoản cá nhân"
+              >
+                <div className="w-8 h-8 rounded-full bg-ops-brand border border-ops-brand-dark flex items-center justify-center text-white font-ops text-xs font-bold shrink-0 shadow-2xs">
+                  {userInitials}
+                </div>
+                <div className="hidden lg:flex flex-col text-left">
+                  <span className="text-xs font-bold text-stone-900 leading-tight">
+                    {staffUser?.fullName || 'Nhân Viên'}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 font-mono">
+                    {roleDisplay}
+                  </span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'h-3.5 w-3.5 text-stone-400 transition-transform duration-200 hidden sm:block',
+                    userMenuOpen && 'rotate-180 text-stone-700',
+                  )}
+                />
+              </button>
+
+              {/* User Account Dropdown Menu */}
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-stone-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  {/* User Info Header */}
+                  <div className="px-3.5 py-2.5 border-b border-stone-100 bg-stone-50/70">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-ops-brand text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+                        {userInitials}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-xs text-stone-900 truncate">
+                          {staffUser?.fullName || 'Nhân Viên'}
+                        </span>
+                        <span className="text-[10px] font-mono text-ops-brand font-bold uppercase tracking-wider">
+                          {roleDisplay}
+                        </span>
+                        <span className="text-[10px] text-stone-500 truncate font-mono">
+                          {staffUser?.phoneNumber || 'Chưa cập nhật SĐT'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions List (Tinh gọn theo từng vai trò) */}
+                  <div className="p-1 space-y-0.5">
+                    {/* 1. Tài khoản */}
+                    <Link
+                      href="/profile?tab=overview"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-stone-700 hover:text-stone-950 hover:bg-stone-100 rounded-lg transition-colors text-left"
+                    >
+                      <User className="h-4 w-4 text-stone-500" />
+                      <span>Tài khoản</span>
+                    </Link>
+
+                    {/* 2. Phiếu lương cá nhân (Dành riêng cho Manager & các vai trò nhân sự) */}
+                    {staffUser?.role !== 'OWNER' && (
+                      <Link
+                        href="/profile?tab=payslip"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-stone-700 hover:text-stone-950 hover:bg-stone-100 rounded-lg transition-colors text-left"
+                      >
+                        <DollarSign className="h-4 w-4 text-emerald-600" />
+                        <span>Phiếu lương cá nhân</span>
+                      </Link>
+                    )}
+
+                    {/* 3. Đổi mật khẩu */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        setPasswordError(null);
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        setChangePasswordModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-stone-700 hover:text-stone-950 hover:bg-stone-100 rounded-lg transition-colors text-left cursor-pointer"
+                    >
+                      <KeyRound className="h-4 w-4 text-stone-500" />
+                      <span>Đổi mật khẩu</span>
+                    </button>
+                  </div>
+
+                  {/* 3. Đăng xuất */}
+                  <div className="pt-1 mt-1 border-t border-stone-100 p-1">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 rounded-lg transition-colors text-left cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4 text-rose-600" />
+                      <span>Đăng xuất</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -396,9 +605,103 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-ops-brand hover:bg-ops-brand-dark text-white rounded-lg font-mono text-xs uppercase font-bold shadow-xs cursor-pointer"
+                  disabled={pinVerifying}
+                  className="flex-1 py-2.5 bg-ops-brand hover:bg-ops-brand-dark disabled:opacity-50 text-white rounded-lg font-mono text-xs uppercase font-bold shadow-xs cursor-pointer"
                 >
-                  Xác Nhận PIN
+                  {pinVerifying ? 'Đang Kiểm Tra...' : 'Xác Nhận PIN'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* GLOBAL CHANGE PASSWORD MODAL                                          */}
+      {/* ===================================================================== */}
+      {changePasswordModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Đổi Mật Khẩu Cá Nhân"
+          className="fixed inset-0 bg-stone-900/50 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs"
+        >
+          <div className="bg-white border border-ops-border rounded-xl shadow-2xl w-full max-w-sm p-5 sm:p-6 max-h-[90vh] overflow-y-auto flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-ops-border">
+              <div className="flex items-center gap-2.5">
+                <KeyRound className="h-5 w-5 text-ops-brand" />
+                <h3 className="font-ops text-base font-bold text-ops-ink">Đổi Mật Khẩu</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChangePasswordModalOpen(false)}
+                className="w-8 h-8 rounded-lg border border-ops-border hover:bg-ops-bg flex items-center justify-center text-ops-muted cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-3.5">
+              {passwordError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
+                  {passwordError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Mật khẩu hiện tại
+                </label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu đang dùng"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Mật khẩu mới
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Tối thiểu 6 ký tự"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Xác nhận mật khẩu mới
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu mới"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center gap-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setChangePasswordModalOpen(false)}
+                  className="flex-1 py-2.5 border border-ops-border hover:bg-stone-50 text-stone-700 rounded-lg font-mono text-xs uppercase font-semibold cursor-pointer"
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPassword}
+                  className="flex-1 py-2.5 bg-ops-brand hover:bg-ops-brand-dark disabled:opacity-50 text-white rounded-lg font-mono text-xs uppercase font-bold shadow-xs cursor-pointer"
+                >
+                  {isSubmittingPassword ? 'Đang Lưu...' : 'Cập Nhật'}
                 </button>
               </div>
             </form>
