@@ -4,3 +4,4 @@ export { DishCatalogList } from './DishCatalogList';
 export { DishDetailPanel } from './DishDetailPanel';
 export { DishFormModal } from './DishFormModal';
 export { DeleteDishModal } from './DeleteDishModal';
+export { DishOptionsEditor } from './DishOptionsEditor';

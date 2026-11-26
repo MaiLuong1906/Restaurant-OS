@@ -23,6 +23,27 @@ export const DISH_CATEGORY_LABELS: Record<DishCategory, string> = {
 };
 
 // ===========================================================================
+// Options & Customizations (Tùy chọn món: Size, Mức đường/đá, Topping)
+// ===========================================================================
+
+export interface DishOptionItem {
+  id: string;              // Client UUID hoặc temp id
+  name: string;            // Tên lựa chọn (e.g. "Size Lớn", "Thêm phô mai")
+  extraPrice: number;      // Giá phụ thu VND (Long >= 0)
+  isDefault?: boolean;     // Lựa chọn mặc định
+  isAvailable?: boolean;   // Trạng thái khả dụng của option
+}
+
+export interface DishOptionGroup {
+  id: string;              // Client UUID hoặc temp id
+  name: string;            // Tên nhóm (e.g. "Kích cỡ", "Mức cay", "Topping thêm")
+  isRequired: boolean;     // Bắt buộc chọn hay không
+  minSelections?: number;  // Số lượng chọn tối thiểu (mặc định 1 nếu isRequired = true)
+  maxSelections?: number;  // 1 = Chọn 1 duy nhất (Radio); >1 = Chọn nhiều (Checkbox)
+  items: DishOptionItem[]; // Danh sách các lựa chọn con
+}
+
+// ===========================================================================
 // Response DTOs (Backend → Frontend)
 // ===========================================================================
 
@@ -50,6 +71,7 @@ export interface DishResponseDto {
   createdAt: string;    // ISO 8601
   updatedAt: string;    // ISO 8601
   comboItems: ComboItemResponse[];
+  optionGroups?: DishOptionGroup[];
 }
 
 // ===========================================================================
@@ -70,6 +92,7 @@ export interface CreateDishRequest {
   isAvailable?: boolean;
   isCombo?: boolean;
   comboItems?: ComboItemRequest[];
+  optionGroups?: DishOptionGroup[];
 }
 
 export interface UpdateDishRequest {
@@ -81,6 +104,7 @@ export interface UpdateDishRequest {
   isAvailable?: boolean;
   isCombo?: boolean;
   comboItems?: ComboItemRequest[];
+  optionGroups?: DishOptionGroup[];
 }
 
 export interface UpdateDishAvailabilityRequest {

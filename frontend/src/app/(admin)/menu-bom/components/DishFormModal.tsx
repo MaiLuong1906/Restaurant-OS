@@ -10,10 +10,12 @@ import {
   ComboItemRequest,
   CreateDishRequest,
   UpdateDishRequest,
+  DishOptionGroup,
 } from '@/types/dish';
 import { AdminModal } from '@/components/admin/AdminModal';
 import { dishService } from '@/services/dishService';
 import { storageService, UploadResult } from '@/services/storageService';
+import { DishOptionsEditor } from './DishOptionsEditor';
 
 // Danh sách category cố định theo enum backend
 const ALL_CATEGORIES: DishCategory[] = [
@@ -43,6 +45,7 @@ interface FormState {
   isAvailable: boolean;
   isCombo: boolean;
   comboItems: ComboItemRequest[];
+  optionGroups: DishOptionGroup[];
 }
 
 function getInitialState(dish?: DishResponseDto): FormState {
@@ -56,6 +59,7 @@ function getInitialState(dish?: DishResponseDto): FormState {
       isAvailable: true,
       isCombo: false,
       comboItems: [],
+      optionGroups: [],
     };
   }
   return {
@@ -67,6 +71,7 @@ function getInitialState(dish?: DishResponseDto): FormState {
     isAvailable: dish.isAvailable,
     isCombo: dish.isCombo,
     comboItems: dish.comboItems.map((ci) => ({ dishId: ci.dishId, quantity: ci.quantity })),
+    optionGroups: dish.optionGroups ? JSON.parse(JSON.stringify(dish.optionGroups)) : [],
   };
 }
 
@@ -206,6 +211,21 @@ export function DishFormModal({
     if (!validate()) return;
 
     const price = Number(form.price);
+    const cleanOptionGroups = form.optionGroups
+      .filter((g) => g.name.trim().length > 0)
+      .map((g) => ({
+        ...g,
+        name: g.name.trim(),
+        items: g.items
+          .filter((it) => it.name.trim().length > 0)
+          .map((it) => ({
+            ...it,
+            name: it.name.trim(),
+            extraPrice: Math.max(0, it.extraPrice || 0),
+          })),
+      }))
+      .filter((g) => g.items.length > 0);
+
     const payload: CreateDishRequest = {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
@@ -215,6 +235,7 @@ export function DishFormModal({
       isAvailable: form.isAvailable,
       isCombo: form.isCombo,
       comboItems: form.isCombo ? form.comboItems : undefined,
+      optionGroups: cleanOptionGroups.length > 0 ? cleanOptionGroups : undefined,
     };
 
     await onSubmit(payload);
@@ -233,7 +254,7 @@ export function DishFormModal({
           ? 'Điền đầy đủ thông tin để thêm vào thực đơn'
           : 'Cập nhật thông tin món ăn'
       }
-      maxWidth="lg"
+      maxWidth="xl"
       ariaLabel={title}
       footer={
         <div className="flex justify-end gap-2.5">
@@ -596,6 +617,14 @@ export function DishFormModal({
             )}
           </div>
         )}
+
+        {/* Nhóm Tùy Chọn & Topping Món Ăn */}
+        <div className="pt-2 border-t border-stone-200">
+          <DishOptionsEditor
+            optionGroups={form.optionGroups}
+            onChange={(groups) => setForm((p) => ({ ...p, optionGroups: groups }))}
+          />
+        </div>
       </form>
     </AdminModal>
   );
