@@ -306,7 +306,7 @@ export default function AdminMenuBomPage() {
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-ops-brand hover:bg-ops-brand-dark text-white rounded-lg shadow-xs text-xs font-mono uppercase tracking-wider font-bold cursor-pointer transition-colors"
               >
                 <Plus className="h-4 w-4" />
-                <span>+ Thêm Món Mới</span>
+                <span>Thêm Món Mới</span>
               </button>
             </div>
           )}

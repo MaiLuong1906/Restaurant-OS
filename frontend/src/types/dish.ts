@@ -93,6 +93,7 @@ export interface CreateDishRequest {
   isCombo?: boolean;
   comboItems?: ComboItemRequest[];
   optionGroups?: DishOptionGroup[];
+  options?: DishOptionGroup[];
 }
 
 export interface UpdateDishRequest {
@@ -105,6 +106,7 @@ export interface UpdateDishRequest {
   isCombo?: boolean;
   comboItems?: ComboItemRequest[];
   optionGroups?: DishOptionGroup[];
+  options?: DishOptionGroup[];
 }
 
 export interface UpdateDishAvailabilityRequest {

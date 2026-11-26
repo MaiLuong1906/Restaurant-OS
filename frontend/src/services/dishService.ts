@@ -12,73 +12,17 @@ import { PageResponse } from '../types/user';
 
 const LOCAL_STORAGE_KEY = 'restaurant_os_dish_options_cache';
 
-const SAMPLE_OPTION_GROUPS: Record<string, DishOptionGroup[]> = {
-  default_main: [
-    {
-      id: 'grp_size_sample',
-      name: 'Kích Cỡ Phần Ăn',
-      isRequired: true,
-      minSelections: 1,
-      maxSelections: 1,
-      items: [
-        { id: 'opt_s1', name: 'Tiêu Chuẩn (1 Người)', extraPrice: 0, isDefault: true, isAvailable: true },
-        { id: 'opt_s2', name: 'Phần Lớn (Up-size)', extraPrice: 35000, isDefault: false, isAvailable: true },
-      ],
-    },
-    {
-      id: 'grp_top_sample',
-      name: 'Topping & Món Kèm',
-      isRequired: false,
-      minSelections: 0,
-      maxSelections: 3,
-      items: [
-        { id: 'opt_t1', name: 'Thêm Phô Mai Đút Lò', extraPrice: 20000, isDefault: false, isAvailable: true },
-        { id: 'opt_t2', name: 'Trứng Ốp La Lòng Đào', extraPrice: 12000, isDefault: false, isAvailable: true },
-        { id: 'opt_t3', name: 'Sốt Tiêu Đen Thêm', extraPrice: 15000, isDefault: false, isAvailable: true },
-      ],
-    },
-  ],
-  default_drink: [
-    {
-      id: 'grp_ice_sample',
-      name: 'Lượng Đá',
-      isRequired: true,
-      minSelections: 1,
-      maxSelections: 1,
-      items: [
-        { id: 'opt_i1', name: 'Đá Bình Thường (100%)', extraPrice: 0, isDefault: true, isAvailable: true },
-        { id: 'opt_i2', name: 'Đá Ít (50%)', extraPrice: 0, isDefault: false, isAvailable: true },
-        { id: 'opt_i3', name: 'Không Đá', extraPrice: 0, isDefault: false, isAvailable: true },
-      ],
-    },
-    {
-      id: 'grp_sugar_sample',
-      name: 'Lượng Đường',
-      isRequired: true,
-      minSelections: 1,
-      maxSelections: 1,
-      items: [
-        { id: 'opt_sg1', name: 'Ngọt Bình Thường (100%)', extraPrice: 0, isDefault: true, isAvailable: true },
-        { id: 'opt_sg2', name: 'Ít Ngọt (50%)', extraPrice: 0, isDefault: false, isAvailable: true },
-        { id: 'opt_sg3', name: 'Không Đường (0%)', extraPrice: 0, isDefault: false, isAvailable: true },
-      ],
-    },
-  ],
-};
-
-function getStoredOptionGroups(dishId: string, category?: string): DishOptionGroup[] | undefined {
+function getStoredOptionGroups(dishId: string, _category?: string): DishOptionGroup[] | undefined {
   if (typeof window === 'undefined') return undefined;
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (raw) {
       const cache = JSON.parse(raw);
-      if (cache[dishId]) return cache[dishId];
+      if (cache[dishId] !== undefined) return cache[dishId];
     }
   } catch {
     // Fallback im lặng
   }
-  if (category === 'DRINK') return SAMPLE_OPTION_GROUPS.default_drink;
-  if (category === 'MAIN') return SAMPLE_OPTION_GROUPS.default_main;
   return undefined;
 }
 
@@ -87,10 +31,8 @@ function saveStoredOptionGroups(dishId: string, groups?: DishOptionGroup[]): voi
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     const cache = raw ? JSON.parse(raw) : {};
-    if (groups && groups.length > 0) {
+    if (groups !== undefined) {
       cache[dishId] = groups;
-    } else {
-      delete cache[dishId];
     }
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cache));
   } catch {
@@ -145,12 +87,12 @@ export const dishService = {
       response = raw;
     }
 
-    // Gắn optionGroups từ cache hoặc mẫu nếu backend chưa trả về
+    // Gắn optionGroups từ cache nếu backend chưa trả về field này
     response.items = response.items.map((dish) => {
-      if (!dish.optionGroups || dish.optionGroups.length === 0) {
+      if (dish.optionGroups === undefined) {
         return {
           ...dish,
-          optionGroups: getStoredOptionGroups(dish.id, dish.category),
+          optionGroups: getStoredOptionGroups(dish.id, dish.category) ?? [],
         };
       }
       return dish;
@@ -174,8 +116,8 @@ export const dishService = {
    */
   async getDishById(id: string): Promise<DishResponseDto> {
     const res = await fetchApi<DishResponseDto>(`/admin/dishes/${id}`);
-    if (!res.optionGroups || res.optionGroups.length === 0) {
-      res.optionGroups = getStoredOptionGroups(res.id, res.category);
+    if (res.optionGroups === undefined) {
+      res.optionGroups = getStoredOptionGroups(res.id, res.category) ?? [];
     }
     return res;
   },
@@ -185,13 +127,22 @@ export const dishService = {
    * Endpoint: POST /api/v1/admin/dishes
    */
   async createDish(request: CreateDishRequest): Promise<DishResponseDto> {
+    const groups = request.options ?? request.optionGroups;
+    const payload =
+      groups !== undefined
+        ? {
+            ...request,
+            options: groups,
+            optionGroups: groups,
+          }
+        : request;
     const res = await fetchApi<DishResponseDto>('/admin/dishes', {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
-    if (request.optionGroups) {
-      saveStoredOptionGroups(res.id, request.optionGroups);
-      res.optionGroups = request.optionGroups;
+    if (groups !== undefined) {
+      saveStoredOptionGroups(res.id, groups);
+      res.optionGroups = groups;
     }
     return res;
   },
@@ -201,15 +152,24 @@ export const dishService = {
    * Endpoint: PUT /api/v1/admin/dishes/{id}
    */
   async updateDish(id: string, request: UpdateDishRequest): Promise<DishResponseDto> {
+    const groups = request.options ?? request.optionGroups;
+    const payload =
+      groups !== undefined
+        ? {
+            ...request,
+            options: groups,
+            optionGroups: groups,
+          }
+        : request;
     const res = await fetchApi<DishResponseDto>(`/admin/dishes/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
-    if (request.optionGroups !== undefined) {
-      saveStoredOptionGroups(id, request.optionGroups);
-      res.optionGroups = request.optionGroups;
-    } else {
-      res.optionGroups = getStoredOptionGroups(id, res.category);
+    if (groups !== undefined) {
+      saveStoredOptionGroups(id, groups);
+      res.optionGroups = groups;
+    } else if (res.optionGroups === undefined) {
+      res.optionGroups = getStoredOptionGroups(id, res.category) ?? [];
     }
     return res;
   },

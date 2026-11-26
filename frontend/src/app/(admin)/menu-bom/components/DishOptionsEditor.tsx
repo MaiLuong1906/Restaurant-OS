@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Plus, Trash2, Layers, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Layers, AlertCircle, Check } from 'lucide-react';
 import { DishOptionGroup, DishOptionItem } from '@/types/dish';
 
 export interface DishOptionsEditorProps {
@@ -102,10 +102,10 @@ export function DishOptionsEditor({ optionGroups, onChange }: DishOptionsEditorP
         <button
           type="button"
           onClick={handleAddGroup}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 hover:text-stone-900 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer border border-stone-200 shrink-0 whitespace-nowrap shadow-2xs"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ops-brand/10 hover:bg-ops-brand/20 text-ops-brand rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border border-ops-brand/20 shrink-0 whitespace-nowrap shadow-2xs"
         >
-          <Plus className="w-3.5 h-3.5 text-ops-brand" />
-          <span>Thêm tùy chọn</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Thêm nhóm tùy chọn</span>
         </button>
       </div>
 
@@ -160,61 +160,69 @@ export function DishOptionsEditor({ optionGroups, onChange }: DishOptionsEditorP
                 </div>
 
                 {/* Cấu hình bắt buộc / chọn 1 hay nhiều */}
-                <div className="flex flex-wrap items-center gap-4 text-xs bg-white p-2.5 rounded-lg border border-stone-200/80">
-                  {/* Bắt buộc chọn */}
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={group.isRequired}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-white p-2.5 rounded-lg border border-stone-200/80 shadow-2xs">
+                  {/* Bắt buộc chọn - Custom Toggle Switch */}
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={group.isRequired}
+                      onClick={() => {
+                        const next = !group.isRequired;
                         handleUpdateGroup(groupIdx, {
-                          isRequired: checked,
-                          minSelections: checked ? 1 : 0,
+                          isRequired: next,
+                          minSelections: next ? 1 : 0,
                         });
                       }}
-                      className="rounded text-ops-brand focus:ring-ops-brand cursor-pointer"
-                    />
-                    <span className="font-medium text-stone-700">
+                      className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
+                        group.isRequired ? 'bg-ops-brand' : 'bg-stone-300'
+                      }`}
+                    >
+                      <div
+                        className={`bg-white w-4 h-4 rounded-full shadow-xs transform transition-transform ${
+                          group.isRequired ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className="font-semibold text-stone-800 text-xs">
                       Bắt buộc chọn
                     </span>
                   </label>
 
-                  <div className="h-4 w-px bg-stone-200 hidden sm:block" />
-
-                  {/* Kiểu lựa chọn: Chọn 1 hay Chọn nhiều */}
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name={`choice_type_${group.id || groupIdx}`}
-                        checked={isSingleChoice}
-                        onChange={() =>
-                          handleUpdateGroup(groupIdx, {
-                            maxSelections: 1,
-                            minSelections: group.isRequired ? 1 : 0,
-                          })
-                        }
-                        className="text-ops-brand focus:ring-ops-brand cursor-pointer"
-                      />
-                      <span className="font-medium text-stone-700">Chọn 1 duy nhất (Radio)</span>
-                    </label>
-
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name={`choice_type_${group.id || groupIdx}`}
-                        checked={!isSingleChoice}
-                        onChange={() =>
-                          handleUpdateGroup(groupIdx, {
-                            maxSelections: 5,
-                            minSelections: 0,
-                          })
-                        }
-                        className="text-ops-brand focus:ring-ops-brand cursor-pointer"
-                      />
-                      <span className="font-medium text-stone-700">Chọn nhiều (Topping)</span>
-                    </label>
+                  {/* Kiểu lựa chọn: Chọn 1 hay Chọn nhiều - Custom Segmented Control */}
+                  <div className="inline-flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateGroup(groupIdx, {
+                          maxSelections: 1,
+                          minSelections: group.isRequired ? 1 : 0,
+                        })
+                      }
+                      className={`px-3 py-1 text-xs rounded-md transition-all cursor-pointer ${
+                        isSingleChoice
+                          ? 'bg-white text-stone-900 font-bold shadow-2xs border border-stone-200/60'
+                          : 'text-stone-500 hover:text-stone-800 font-medium'
+                      }`}
+                    >
+                      Chọn 1 duy nhất
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateGroup(groupIdx, {
+                          maxSelections: 5,
+                          minSelections: 0,
+                        })
+                      }
+                      className={`px-3 py-1 text-xs rounded-md transition-all cursor-pointer ${
+                        !isSingleChoice
+                          ? 'bg-white text-stone-900 font-bold shadow-2xs border border-stone-200/60'
+                          : 'text-stone-500 hover:text-stone-800 font-medium'
+                      }`}
+                    >
+                      Chọn nhiều (Topping)
+                    </button>
                   </div>
                 </div>
 
@@ -234,7 +242,7 @@ export function DishOptionsEditor({ optionGroups, onChange }: DishOptionsEditorP
                     {group.items.map((item, itemIdx) => (
                       <div
                         key={item.id || itemIdx}
-                        className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 bg-white rounded-lg border border-stone-200"
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 shadow-2xs"
                       >
                         {/* Tên lựa chọn */}
                         <div className="flex-1">
@@ -245,12 +253,12 @@ export function DishOptionsEditor({ optionGroups, onChange }: DishOptionsEditorP
                               handleUpdateItem(groupIdx, itemIdx, { name: e.target.value })
                             }
                             placeholder="Tên lựa chọn (e.g. Size Vừa, Thêm Sốt Nấm...)"
-                            className="w-full p-1.5 bg-stone-50 border border-stone-200 rounded text-xs text-stone-900 focus:outline-none focus:bg-white focus:border-ops-brand font-medium"
+                            className="w-full p-1.5 bg-stone-50/70 border border-stone-200 rounded-lg text-xs text-stone-900 focus:outline-none focus:bg-white focus:border-ops-brand font-medium transition-colors"
                           />
                         </div>
 
                         {/* Giá phụ thu (+ VND) */}
-                        <div className="w-full sm:w-36 flex items-center gap-1">
+                        <div className="w-full sm:w-32 flex items-center gap-1 shrink-0">
                           <span className="text-xs text-stone-400 font-bold shrink-0">+</span>
                           <input
                             type="number"
@@ -263,33 +271,34 @@ export function DishOptionsEditor({ optionGroups, onChange }: DishOptionsEditorP
                               })
                             }
                             placeholder="0"
-                            className="w-full p-1.5 bg-stone-50 border border-stone-200 rounded text-xs font-mono font-bold text-stone-900 focus:outline-none focus:bg-white focus:border-ops-brand text-right"
+                            className="w-full p-1.5 bg-stone-50/70 border border-stone-200 rounded-lg text-xs font-mono font-bold text-stone-900 focus:outline-none focus:bg-white focus:border-ops-brand text-right transition-colors"
                           />
                           <span className="text-[11px] text-stone-500 font-mono shrink-0">đ</span>
                         </div>
 
-                        {/* Checkbox Mặc định */}
-                        <label
-                          className="flex items-center gap-1.5 text-xs text-stone-600 cursor-pointer shrink-0 select-none px-1"
-                          title="Tự động chọn khi khách mở món"
+                        {/* Nút Mặc định (Fixed-width Chip Badge tránh layout shift) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextVal = !item.isDefault;
+                            handleUpdateItem(groupIdx, itemIdx, { isDefault: nextVal });
+                          }}
+                          title="Tự động chọn sẵn khi khách mở món"
+                          className={`w-[88px] h-[30px] inline-flex items-center justify-center gap-1 px-2 rounded-lg text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 select-none ${
+                            item.isDefault
+                              ? 'bg-ops-brand text-white border-ops-brand shadow-2xs'
+                              : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100 hover:text-stone-800'
+                          }`}
                         >
-                          <input
-                            type={isSingleChoice ? 'radio' : 'checkbox'}
-                            name={`default_${group.id || groupIdx}`}
-                            checked={Boolean(item.isDefault)}
-                            onChange={(e) =>
-                              handleUpdateItem(groupIdx, itemIdx, { isDefault: e.target.checked })
-                            }
-                            className="text-ops-brand focus:ring-ops-brand cursor-pointer"
-                          />
-                          <span className="text-[11px]">Mặc định</span>
-                        </label>
+                          {item.isDefault && <Check className="w-3 h-3 stroke-[3] shrink-0" />}
+                          <span>Mặc định</span>
+                        </button>
 
                         {/* Xóa item */}
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(groupIdx, itemIdx)}
-                          className="p-1 text-stone-400 hover:text-rose-600 rounded cursor-pointer transition-colors shrink-0"
+                          className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors shrink-0"
                           title="Xóa lựa chọn này"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -298,14 +307,14 @@ export function DishOptionsEditor({ optionGroups, onChange }: DishOptionsEditorP
                     ))}
                   </div>
 
-                  {/* Nút thêm lựa chọn con */}
+                  {/* Nút thêm lựa chọn con (Dashed Button Đồng Bộ) */}
                   <button
                     type="button"
                     onClick={() => handleAddItem(groupIdx)}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-ops-brand hover:text-ops-brand-dark hover:bg-ops-brand/5 rounded-md transition-colors cursor-pointer"
+                    className="w-full py-2 px-3 border border-dashed border-stone-300 hover:border-ops-brand hover:bg-ops-brand/5 text-stone-600 hover:text-ops-brand rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer group mt-1"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Thêm lựa chọn con</span>
+                    <Plus className="w-3.5 h-3.5 text-stone-400 group-hover:text-ops-brand" />
+                    <span>Thêm lựa chọn con vào nhóm</span>
                   </button>
                 </div>
               </div>

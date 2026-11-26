@@ -235,7 +235,8 @@ export function DishFormModal({
       isAvailable: form.isAvailable,
       isCombo: form.isCombo,
       comboItems: form.isCombo ? form.comboItems : undefined,
-      optionGroups: cleanOptionGroups.length > 0 ? cleanOptionGroups : undefined,
+      optionGroups: cleanOptionGroups,
+      options: cleanOptionGroups,
     };
 
     await onSubmit(payload);
