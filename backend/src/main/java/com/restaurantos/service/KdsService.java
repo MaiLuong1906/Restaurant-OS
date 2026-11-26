@@ -101,6 +101,7 @@ public class KdsService {
                 .map(order -> {
                     List<OrderItemEntity> items = orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
                     boolean hasWaiting = false;
+                    List<KdsOrderEventData> transitionedEvents = new ArrayList<>();
                     Instant now = Instant.now();
 
                     for (OrderItemEntity item : items) {
@@ -108,11 +109,13 @@ public class KdsService {
                             item.setStatus("READY");
                             item.setUpdatedAt(now);
                             hasWaiting = true;
+                            transitionedEvents.add(new KdsOrderEventData(item.getId(), "READY"));
                         }
                     }
 
                     if (hasWaiting) {
                         orderItemRepository.saveAll(items);
+                        publishStatusUpdatesAfterCommit(transitionedEvents);
                     }
 
                     return mapToTicketDto(order, items);
@@ -166,6 +169,7 @@ public class KdsService {
         item.setStatus(targetStatus);
         item.setUpdatedAt(Instant.now());
         OrderItemEntity saved = orderItemRepository.save(item);
+        publishStatusUpdatesAfterCommit(List.of(new KdsOrderEventData(saved.getId(), targetStatus)));
 
         return Optional.of(mapToItemDto(saved));
     }
@@ -246,17 +250,24 @@ public class KdsService {
     }
 
     private void publishBatchStatusUpdateAfterCommit(List<UUID> itemIds) {
+        List<KdsOrderEventData> updates = itemIds.stream()
+                .map(itemId -> new KdsOrderEventData(itemId, "READY"))
+                .toList();
+        publishStatusUpdatesAfterCommit(updates);
+    }
+
+    private void publishStatusUpdatesAfterCommit(List<KdsOrderEventData> updates) {
+        if (updates == null || updates.isEmpty()) {
+            return;
+        }
         Runnable sendAction = () -> {
-            for (UUID itemId : itemIds) {
-                KdsOrderEvent event = new KdsOrderEvent(
-                        "UPDATE_STATUS",
-                        new KdsOrderEventData(itemId, "READY")
-                );
+            for (KdsOrderEventData data : updates) {
+                KdsOrderEvent event = new KdsOrderEvent("UPDATE_STATUS", data);
                 try {
                     messagingTemplate.convertAndSend(KDS_ORDERS_TOPIC, event);
                 } catch (Exception ex) {
                     log.warn("Failed to publish STOMP UPDATE_STATUS event for item {}: {}",
-                            itemId, ex.getMessage());
+                            data.id(), ex.getMessage());
                 }
             }
         };
