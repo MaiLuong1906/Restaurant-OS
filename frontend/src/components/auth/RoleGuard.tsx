@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ShieldAlert, Lock } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { canAccessRoute, type PermissionCode } from '@/lib/rbac';
@@ -26,6 +26,7 @@ export function RoleGuard({
   children,
 }: RoleGuardProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const staffUser = useAuthStore((s) => s.staffUser);
   const permissions = useAuthStore((s) => s.permissions);
   const isStaffAuthenticated = useAuthStore((s) => s.isStaffAuthenticated);
@@ -34,6 +35,12 @@ export function RoleGuard({
 
   const strictGuard = process.env.NEXT_PUBLIC_ENABLE_ROUTE_GUARD === 'true';
   const isLoggedIn = isStaffAuthenticated || (allowKdsSession && isKdsAuthenticated);
+
+  React.useEffect(() => {
+    if (!isLoggedIn && strictGuard && typeof window !== 'undefined') {
+      router.replace(`${loginHref}?from=${encodeURIComponent(pathname)}`);
+    }
+  }, [isLoggedIn, strictGuard, loginHref, pathname, router]);
 
   if (!isLoggedIn) {
     if (!strictGuard) {

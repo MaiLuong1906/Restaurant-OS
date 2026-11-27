@@ -5,6 +5,8 @@ import { Plus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lu
 import { AdminToast, useAdminToast } from '@/components/admin/AdminToast';
 import { ApiError } from '@/lib/api-client';
 import { dishService } from '@/services/dishService';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { hasPermission, PERMISSIONS } from '@/lib/rbac';
 import {
   CreateDishRequest,
   DishResponseDto,
@@ -24,6 +26,14 @@ export default function AdminMenuBomPage() {
   // =========================================================================
   // State: data
   // =========================================================================
+  const staffUser = useAuthStore((s) => s.staffUser);
+  const userPermissions = useAuthStore((s) => s.permissions);
+  const canManageCatalog = hasPermission(
+    staffUser?.role,
+    PERMISSIONS.MENU_CATALOG_CREATE_UPDATE,
+    userPermissions
+  );
+
   const [pageData, setPageData] = React.useState<PageResponse<DishResponseDto> | null>(null);
   const [dishes, setDishes] = React.useState<DishResponseDto[]>([]);
   const [categories, setCategories] = React.useState<string[]>([]);
@@ -289,15 +299,17 @@ export default function AdminMenuBomPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-ops-brand hover:bg-ops-brand-dark text-white rounded-lg shadow-xs text-xs font-mono uppercase tracking-wider font-bold cursor-pointer transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              <span>+ Thêm Món Mới</span>
-            </button>
-          </div>
+          {canManageCatalog && (
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-ops-brand hover:bg-ops-brand-dark text-white rounded-lg shadow-xs text-xs font-mono uppercase tracking-wider font-bold cursor-pointer transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Thêm Món Mới</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Error Banner */}
@@ -446,6 +458,7 @@ export default function AdminMenuBomPage() {
               dish={selectedDish}
               onEdit={(d) => setEditDish(d)}
               onDelete={(d) => setDeleteDish(d)}
+              canEdit={canManageCatalog}
             />
           </div>
         </div>

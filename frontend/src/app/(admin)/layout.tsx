@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   LayoutGrid,
@@ -20,11 +20,16 @@ import {
   X,
   KeyRound,
   Bell,
+  LogOut,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { canAccessRoute, PERMISSIONS } from '@/lib/rbac';
 import { RoleGuard } from '@/components/auth/RoleGuard';
+import { authService } from '@/lib/auth-service';
+import { ApiError } from '@/lib/api-client';
 
 export interface NavGroup {
   groupTitle: string;
@@ -74,9 +79,38 @@ const NAV_GROUPS: NavGroup[] = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const staffUser = useAuthStore((s) => s.staffUser);
   const permissions = useAuthStore((s) => s.permissions);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
+  // Sinh avatar chữ viết tắt từ tên người dùng thực tế
+  const userInitials = React.useMemo(() => {
+    if (!staffUser?.fullName) return 'NV';
+    const parts = staffUser.fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }, [staffUser]);
+
+  // Hiển thị vai trò hệ thống tiếng Việt chuẩn
+  const roleDisplay = React.useMemo(() => {
+    switch (staffUser?.role) {
+      case 'OWNER':
+        return 'Chủ Nhà Hàng';
+      case 'MANAGER':
+        return 'Quản Lý Ca';
+      case 'CASHIER':
+        return 'Thu Ngân';
+      case 'CHEF':
+        return 'Bếp Trưởng';
+      case 'WAITER':
+        return 'Nhân Viên Phục Vụ';
+      case 'STAFF':
+        return 'Nhân Viên';
+      default:
+        return 'Nhân Viên Quản Trị';
+    }
+  }, [staffUser]);
 
   // Lọc động thanh menu Sidebar theo quyền RBAC khi đã đăng nhập
   const visibleNavGroups = React.useMemo(() => {
@@ -91,6 +125,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pinModalOpen, setPinModalOpen] = React.useState(false);
   const [pinPurpose, setPinPurpose] = React.useState('Xác thực quyền quản trị');
   const [pinInput, setPinInput] = React.useState('');
+  const [pinVerifying, setPinVerifying] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const userMenuRef = React.useRef<HTMLDivElement | null>(null);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
   const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -99,6 +136,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
+
+  // Đóng dropdown menu người dùng khi click ra ngoài
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
 
   const showToast = React.useCallback((msg: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -114,20 +166,44 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setPinModalOpen(true);
   };
 
-  const handleConfirmPin = (e: React.FormEvent) => {
+  const handleConfirmPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput === '8841' || pinInput === '9999' || pinInput.length >= 4) {
-      showToast(`Mã PIN hợp lệ! Đã xác thực: ${pinPurpose}`);
+    if (!pinInput || pinInput.length < 4) {
+      showToast('Vui lòng nhập mã PIN từ 4 đến 6 số');
+      return;
+    }
+    setPinVerifying(true);
+    try {
+      if (process.env.NEXT_PUBLIC_AUTH_MODE === 'live') {
+        const res = await authService.verifyManagerPin({ pin: pinInput });
+        showToast(`Mã PIN hợp lệ! Xác thực bởi ${res.approverName} (${res.approverRole}): ${pinPurpose}`);
+      } else {
+        if (pinInput === '8841' || pinInput === '9999') {
+          showToast(`[Mock] Mã PIN hợp lệ! Đã xác thực: ${pinPurpose}`);
+        } else {
+          showToast('Mã PIN không đúng! Vui lòng thử lại.');
+          return;
+        }
+      }
       setPinModalOpen(false);
       setPinInput('');
-    } else {
-      showToast('Mã PIN không đúng! Vui lòng thử lại (Gợi ý: 8841 hoặc 9999).');
+    } catch (err: unknown) {
+      const msg = err instanceof ApiError ? err.message : 'Mã PIN Quản lý không đúng hoặc không có quyền duyệt';
+      showToast(msg);
+    } finally {
+      setPinVerifying(false);
     }
   };
 
-  // Close mobile sidebar on route change
+  const handleLogout = () => {
+    authService.logoutStaff();
+    router.push('/login');
+  };
+
+  // Close mobile sidebar & user menu on route change
   React.useEffect(() => {
     setMobileMenuOpen(false);
+    setUserMenuOpen(false);
   }, [pathname]);
 
   // Handle escape key
@@ -136,6 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (e.key === 'Escape') {
         setMobileMenuOpen(false);
         setPinModalOpen(false);
+        setUserMenuOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -301,17 +378,115 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-ops-brand ring-2 ring-white" />
             </button>
 
-            {/* User Profile Card */}
-            <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-stone-200">
-              <div className="w-8 h-8 rounded-full bg-ops-brand border border-ops-brand-dark flex items-center justify-center text-white font-ops text-xs font-bold shrink-0 shadow-2xs">
-                LN
-              </div>
-              <div className="hidden lg:flex flex-col text-left">
-                <span className="text-xs font-bold text-stone-900 leading-tight">Lương Nguyễn</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 font-mono">
-                  Chủ Nhà Hàng
-                </span>
-              </div>
+            {/* User Profile Card & Interactive Dropdown Menu */}
+            <div className="relative pl-1 sm:pl-2 border-l border-stone-200" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen((prev) => !prev)}
+                className={cn(
+                  'flex items-center gap-2 p-1.5 rounded-xl transition-all cursor-pointer text-left focus:outline-none',
+                  userMenuOpen ? 'bg-stone-100 ring-2 ring-ops-brand/20' : 'hover:bg-stone-50',
+                )}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="true"
+                aria-label="Menu tài khoản cá nhân"
+              >
+                <div className="w-8 h-8 rounded-full bg-ops-brand border border-ops-brand-dark flex items-center justify-center text-white font-ops text-xs font-bold shrink-0 shadow-2xs">
+                  {userInitials}
+                </div>
+                <div className="hidden lg:flex flex-col text-left">
+                  <span className="text-xs font-bold text-stone-900 leading-tight">
+                    {staffUser?.fullName || 'Nhân Viên'}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 font-mono">
+                    {roleDisplay}
+                  </span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'h-3.5 w-3.5 text-stone-400 transition-transform duration-200 hidden sm:block',
+                    userMenuOpen && 'rotate-180 text-stone-700',
+                  )}
+                />
+              </button>
+
+              {/* User Account Dropdown Menu */}
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-stone-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  {/* User Info Header */}
+                  <div className="px-3.5 py-2.5 border-b border-stone-100 bg-stone-50/70">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-ops-brand text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+                        {userInitials}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-xs text-stone-900 truncate">
+                          {staffUser?.fullName || 'Nhân Viên'}
+                        </span>
+                        <span className="text-[10px] font-mono text-ops-brand font-bold uppercase tracking-wider">
+                          {roleDisplay}
+                        </span>
+                        <span className="text-[10px] text-stone-500 truncate font-mono">
+                          {staffUser?.phoneNumber || 'Chưa cập nhật SĐT'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions List (Tinh gọn theo từng vai trò) */}
+                  <div className="p-1 space-y-0.5">
+                    {/* 1. Tài khoản */}
+                    <Link
+                      href="/profile?tab=overview"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-stone-700 hover:text-stone-950 hover:bg-stone-100 rounded-lg transition-colors text-left"
+                    >
+                      <User className="h-4 w-4 text-stone-500" />
+                      <span>Tài khoản</span>
+                    </Link>
+
+                    {/* 2. Phiếu lương cá nhân (Dành riêng cho Manager & các vai trò nhân sự) */}
+                    {staffUser?.role !== 'OWNER' && (
+                      <Link
+                        href="/profile?tab=payslip"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-stone-700 hover:text-stone-950 hover:bg-stone-100 rounded-lg transition-colors text-left"
+                      >
+                        <DollarSign className="h-4 w-4 text-emerald-600" />
+                        <span>Phiếu lương cá nhân</span>
+                      </Link>
+                    )}
+
+                    {/* 3. Đổi mật khẩu (Tạm vô hiệu hóa - chờ Backend cung cấp API ở Sprint tới) */}
+                    <button
+                      type="button"
+                      disabled
+                      title="Chức năng đổi mật khẩu đang được phát triển ở Sprint tiếp theo"
+                      className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium text-stone-400 bg-stone-50/50 rounded-lg cursor-not-allowed text-left opacity-70 select-none"
+                    >
+                      <div className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4 text-stone-400" />
+                        <span>Đổi mật khẩu</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-200/80 text-stone-600 font-semibold">
+                        Sắp có
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* 3. Đăng xuất */}
+                  <div className="pt-1 mt-1 border-t border-stone-100 p-1">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 rounded-lg transition-colors text-left cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4 text-rose-600" />
+                      <span>Đăng xuất</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -396,15 +571,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-ops-brand hover:bg-ops-brand-dark text-white rounded-lg font-mono text-xs uppercase font-bold shadow-xs cursor-pointer"
+                  disabled={pinVerifying}
+                  className="flex-1 py-2.5 bg-ops-brand hover:bg-ops-brand-dark disabled:opacity-50 text-white rounded-lg font-mono text-xs uppercase font-bold shadow-xs cursor-pointer"
                 >
-                  Xác Nhận PIN
+                  {pinVerifying ? 'Đang Kiểm Tra...' : 'Xác Nhận PIN'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
 
       {/* ===================================================================== */}
       {/* GLOBAL TOAST NOTIFICATION CONTAINER                                  */}

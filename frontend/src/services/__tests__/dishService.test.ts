@@ -258,4 +258,37 @@ describe('dishService', () => {
       expect(res.map((d) => d.id)).toEqual(['1', '3']);
     });
   });
+
+  describe('optionGroups & customizations', () => {
+    it('hỗ trợ đính kèm optionGroups khi tạo món mới', async () => {
+      const optionGroups = [
+        {
+          id: 'grp-1',
+          name: 'Kích Cỡ',
+          isRequired: true,
+          items: [
+            { id: 'opt-1', name: 'Size Nhỏ', extraPrice: 0, isDefault: true },
+            { id: 'opt-2', name: 'Size Lớn', extraPrice: 20000 },
+          ],
+        },
+      ];
+
+      const payload = {
+        name: 'Trà Sữa Oolong',
+        price: 45000,
+        category: 'DRINK',
+        optionGroups,
+      };
+
+      mockFetchApi.mockResolvedValueOnce(
+        makeDish({ id: 'dish-tea', name: payload.name, price: payload.price, category: payload.category })
+      );
+
+      const res = await dishService.createDish(payload);
+      expect(res.name).toBe('Trà Sữa Oolong');
+      expect(res.optionGroups).toBeDefined();
+      expect(res.optionGroups).toHaveLength(1);
+      expect(res.optionGroups?.[0].name).toBe('Kích Cỡ');
+    });
+  });
 });

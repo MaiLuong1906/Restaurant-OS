@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Edit2, Trash2, Package, ChevronRight, UtensilsCrossed } from 'lucide-react';
+import { Edit2, Trash2, Package, ChevronRight, UtensilsCrossed, Layers } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 import { dishService } from '@/services/dishService';
 import { DISH_CATEGORY_LABELS, DishCategory, DishResponseDto } from '@/types/dish';
@@ -10,6 +10,7 @@ export interface DishDetailPanelProps {
   dish: DishResponseDto | null;
   onEdit: (dish: DishResponseDto) => void;
   onDelete: (dish: DishResponseDto) => void;
+  canEdit?: boolean;
 }
 
 /**
@@ -17,7 +18,7 @@ export interface DishDetailPanelProps {
  * - Nếu isCombo: hiển thị danh sách comboItems
  * - Nếu không: hiển thị BOM placeholder (Coming Soon)
  */
-export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps) {
+export function DishDetailPanel({ dish, onEdit, onDelete, canEdit = true }: DishDetailPanelProps) {
   if (!dish) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-20 text-stone-300">
@@ -74,24 +75,30 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => onEdit(dish)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-            Sửa
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(dish)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Xóa
-          </button>
-        </div>
+        {canEdit ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onEdit(dish)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Sửa
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(dish)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg font-mono text-xs font-bold uppercase cursor-pointer transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Xóa
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-stone-100 border border-stone-200 rounded-lg text-stone-500 font-mono text-xs font-bold uppercase">
+            <span>Chế độ Xem &amp; Báo Hết</span>
+          </div>
+        )}
       </div>
 
       {/* Financial Summary */}
@@ -134,6 +141,66 @@ export function DishDetailPanel({ dish, onEdit, onDelete }: DishDetailPanelProps
           </>
         )}
       </div>
+
+      {/* Danh Sách Nhóm Tùy Chọn / Options & Modifiers */}
+      {dish.optionGroups && dish.optionGroups.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-ops-brand" />
+            <span className="font-mono text-xs uppercase font-bold text-stone-700 tracking-wider">
+              Tùy Chọn &amp; Topping ({dish.optionGroups.length} nhóm)
+            </span>
+          </div>
+
+          <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+            {dish.optionGroups.map((group, gIdx) => (
+              <div
+                key={group.id || gIdx}
+                className="p-3 bg-stone-50/80 rounded-xl border border-stone-200 space-y-2 text-xs"
+              >
+                <div className="flex items-center justify-between pb-1 border-b border-stone-200/60">
+                  <span className="font-bold text-stone-900">{group.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded ${
+                        group.isRequired
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-stone-200 text-stone-700'
+                      }`}
+                    >
+                      {group.isRequired ? 'Bắt buộc chọn' : 'Tùy chọn'}
+                    </span>
+                    <span className="text-[10px] font-mono text-stone-500 bg-white border border-stone-200 px-1.5 py-0.5 rounded">
+                      {(group.maxSelections ?? 1) === 1
+                        ? 'Chọn 1'
+                        : `Tối đa ${group.maxSelections || 'nhiều'}`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {group.items.map((item, iIdx) => (
+                    <div
+                      key={item.id || iIdx}
+                      className="flex items-center justify-between p-2 bg-white rounded-lg border border-stone-200"
+                    >
+                      <span className="text-stone-800 font-medium flex items-center gap-1">
+                        {item.name}
+                        {item.isDefault && (
+                          <span className="text-[10px] text-ops-brand font-bold">(Mặc định)</span>
+                        )}
+                      </span>
+                      <span className="font-mono font-bold text-ops-brand">
+                        {item.extraPrice > 0 ? `+${formatVND(item.extraPrice)}` : '+0 đ'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Combo Items Table */}
       {dish.isCombo && dish.comboItems.length > 0 && (
