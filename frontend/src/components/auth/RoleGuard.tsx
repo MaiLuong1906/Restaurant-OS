@@ -38,10 +38,7 @@ export function RoleGuard({
 
   React.useEffect(() => {
     if (!isLoggedIn && strictGuard && typeof window !== 'undefined') {
-      const redirectTimer = setTimeout(() => {
-        router.replace(`${loginHref}?from=${encodeURIComponent(pathname)}`);
-      }, 600);
-      return () => clearTimeout(redirectTimer);
+      router.replace(`${loginHref}?from=${encodeURIComponent(pathname)}`);
     }
   }, [isLoggedIn, strictGuard, loginHref, pathname, router]);
 
