@@ -65,7 +65,18 @@ public final class OrderDtos {
             String tableNumber,
             Integer capacity,
             String status,
-            UUID currentOrderId
+            UUID currentOrderId,
+            UUID zoneId,
+            String zoneName,
+            Instant occupiedAt
+    ) {
+        public TableResponse(UUID id, String tableNumber, Integer capacity, String status, UUID currentOrderId) {
+            this(id, tableNumber, capacity, status, currentOrderId, null, null, null);
+        }
+    }
+
+    public record UpdateTableStatusRequest(
+            String status
     ) {}
 
     // ─── Dish Portion Response ────────────────────────────────────────────────

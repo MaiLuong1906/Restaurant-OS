@@ -46,4 +46,25 @@ public class TableController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy bàn: " + id, null)));
     }
+
+    /**
+     * PATCH /api/v1/tables/{id}/status — Cập nhật trạng thái bàn trên Sơ đồ bàn POS (Khóa bàn, Mở khóa, Đã dọn xong).
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<OrderDtos.TableResponse>> updateTableStatus(
+            @PathVariable String id,
+            @RequestBody OrderDtos.UpdateTableStatusRequest request) {
+        UUID tableId;
+        try {
+            tableId = UUID.fromString(id);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("BAD_REQUEST", "Table ID không hợp lệ: " + id, null));
+        }
+
+        return tableService.updateTableStatus(tableId, request != null ? request.status() : null)
+                .map(t -> ResponseEntity.ok(ApiResponse.success(t, "Cập nhật trạng thái bàn thành công")))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy bàn: " + id, null)));
+    }
 }

@@ -1,10 +1,13 @@
 package com.restaurantos.service;
 
 import com.restaurantos.dto.OrderDtos;
+import com.restaurantos.dto.reservation.PosTableEvent;
 import com.restaurantos.entity.*;
+import com.restaurantos.enums.TableStatus;
 import com.restaurantos.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,11 +22,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderService {
 
+    private static final String POS_TABLES_TOPIC = "/topic/pos/tables";
+
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final TableRepository tableRepository;
     private final DishRepository dishRepository;
     private final DishPortionRepository dishPortionRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Tạo đơn hàng mới. Idempotent nếu FE truyền idempotencyKey.
@@ -174,6 +180,22 @@ public class OrderService {
 
         // Lấy tất cả items của order (bao gồm các món cũ + món mới)
         List<OrderItemEntity> allItems = orderItemRepository.findByOrderId(orderId);
+
+        try {
+            PosTableEvent posEvent = new PosTableEvent(
+                    "ORDER_UPDATED",
+                    table.getId(),
+                    table.getTableNumber(),
+                    TableStatus.SERVING,
+                    null,
+                    null,
+                    null,
+                    null,
+                    now
+            );
+            messagingTemplate.convertAndSend(POS_TABLES_TOPIC, posEvent);
+        } catch (Exception ignored) {
+        }
 
         return toOrderResponse(order, allItems);
     }

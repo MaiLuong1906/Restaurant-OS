@@ -1,13 +1,121 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   PRESET_DISCOUNTS,
   computeTablePayable,
   computeTableSubtotal,
   usePosStore,
 } from '../usePosStore';
+import { CashierTable } from '../../types';
 import { resolveReservationTargetDate } from '../../lib/utils';
+import * as apiClient from '../../lib/api-client';
+
+const TEST_SEED_TABLES: CashierTable[] = [
+  {
+    id: 't1',
+    label: 'Bàn 01',
+    seats: 4,
+    area: 'Sảnh Tầng 1',
+    status: 'IDLE',
+    guests: 0,
+    seatedMin: 0,
+    staff: '',
+    depositAmount: 0,
+    discountAmount: 0,
+    items: [],
+  },
+  {
+    id: 't2',
+    label: 'Bàn 02',
+    seats: 4,
+    area: 'Sảnh Tầng 1',
+    status: 'OCCUPIED',
+    guests: 3,
+    seatedMin: 34,
+    staff: 'Lan',
+    depositAmount: 0,
+    discountAmount: 0,
+    items: [
+      { id: 'i_201', name: 'Phở Bò Tái Lăn Hà Nội', qty: 2, unitPrice: 95000, status: 'SERVED' },
+      { id: 'i_202', name: 'Chả Cá Lã Vọng', qty: 1, unitPrice: 185000, status: 'SERVED' },
+      { id: 'i_203', name: 'Trà Sen Tây Hồ', qty: 3, unitPrice: 45000, status: 'SERVED' },
+    ],
+  },
+  {
+    id: 't4',
+    label: 'Bàn 04',
+    seats: 6,
+    area: 'Sảnh Tầng 1',
+    status: 'OVERDUE',
+    guests: 5,
+    seatedMin: 52,
+    staff: 'Lan',
+    depositAmount: 200000,
+    discountAmount: 0,
+    allergyAlert: 'Khách dị ứng đậu phộng — ưu tiên kiểm tra bill & đối soát cọc',
+    items: [
+      { id: 'i_401', name: 'Nem Rán Phố Cổ', qty: 2, unitPrice: 85000, status: 'SERVED', note: 'Không đậu phộng' },
+      { id: 'i_402', name: 'Gỏi Ngó Sen Tôm Thịt', qty: 1, unitPrice: 115000, status: 'SERVED', note: 'Không hành phi' },
+      { id: 'i_403', name: 'Lẩu Riêu Cua Bắp Bò', qty: 1, unitPrice: 320000, status: 'SERVED' },
+      { id: 'i_404', name: 'Bún Tươi & Rau Đồng Nội', qty: 2, unitPrice: 35000, status: 'SERVED' },
+      { id: 'i_405', name: 'Nước Mơ Ngâm Lâu Năm', qty: 5, unitPrice: 45000, status: 'SERVED' },
+    ],
+  },
+  {
+    id: 't5',
+    label: 'Bàn 05',
+    seats: 6,
+    area: 'Sảnh Tầng 1',
+    status: 'IDLE',
+    guests: 0,
+    seatedMin: 0,
+    staff: '',
+    depositAmount: 0,
+    discountAmount: 0,
+    items: [],
+  },
+  {
+    id: 't6',
+    label: 'Bàn 06',
+    seats: 4,
+    area: 'Sảnh Tầng 1',
+    status: 'OCCUPIED',
+    guests: 4,
+    seatedMin: 25,
+    staff: 'Mai',
+    depositAmount: 0,
+    discountAmount: 0,
+    items: [
+      { id: 'i_601', name: 'Bún Chả Hàng Mành', qty: 2, unitPrice: 95000, status: 'SERVED' },
+      { id: 'i_602', name: 'Bò Lúc Lắc Khoai Tây', qty: 1, unitPrice: 175000, status: 'READY' },
+      { id: 'i_603', name: 'Chè Khúc Bạch Nhãn Lồng', qty: 4, unitPrice: 45000, status: 'WAITING' },
+    ],
+  },
+  {
+    id: 't8',
+    label: 'Bàn 08',
+    seats: 8,
+    area: 'Tầng 2 VIP',
+    status: 'IDLE',
+    guests: 0,
+    seatedMin: 0,
+    staff: '',
+    depositAmount: 0,
+    discountAmount: 0,
+    items: [],
+  },
+];
 
 describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguyên VND)', () => {
+  beforeEach(() => {
+    usePosStore.setState({
+      tables: TEST_SEED_TABLES.map((t) => ({
+        ...t,
+        items: t.items.map((it) => ({ ...it })),
+      })),
+      reservations: [],
+      selectedTableId: null,
+    });
+  });
   it('quản lý selectedTableId khởi tạo là null, cho phép chọn bàn và gỡ chọn bàn', () => {
     // Khởi tạo ban đầu là null
     expect(usePosStore.getState().selectedTableId).toBeNull();
@@ -246,6 +354,87 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
 
     store.reopenShiftDemo();
     expect(usePosStore.getState().shift.status).toBe('OPEN');
+  });
+
+  it('Sơ đồ bàn trực quan: syncWithBackend phải đồng bộ danh sách bàn thật từ /tables, gắn món từ /orders/active và cảnh báo dị ứng', async () => {
+    usePosStore.setState({ tables: [], reservations: [], hasBackendTableUuids: false });
+
+    const table1Uuid = '11111111-1111-4111-8111-111111111111';
+    const table4Uuid = '44444444-4444-4444-8444-444444444444';
+    const opened50MinAgo = new Date(Date.now() - 50 * 60 * 1000).toISOString();
+
+    const spy = vi.spyOn(apiClient, 'fetchApi').mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/tables') {
+        return [
+          {
+            id: table1Uuid,
+            tableNumber: 'Bàn 01',
+            capacity: 4,
+            status: 'VACANT',
+            currentOrderId: null,
+            zoneName: 'Tầng 1 - Sảnh Chính',
+          },
+          {
+            id: table4Uuid,
+            tableNumber: 'Bàn 04',
+            capacity: 6,
+            status: 'SERVING',
+            currentOrderId: 'ord-04',
+            zoneName: 'Tầng 2 - Phòng VIP',
+            occupiedAt: opened50MinAgo,
+          },
+        ];
+      }
+      if (endpoint === '/orders/active') {
+        return [
+          {
+            id: 'ord-04',
+            tableId: table4Uuid,
+            orderCode: 'ORD-004',
+            status: 'PLACED',
+            totalAmount: 190000,
+            openedAt: opened50MinAgo,
+            items: [
+              {
+                id: 'item-1',
+                dishId: 'dish-1',
+                dishNameSnapshot: 'Phở Bò Đặc Biệt',
+                quantity: 2,
+                unitPrice: 95000,
+                status: 'SERVED',
+                notes: 'Ít hành',
+                allergyNote: 'Dị ứng đậu phộng nghiêm ngặt',
+              },
+            ],
+          },
+        ];
+      }
+      return [];
+    });
+
+    await usePosStore.getState().syncWithBackend();
+
+    const syncedTables = usePosStore.getState().tables;
+    expect(syncedTables).toHaveLength(2);
+    expect(usePosStore.getState().hasBackendTableUuids).toBe(true);
+
+    const t1 = syncedTables.find((t) => t.id === table1Uuid)!;
+    expect(t1.status).toBe('IDLE');
+    expect(t1.area).toBe('Sảnh Tầng 1');
+    expect(t1.items).toHaveLength(0);
+
+    const t4 = syncedTables.find((t) => t.id === table4Uuid)!;
+    // Ngồi 50 phút >= 45 phút SLA -> OVERDUE
+    expect(t4.status).toBe('OVERDUE');
+    expect(t4.area).toBe('Tầng 2 VIP');
+    expect(t4.items).toHaveLength(1);
+    expect(t4.items[0].name).toBe('Phở Bò Đặc Biệt');
+    expect(t4.items[0].qty).toBe(2);
+    expect(t4.items[0].unitPrice).toBe(95000);
+    expect(t4.allergyAlert).toContain('Dị ứng đậu phộng nghiêm ngặt');
+    expect(computeTableSubtotal(t4)).toBe(190000);
+
+    spy.mockRestore();
   });
 });
 

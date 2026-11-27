@@ -64,8 +64,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
 
-                // 9. Danh sách bàn (Waiter FloorPlan & Reservation)
+                // 9. Danh sách bàn & Cập nhật trạng thái bàn (Waiter & POS FloorPlan)
                 .requestMatchers(HttpMethod.GET, "/api/v1/tables/**").permitAll()
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/tables/**").permitAll()
 
                 // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
                 .anyRequest().authenticated()

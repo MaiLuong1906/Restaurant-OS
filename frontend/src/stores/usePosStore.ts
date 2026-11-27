@@ -54,6 +54,42 @@ interface BackendAvailableTableResponse {
   qrCodeToken: string | null;
 }
 
+interface BackendTableResponse {
+  id: string;
+  tableNumber: string;
+  capacity: number;
+  status: string;
+  currentOrderId?: string | null;
+  zoneId?: string | null;
+  zoneName?: string | null;
+  occupiedAt?: string | null;
+}
+
+interface BackendOrderItemResponse {
+  id: string;
+  dishId: string;
+  dishNameSnapshot: string;
+  portionId?: string | null;
+  portionNameSnapshot?: string | null;
+  quantity: number;
+  unitPrice: number;
+  status: string;
+  notes?: string | null;
+  allergyNote?: string | null;
+}
+
+interface BackendOrderResponse {
+  id: string;
+  tableId: string;
+  orderCode?: string | null;
+  status: string;
+  totalAmount: number;
+  customerNotes?: string | null;
+  openedAt?: string | null;
+  createdAt?: string | null;
+  items: BackendOrderItemResponse[];
+}
+
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function mapZoneNameToArea(zoneName?: string | null): CashierTableArea {
@@ -65,21 +101,42 @@ function mapZoneNameToArea(zoneName?: string | null): CashierTableArea {
 }
 
 function mapBackendTableStatus(
-  status?: 'VACANT' | 'SERVING' | 'BILLING' | 'CLEANING' | 'RESERVED' | null
+  status?: string | null
 ): CashierTable['status'] {
-  switch (status) {
+  switch ((status || '').toUpperCase()) {
     case 'RESERVED':
       return 'RESERVED';
     case 'SERVING':
+    case 'DINING':
+    case 'OCCUPIED':
       return 'OCCUPIED';
     case 'BILLING':
+    case 'LOCKED':
       return 'LOCKED';
     case 'CLEANING':
       return 'CLEANING';
     case 'VACANT':
+    case 'IDLE':
+    case 'FREE':
     default:
       return 'IDLE';
   }
+}
+
+function mapBackendItemStatus(
+  status?: string | null
+): 'WAITING' | 'READY' | 'SERVED' {
+  const normalized = (status || '').toUpperCase();
+  if (normalized === 'SERVED') return 'SERVED';
+  if (normalized === 'READY') return 'READY';
+  return 'WAITING';
+}
+
+function computeSeatedMinutes(openedAtIso?: string | null, nowMs: number = Date.now()): number {
+  if (!openedAtIso) return 0;
+  const parsed = new Date(openedAtIso).getTime();
+  if (Number.isNaN(parsed)) return 0;
+  return Math.max(1, Math.round((nowMs - parsed) / 60000));
 }
 
 function mapBackendReservationToFrontend(res: BackendReservationResponse): TableReservation {
@@ -142,160 +199,7 @@ export const PRESET_DISCOUNTS: DiscountRule[] = [
   { id: 'd_voucher100k', code: 'GIAM100K', label: 'Voucher tri ân (-100.000 ₫)', type: 'FIXED', value: 100000 },
 ];
 
-const INITIAL_TABLES: CashierTable[] = [
-  {
-    id: 't1',
-    label: 'Bàn 01',
-    seats: 4,
-    area: 'Sảnh Tầng 1',
-    status: 'IDLE',
-    guests: 0,
-    seatedMin: 0,
-    staff: '',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [],
-  },
-  {
-    id: 't2',
-    label: 'Bàn 02',
-    seats: 4,
-    area: 'Sảnh Tầng 1',
-    status: 'OCCUPIED',
-    guests: 3,
-    seatedMin: 34,
-    staff: 'Lan',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [
-      { id: 'i_201', name: 'Phở Bò Tái Lăn Hà Nội', qty: 2, unitPrice: 95000, status: 'SERVED' },
-      { id: 'i_202', name: 'Chả Cá Lã Vọng', qty: 1, unitPrice: 185000, status: 'SERVED' },
-      { id: 'i_203', name: 'Trà Sen Tây Hồ', qty: 3, unitPrice: 45000, status: 'SERVED' },
-    ],
-  },
-  {
-    id: 't3',
-    label: 'Bàn 03',
-    seats: 2,
-    area: 'Sảnh Tầng 1',
-    status: 'IDLE',
-    guests: 0,
-    seatedMin: 0,
-    staff: '',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [],
-  },
-  {
-    id: 't4',
-    label: 'Bàn 04',
-    seats: 6,
-    area: 'Sảnh Tầng 1',
-    status: 'OVERDUE',
-    guests: 5,
-    seatedMin: 52,
-    staff: 'Lan',
-    depositAmount: 200000,
-    discountAmount: 0,
-    allergyAlert: 'Khách dị ứng đậu phộng — ưu tiên kiểm tra bill & đối soát cọc',
-    items: [
-      { id: 'i_401', name: 'Nem Rán Phố Cổ', qty: 2, unitPrice: 85000, status: 'SERVED', note: 'Không đậu phộng' },
-      { id: 'i_402', name: 'Gỏi Ngó Sen Tôm Thịt', qty: 1, unitPrice: 115000, status: 'SERVED', note: 'Không hành phi' },
-      { id: 'i_403', name: 'Lẩu Riêu Cua Bắp Bò', qty: 1, unitPrice: 320000, status: 'SERVED' },
-      { id: 'i_404', name: 'Bún Tươi & Rau Đồng Nội', qty: 2, unitPrice: 35000, status: 'SERVED' },
-      { id: 'i_405', name: 'Nước Mơ Ngâm Lâu Năm', qty: 5, unitPrice: 45000, status: 'SERVED' },
-    ],
-  },
-  {
-    id: 't5',
-    label: 'Bàn 05',
-    seats: 6,
-    area: 'Sảnh Tầng 1',
-    status: 'IDLE',
-    guests: 0,
-    seatedMin: 0,
-    staff: '',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [],
-  },
-  {
-    id: 't6',
-    label: 'Bàn 06',
-    seats: 4,
-    area: 'Sảnh Tầng 1',
-    status: 'OCCUPIED',
-    guests: 4,
-    seatedMin: 25,
-    staff: 'Mai',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [
-      { id: 'i_601', name: 'Bún Chả Hàng Mành', qty: 2, unitPrice: 95000, status: 'SERVED' },
-      { id: 'i_602', name: 'Bò Lúc Lắc Khoai Tây', qty: 1, unitPrice: 175000, status: 'READY' },
-      { id: 'i_603', name: 'Chè Khúc Bạch Nhãn Lồng', qty: 4, unitPrice: 45000, status: 'WAITING' },
-    ],
-  },
-  {
-    id: 't7',
-    label: 'Bàn 07',
-    seats: 4,
-    area: 'Tầng 2 VIP',
-    status: 'OVERDUE',
-    guests: 4,
-    seatedMin: 48,
-    staff: 'Nam',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [
-      { id: 'i_701', name: 'Nem Rán Phố Cổ', qty: 3, unitPrice: 85000, status: 'SERVED' },
-      { id: 'i_702', name: 'Cá Lăng Nướng Riềng Mẻ', qty: 1, unitPrice: 285000, status: 'SERVED' },
-      { id: 'i_703', name: 'Cơm Hạt Sen Lá Dứa', qty: 2, unitPrice: 65000, status: 'SERVED' },
-    ],
-  },
-  {
-    id: 't8',
-    label: 'Bàn 08',
-    seats: 8,
-    area: 'Tầng 2 VIP',
-    status: 'IDLE',
-    guests: 0,
-    seatedMin: 0,
-    staff: '',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [],
-  },
-  {
-    id: 't9',
-    label: 'Bàn 09',
-    seats: 4,
-    area: 'Sân vườn',
-    status: 'OCCUPIED',
-    guests: 2,
-    seatedMin: 19,
-    staff: 'Lan',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [
-      { id: 'i_901', name: 'Gỏi Cuốn Tôm Thịt', qty: 2, unitPrice: 75000, status: 'SERVED' },
-      { id: 'i_902', name: 'Cà Phê Trứng Phố Cổ', qty: 2, unitPrice: 55000, status: 'SERVED' },
-    ],
-  },
-  {
-    id: 't10',
-    label: 'Bàn 10',
-    seats: 6,
-    area: 'Sân vườn',
-    status: 'CLEANING',
-    guests: 0,
-    seatedMin: 0,
-    staff: 'Mai',
-    depositAmount: 0,
-    discountAmount: 0,
-    items: [],
-  },
-];
+const INITIAL_TABLES: CashierTable[] = [];
 
 function createInitialShift(now: Date = new Date()): ShiftSettlementRecord {
   const meta = getRealtimeShiftMeta(now);
@@ -592,11 +496,19 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     set({ isLoading: true });
     try {
       const now = new Date();
+      const nowMs = now.getTime();
       const todayIso = formatIsoDate(now);
       const todayShortVN = formatShortDateVN(now);
-      const futureCheckTime = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+      const futureCheckTime = new Date(nowMs + 30 * 60 * 1000).toISOString();
 
-      const [remoteReservationsResult, availableTablesResult] = await Promise.allSettled([
+      const [
+        tablesResult,
+        activeOrdersResult,
+        remoteReservationsResult,
+        availableTablesResult,
+      ] = await Promise.allSettled([
+        fetchApi<BackendTableResponse[]>('/tables'),
+        fetchApi<BackendOrderResponse[]>('/orders/active'),
         fetchApi<BackendReservationResponse[]>(
           `/reservations?date=${encodeURIComponent(todayIso)}`
         ),
@@ -606,17 +518,21 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
       ]);
 
       if (
+        tablesResult.status === 'rejected' &&
+        activeOrdersResult.status === 'rejected' &&
         remoteReservationsResult.status === 'rejected' &&
         availableTablesResult.status === 'rejected'
       ) {
         const reason =
-          remoteReservationsResult.reason instanceof Error
+          tablesResult.reason instanceof Error
+            ? tablesResult.reason.message
+            : remoteReservationsResult.reason instanceof Error
             ? remoteReservationsResult.reason.message
-            : 'Không thể kết nối máy chủ đặt bàn';
+            : 'Không thể kết nối máy chủ POS';
         set({
           isLoading: false,
-          syncError: `Chưa đồng bộ được với máy chủ (${reason}). Đang hiển thị dữ liệu gần nhất.`,
-          lastActionToast: `Chưa đồng bộ được danh sách đặt bàn: ${reason}`,
+          syncError: `Chưa đồng bộ được với máy chủ (${reason}). Vui lòng kiểm tra kết nối Backend.`,
+          lastActionToast: `Chưa đồng bộ được dữ liệu POS: ${reason}`,
         });
         return;
       }
@@ -627,29 +543,166 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
           ? remoteReservationsResult.value.map(mapBackendReservationToFrontend)
           : get().reservations;
 
-      let nextTables = [...get().tables];
+      const existingTablesById = new Map(get().tables.map((t) => [t.id, t]));
+      const existingTablesByLabel = new Map(
+        get().tables.map((t) => [t.label.trim().toLowerCase(), t])
+      );
 
+      // Map zoneName bổ trợ từ /reservations/available-tables nếu có
+      const availZoneByLabel = new Map<string, { id: string; capacity: number; zoneName: string | null }>();
       if (
+        availableTablesResult.status === 'fulfilled' &&
+        Array.isArray(availableTablesResult.value)
+      ) {
+        for (const tb of availableTablesResult.value) {
+          availZoneByLabel.set(tb.tableNumber.trim().toLowerCase(), {
+            id: tb.id,
+            capacity: tb.capacity,
+            zoneName: tb.zoneName,
+          });
+        }
+      }
+
+      // Map active orders theo tableId
+      const activeOrderByTableId = new Map<string, BackendOrderResponse>();
+      if (
+        activeOrdersResult.status === 'fulfilled' &&
+        Array.isArray(activeOrdersResult.value)
+      ) {
+        for (const ord of activeOrdersResult.value) {
+          if (ord.tableId && !activeOrderByTableId.has(ord.tableId)) {
+            activeOrderByTableId.set(ord.tableId, ord);
+          }
+        }
+      }
+
+      let nextTables: CashierTable[] = [...get().tables];
+
+      // 1. Xây dựng danh sách bàn thật từ GET /api/v1/tables (hoặc fallback từ available-tables)
+      if (
+        tablesResult.status === 'fulfilled' &&
+        Array.isArray(tablesResult.value) &&
+        tablesResult.value.length > 0
+      ) {
+        const sortedBackendTables = [...tablesResult.value].sort((a, b) =>
+          a.tableNumber.localeCompare(b.tableNumber, 'vi', { numeric: true })
+        );
+
+        nextTables = sortedBackendTables.map((bt) => {
+          const normalizedLabel = bt.tableNumber.trim().toLowerCase();
+          const prev =
+            existingTablesById.get(bt.id) ?? existingTablesByLabel.get(normalizedLabel);
+          const availMeta = availZoneByLabel.get(normalizedLabel);
+          const resolvedZoneName = bt.zoneName ?? availMeta?.zoneName ?? null;
+          const area: CashierTableArea = resolvedZoneName
+            ? mapZoneNameToArea(resolvedZoneName)
+            : prev?.area ?? 'Sảnh Tầng 1';
+
+          let mappedStatus = mapBackendTableStatus(bt.status);
+          const activeOrder = activeOrderByTableId.get(bt.id);
+
+          const orderItems = activeOrder
+            ? (activeOrder.items ?? [])
+                .filter((it) => (it.status || '').toUpperCase() !== 'REJECTED')
+                .map((it) => {
+                  const noteParts = [it.notes?.trim(), it.allergyNote ? `Dị ứng: ${it.allergyNote.trim()}` : '']
+                    .filter(Boolean);
+                  return {
+                    id: it.id,
+                    name: it.dishNameSnapshot || 'Món ăn',
+                    qty: Math.max(1, Math.round(Number(it.quantity) || 1)),
+                    unitPrice: Math.max(0, Math.round(Number(it.unitPrice) || 0)),
+                    status: mapBackendItemStatus(it.status),
+                    note: noteParts.length > 0 ? noteParts.join(' • ') : undefined,
+                  };
+                })
+            : prev?.items ?? [];
+
+          const allergyNotes = activeOrder
+            ? Array.from(
+                new Set(
+                  (activeOrder.items ?? [])
+                    .map((it) => it.allergyNote?.trim())
+                    .filter((n): n is string => Boolean(n))
+                )
+              )
+            : [];
+
+          const seatedMin = activeOrder
+            ? computeSeatedMinutes(activeOrder.openedAt ?? activeOrder.createdAt ?? bt.occupiedAt, nowMs)
+            : mappedStatus === 'OCCUPIED' || mappedStatus === 'LOCKED'
+            ? computeSeatedMinutes(bt.occupiedAt, nowMs) || prev?.seatedMin || 1
+            : 0;
+
+          if (activeOrder && mappedStatus === 'IDLE') {
+            mappedStatus = 'OCCUPIED';
+          }
+          if (mappedStatus === 'OCCUPIED' && seatedMin >= 45) {
+            mappedStatus = 'OVERDUE';
+          }
+
+          return {
+            id: bt.id,
+            label: bt.tableNumber,
+            seats: bt.capacity || prev?.seats || 4,
+            area,
+            status: prev?.status === 'LOCKED' ? 'LOCKED' : mappedStatus,
+            guests:
+              mappedStatus === 'IDLE' || mappedStatus === 'CLEANING'
+                ? 0
+                : prev?.guests && prev.guests > 0
+                ? prev.guests
+                : activeOrder
+                ? Math.min(bt.capacity || 4, Math.max(1, orderItems.reduce((s, i) => s + i.qty, 0)))
+                : 0,
+            seatedMin,
+            staff:
+              mappedStatus === 'IDLE'
+                ? ''
+                : prev?.staff || (activeOrder ? 'Phục vụ' : ''),
+            depositAmount: prev?.depositAmount ?? 0,
+            discountAmount: prev?.discountAmount ?? 0,
+            discountLabel: prev?.discountLabel,
+            reservationId: prev?.reservationId,
+            lockedBy: prev?.lockedBy,
+            allergyAlert:
+              allergyNotes.length > 0
+                ? allergyNotes.join(' | ')
+                : activeOrder?.customerNotes?.toLowerCase().includes('dị ứng')
+                ? activeOrder.customerNotes
+                : prev?.allergyAlert,
+            mergedIntoTableId: prev?.mergedIntoTableId,
+            mergedIntoTableLabel: prev?.mergedIntoTableLabel,
+            mergedMemberTables: prev?.mergedMemberTables,
+            items: mappedStatus === 'IDLE' || mappedStatus === 'CLEANING' ? [] : orderItems,
+          };
+        });
+      } else if (
         availableTablesResult.status === 'fulfilled' &&
         Array.isArray(availableTablesResult.value) &&
         availableTablesResult.value.length > 0
       ) {
-        const availMap = new Map(
-          availableTablesResult.value.map((tb) => [tb.tableNumber.trim().toLowerCase(), tb])
-        );
-        nextTables = nextTables.map((t) => {
-          const matched = availMap.get(t.label.trim().toLowerCase());
-          if (!matched) return t;
+        nextTables = availableTablesResult.value.map((tb) => {
+          const prev =
+            existingTablesById.get(tb.id) ??
+            existingTablesByLabel.get(tb.tableNumber.trim().toLowerCase());
           return {
-            ...t,
-            id: matched.id,
-            seats: matched.capacity || t.seats,
-            area: mapZoneNameToArea(matched.zoneName),
+            id: tb.id,
+            label: tb.tableNumber,
+            seats: tb.capacity || 4,
+            area: mapZoneNameToArea(tb.zoneName),
+            status: mapBackendTableStatus(tb.status),
+            guests: prev?.guests ?? 0,
+            seatedMin: prev?.seatedMin ?? 0,
+            staff: prev?.staff ?? '',
+            depositAmount: prev?.depositAmount ?? 0,
+            discountAmount: prev?.discountAmount ?? 0,
+            items: prev?.items ?? [],
           };
         });
       }
 
-      // Đồng bộ trạng thái các bàn đã đặt trước / đã check-in TRONG NGÀY HÔM NAY từ DB
+      // 2. Đồng bộ trạng thái các bàn đã đặt trước / đã check-in TRONG NGÀY HÔM NAY từ DB
       if (
         remoteReservationsResult.status === 'fulfilled' &&
         Array.isArray(remoteReservationsResult.value)
@@ -659,6 +712,32 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
           if (mappedRes.reservedDate !== todayShortVN) {
             continue;
           }
+
+          const existsInList = nextTables.some(
+            (t) =>
+              (rawRes.tableId && t.id === rawRes.tableId) ||
+              (rawRes.tableNumber &&
+                t.label.trim().toLowerCase() === rawRes.tableNumber.trim().toLowerCase())
+          );
+
+          if (!existsInList && rawRes.tableId && rawRes.tableNumber) {
+            nextTables.push({
+              id: rawRes.tableId,
+              label: rawRes.tableNumber,
+              seats: rawRes.tableCapacity ?? 4,
+              area: mapZoneNameToArea(rawRes.zoneName),
+              status: mappedRes.status === 'CONFIRMED' ? 'RESERVED' : 'OCCUPIED',
+              guests: mappedRes.partySize,
+              seatedMin: mappedRes.status === 'CHECKED_IN' ? 1 : 0,
+              staff: 'Lễ tân / Thu ngân',
+              depositAmount: mappedRes.depositAmount,
+              discountAmount: 0,
+              reservationId: mappedRes.id,
+              items: [],
+            });
+            continue;
+          }
+
           nextTables = nextTables.map((t) => {
             const isSameTable =
               (rawRes.tableId && t.id === rawRes.tableId) ||
@@ -686,7 +765,7 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
             if (mappedRes.status === 'CHECKED_IN' && rawRes.tableStatus === 'SERVING') {
               return {
                 ...updatedTable,
-                status: 'OCCUPIED',
+                status: updatedTable.status === 'OVERDUE' ? 'OVERDUE' : 'OCCUPIED',
                 guests: mappedRes.partySize,
                 depositAmount: mappedRes.depositAmount,
                 reservationId: mappedRes.id,
@@ -699,10 +778,10 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
 
       const hasUuids = nextTables.some((t) => UUID_V4_REGEX.test(t.id));
       const partialError =
-        remoteReservationsResult.status === 'rejected'
+        tablesResult.status === 'rejected' && availableTablesResult.status === 'rejected'
+          ? 'Chưa đồng bộ được danh sách bàn từ máy chủ.'
+          : remoteReservationsResult.status === 'rejected'
           ? 'Chưa tải được danh sách đơn đặt bàn từ máy chủ.'
-          : availableTablesResult.status === 'rejected'
-          ? 'Chưa đồng bộ được danh sách bàn trống từ máy chủ.'
           : null;
 
       set({
@@ -1304,13 +1383,17 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
       lastActionToast: `Đã khóa trạng thái ${target.label} (Lock Table State) để quyết toán an toàn.`,
     });
 
-    fetchApi(`/pos/tables/${tableId}/lock`, {
-      method: 'POST',
-      headers: { 'X-Idempotency-Key': idempotencyKey },
-    }).catch(() => {});
+    if (UUID_V4_REGEX.test(tableId)) {
+      fetchApi(`/tables/${tableId}/status`, {
+        method: 'PATCH',
+        headers: { 'X-Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ status: 'BILLING' }),
+      }).catch(() => {});
+    }
   },
 
   unlockTableState: (tableId) => {
+    const idempotencyKey = generateIdempotencyKey();
     const { tables } = get();
     set({
       tables: tables.map((t) =>
@@ -1324,6 +1407,14 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
       ),
       lastActionToast: 'Đã mở khóa trạng thái bàn.',
     });
+
+    if (UUID_V4_REGEX.test(tableId)) {
+      fetchApi(`/tables/${tableId}/status`, {
+        method: 'PATCH',
+        headers: { 'X-Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ status: 'SERVING' }),
+      }).catch(() => {});
+    }
   },
 
   // UC4 <<extend>> Apply Discount
@@ -1532,6 +1623,7 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
   },
 
   markTableCleanDone: (tableId) => {
+    const idempotencyKey = generateIdempotencyKey();
     const { tables } = get();
     const table = tables.find((t) => t.id === tableId);
     if (!table) return;
@@ -1543,6 +1635,14 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
       ),
       lastActionToast: `${table.label} đã dọn xong và sẵn sàng đón khách mới.`,
     });
+
+    if (UUID_V4_REGEX.test(tableId)) {
+      fetchApi(`/tables/${tableId}/status`, {
+        method: 'PATCH',
+        headers: { 'X-Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ status: 'VACANT' }),
+      }).catch(() => {});
+    }
   },
 
   // UC5: Ghi nhận phiếu chi nội bộ có ghi chú & Settle Cash
