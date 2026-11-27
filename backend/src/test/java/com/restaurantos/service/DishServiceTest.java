@@ -43,6 +43,9 @@ class DishServiceTest {
     @Mock
     private DishComboRepository dishComboRepository;
 
+    @org.mockito.Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
     @InjectMocks
     private DishServiceImpl dishService;
 

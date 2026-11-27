@@ -1,9 +1,12 @@
 package com.restaurantos.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurantos.common.dto.PageResponse;
 import com.restaurantos.common.dto.dish.ComboItemRequest;
 import com.restaurantos.common.dto.dish.ComboItemResponse;
 import com.restaurantos.common.dto.dish.CreateDishRequest;
+import com.restaurantos.common.dto.dish.DishOptionGroupDto;
 import com.restaurantos.common.dto.dish.DishResponseDto;
 import com.restaurantos.common.dto.dish.UpdateDishAvailabilityRequest;
 import com.restaurantos.common.dto.dish.UpdateDishRequest;
@@ -36,12 +39,46 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DishServiceImpl implements DishService {
 
     private final DishRepository dishRepository;
     private final DishComboRepository dishComboRepository;
+    private final ObjectMapper objectMapper;
+
+    public DishServiceImpl(
+            DishRepository dishRepository,
+            DishComboRepository dishComboRepository,
+            ObjectMapper objectMapper
+    ) {
+        this.dishRepository = dishRepository;
+        this.dishComboRepository = dishComboRepository;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
+
+    private List<DishOptionGroupDto> parseOptions(String optionsJson) {
+        if (optionsJson == null || optionsJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(optionsJson, new TypeReference<List<DishOptionGroupDto>>() {});
+        } catch (Exception e) {
+            log.warn("Lỗi parse JSON options món ăn: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private String serializeOptions(List<DishOptionGroupDto> options) {
+        if (options == null || options.isEmpty()) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(options);
+        } catch (Exception e) {
+            log.warn("Lỗi serialize options sang JSON: {}", e.getMessage());
+            return "[]";
+        }
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -54,7 +91,11 @@ public class DishServiceImpl implements DishService {
                 pageable
         );
 
-        return PageResponse.from(dishPage, d -> DishResponseDto.fromEntity(d, Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList()));
+        return PageResponse.from(dishPage, d -> DishResponseDto.fromEntity(
+                d,
+                Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList(),
+                parseOptions(d.getOptions())
+        ));
     }
 
     @Override
@@ -64,7 +105,11 @@ public class DishServiceImpl implements DishService {
                 normalizeFilter(category),
                 normalizeSearch(search),
                 isAvailable
-        ).stream().map(d -> DishResponseDto.fromEntity(d, Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList())).toList();
+        ).stream().map(d -> DishResponseDto.fromEntity(
+                d,
+                Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList(),
+                parseOptions(d.getOptions())
+        )).toList();
     }
 
     @Override
@@ -72,7 +117,11 @@ public class DishServiceImpl implements DishService {
     public DishResponseDto getDishById(UUID id) {
         DishEntity dish = dishRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy món ăn với ID: " + id));
-        return DishResponseDto.fromEntity(dish, Boolean.TRUE.equals(dish.getIsCombo()) ? loadComboItems(dish.getId()) : Collections.emptyList());
+        return DishResponseDto.fromEntity(
+                dish,
+                Boolean.TRUE.equals(dish.getIsCombo()) ? loadComboItems(dish.getId()) : Collections.emptyList(),
+                parseOptions(dish.getOptions())
+        );
     }
 
     @Override
@@ -99,6 +148,7 @@ public class DishServiceImpl implements DishService {
                 .isAvailable(request.isAvailable() != null ? request.isAvailable() : true)
                 .isCombo(request.isCombo() != null ? request.isCombo() : false)
                 .soldOutReason(Boolean.FALSE.equals(request.isAvailable()) ? "Tạm ngưng phục vụ" : null)
+                .options(serializeOptions(request.options()))
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -113,7 +163,7 @@ public class DishServiceImpl implements DishService {
         log.info("Đã tạo mới món ăn ID: {}, Tên: '{}', Giá: {} VND, Danh mục: {}, isCombo: {}",
                 saved.getId(), saved.getName(), saved.getPrice(), saved.getCategory(), saved.getIsCombo());
 
-        return DishResponseDto.fromEntity(saved, comboItems);
+        return DishResponseDto.fromEntity(saved, comboItems, parseOptions(saved.getOptions()));
     }
 
     @Override
@@ -151,6 +201,10 @@ public class DishServiceImpl implements DishService {
             dish.setIsCombo(request.isCombo());
         }
 
+        if (request.options() != null) {
+            dish.setOptions(serializeOptions(request.options()));
+        }
+
         dish.setUpdatedAt(Instant.now());
         DishEntity updated = dishRepository.save(dish);
 
@@ -166,7 +220,7 @@ public class DishServiceImpl implements DishService {
 
         log.info("Đã cập nhật món ăn ID: {}, Tên: '{}', Giá: {} VND", updated.getId(), updated.getName(), updated.getPrice());
 
-        return DishResponseDto.fromEntity(updated, comboItems);
+        return DishResponseDto.fromEntity(updated, comboItems, parseOptions(updated.getOptions()));
     }
 
     @Override
