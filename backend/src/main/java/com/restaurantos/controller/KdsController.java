@@ -3,6 +3,7 @@ package com.restaurantos.controller;
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.OrderChangeAlertDto;
 import com.restaurantos.dto.CompleteBatchRequest;
 import com.restaurantos.dto.CompleteTicketRequest;
 import com.restaurantos.dto.UpdateItemStatusRequest;
@@ -99,5 +100,36 @@ public class KdsController {
                 .map(tickets -> ResponseEntity.ok(ApiResponse.success(tickets, "Hoàn tất mẻ nấu thành công")))
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy một hoặc nhiều món trong mẻ nấu", null)));
+    }
+
+    @GetMapping("/order-changes")
+    @Operation(summary = "A6: Lấy danh sách cảnh báo hủy/sửa đơn chờ bếp xác nhận", description = "Đọc từ nhật ký hủy món (order_item_voids), lọc bỏ các cảnh báo đã xác nhận")
+    public ResponseEntity<ApiResponse<List<OrderChangeAlertDto>>> getPendingOrderChanges() {
+        List<OrderChangeAlertDto> alerts = kdsService.getPendingOrderChanges();
+        return ResponseEntity.ok(ApiResponse.success(alerts, "Lấy danh sách cảnh báo thay đổi đơn thành công"));
+    }
+
+    @PostMapping("/order-changes/{alertId}/acknowledge")
+    @Operation(summary = "A6: Bếp xác nhận đã nhận cảnh báo hủy/sửa đơn", description = "Đánh dấu cảnh báo đã xác nhận để không còn hiện trong danh sách chờ")
+    public ResponseEntity<ApiResponse<OrderChangeAlertDto>> acknowledgeOrderChange(
+            @Parameter(description = "Mã định danh cảnh báo (order_item_voids.id)")
+            @PathVariable UUID alertId
+    ) {
+        return kdsService.acknowledgeOrderChange(alertId)
+                .map(alert -> ResponseEntity.ok(ApiResponse.success(alert, "Xác nhận cảnh báo thay đổi đơn thành công")))
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy cảnh báo với ID: " + alertId, null)));
+    }
+
+    @PostMapping("/order-changes/{alertId}/defer")
+    @Operation(summary = "A6: Bếp hoãn xử lý cảnh báo hủy/sửa đơn", description = "Giữ nguyên cảnh báo trong danh sách chờ để bếp xử lý sau")
+    public ResponseEntity<ApiResponse<OrderChangeAlertDto>> deferOrderChange(
+            @Parameter(description = "Mã định danh cảnh báo (order_item_voids.id)")
+            @PathVariable UUID alertId
+    ) {
+        return kdsService.deferOrderChange(alertId)
+                .map(alert -> ResponseEntity.ok(ApiResponse.success(alert, "Đã hoãn xử lý cảnh báo thay đổi đơn")))
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy cảnh báo với ID: " + alertId, null)));
     }
 }

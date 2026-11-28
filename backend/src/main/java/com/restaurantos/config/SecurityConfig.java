@@ -100,6 +100,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/kds/**").hasAuthority("KDS:QUEUE:VIEW")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/kds/**").hasAuthority("KDS:COOKING_STATUS:UPDATE")
                         .requestMatchers(HttpMethod.POST, "/api/v1/kds/batches/complete").hasAuthority("KDS:COOKING_STATUS:UPDATE")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/kds/order-changes/**").hasAuthority("KDS:COOKING_STATUS:UPDATE")
 
                         // 7. Quản trị nhân sự & thực đơn (kết hợp @PreAuthorize chi tiết theo từng method)
                         .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").authenticated()

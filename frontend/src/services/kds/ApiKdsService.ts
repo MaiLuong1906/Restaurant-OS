@@ -73,34 +73,111 @@ export class ApiKdsService implements KdsService {
   }
 
   async getPendingOrderChanges(): Promise<OrderChangeAlertData[]> {
-    return [];
+    return fetchApi<OrderChangeAlertData[]>('/kds/order-changes');
   }
 
   async acknowledgeOrderChange(
-    _alertId: string,
-    _idempotencyKey?: string
+    alertId: string,
+    idempotencyKey?: string
   ): Promise<{ alert: OrderChangeAlertData; ticket: Ticket }> {
-    throw new Error('acknowledgeOrderChange chưa được hỗ trợ ở live mode');
+    const alert = await fetchApi<OrderChangeAlertData>(`/kds/order-changes/${alertId}/acknowledge`, {
+      method: 'POST',
+      headers: idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : undefined,
+    });
+    let ticket: Ticket;
+    try {
+      ticket = await this.getTicketById(alert.ticketId);
+    } catch {
+      ticket = {
+        id: alert.ticketId,
+        tableNo: alert.tableNo,
+        items: [],
+        status: 'WAITING',
+        createdAt: alert.createdAt ?? new Date().toISOString(),
+        slaMinutes: 15,
+      } as unknown as Ticket;
+    }
+    return { alert, ticket };
   }
 
-  async deferOrderChange(_alertId: string): Promise<void> {
-    // No-op
+  async deferOrderChange(alertId: string): Promise<void> {
+    await fetchApi<OrderChangeAlertData>(`/kds/order-changes/${alertId}/defer`, {
+      method: 'POST',
+    });
   }
 
   async listDishAvailability(): Promise<DishAvailability[]> {
-    return [];
+    interface BackendDishItem {
+      id: string;
+      name: string;
+      category?: string;
+      isAvailable: boolean;
+      soldOutReason?: string | null;
+    }
+    const [availableDishes, soldOutDishes] = await Promise.all([
+      fetchApi<BackendDishItem[]>('/dishes?isAvailable=true'),
+      fetchApi<BackendDishItem[]>('/dishes?isAvailable=false'),
+    ]);
+    return [...availableDishes, ...soldOutDishes].map((d) => ({
+      dishId: d.id,
+      dishName: d.name,
+      status: d.isAvailable ? 'AVAILABLE' : 'SOLD_OUT',
+      remainingPortions: d.isAvailable ? 1 : 0,
+      waitingTables: [],
+    }));
   }
 
-  async markSoldOut(_dishId: string, _idempotencyKey: string): Promise<DishAvailability> {
-    throw new Error('markSoldOut chưa được hỗ trợ ở live mode');
+  async markSoldOut(dishId: string, idempotencyKey: string): Promise<DishAvailability> {
+    interface BackendDishItem {
+      id: string;
+      name: string;
+      isAvailable: boolean;
+      soldOutReason?: string | null;
+    }
+    const d = await fetchApi<BackendDishItem>(`/dishes/${dishId}/availability`, {
+      method: 'PATCH',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        isAvailable: false,
+        soldOutReason: 'Bếp báo hết món',
+      }),
+    });
+    return {
+      dishId: d.id,
+      dishName: d.name,
+      status: d.isAvailable ? 'AVAILABLE' : 'SOLD_OUT',
+      remainingPortions: 0,
+      waitingTables: [],
+      soldOutAt: new Date().toISOString(),
+    };
   }
 
   async reopenDish(
-    _dishId: string,
-    _quantity: number,
-    _idempotencyKey: string
+    dishId: string,
+    quantity: number,
+    idempotencyKey: string
   ): Promise<DishAvailability> {
-    throw new Error('reopenDish chưa được hỗ trợ ở live mode');
+    interface BackendDishItem {
+      id: string;
+      name: string;
+      isAvailable: boolean;
+      soldOutReason?: string | null;
+    }
+    const d = await fetchApi<BackendDishItem>(`/dishes/${dishId}/availability`, {
+      method: 'PATCH',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        isAvailable: true,
+        soldOutReason: null,
+      }),
+    });
+    return {
+      dishId: d.id,
+      dishName: d.name,
+      status: d.isAvailable ? 'AVAILABLE' : 'SOLD_OUT',
+      remainingPortions: quantity,
+      waitingTables: [],
+    };
   }
 
   async getWasteDishOptions(): Promise<WasteDishOption[]> {

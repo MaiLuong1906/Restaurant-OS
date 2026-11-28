@@ -3,8 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { DishAvailability } from '@/types';
-import { kdsService } from '@/services/mock';
+import { kdsService as mockKdsService } from '@/services/mock';
+import { ApiKdsService, KdsService } from '@/services/kds';
 import { ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react';
+
+const isLiveMode = process.env.NEXT_PUBLIC_KDS_MODE === 'live';
+const kdsService: KdsService = isLiveMode ? new ApiKdsService() : mockKdsService;
 
 export default function SoldOutPage() {
   const [dishes, setDishes] = React.useState<DishAvailability[]>([]);
@@ -59,6 +63,12 @@ export default function SoldOutPage() {
 
   const handleConfirmReopen = async (dishId: string) => {
     const qty = reopenQuantities[dishId] || 1;
+    const prevDishes = dishes;
+    setDishes((prev) =>
+      prev.map((d) =>
+        d.dishId === dishId ? { ...d, status: 'AVAILABLE', remainingPortions: qty } : d
+      )
+    );
     try {
       setActionPending(true);
       const key = `reopen-${dishId}-${Date.now()}`;
@@ -66,6 +76,7 @@ export default function SoldOutPage() {
       setDishes((prev) => prev.map((d) => (d.dishId === updated.dishId ? updated : d)));
       setReopenEditingId(null);
     } catch (err) {
+      setDishes(prevDishes);
       setError((err as Error).message || 'Lỗi khi mở bán lại');
     } finally {
       setActionPending(false);
@@ -80,6 +91,12 @@ export default function SoldOutPage() {
 
   const handleConfirmSoldOut = async () => {
     if (!selectedDish) return;
+    const prevDishes = dishes;
+    setDishes((prev) =>
+      prev.map((d) =>
+        d.dishId === selectedDish.dishId ? { ...d, status: 'SOLD_OUT' } : d
+      )
+    );
     try {
       setActionPending(true);
       const key = `soldout-${selectedDish.dishId}-${Date.now()}`;
@@ -87,6 +104,7 @@ export default function SoldOutPage() {
       setDishes((prev) => prev.map((d) => (d.dishId === updated.dishId ? updated : d)));
       setView('success');
     } catch (err) {
+      setDishes(prevDishes);
       setError((err as Error).message || 'Lỗi khi báo hết món');
     } finally {
       setActionPending(false);
@@ -349,7 +367,9 @@ export default function SoldOutPage() {
                   <div key={d.dishId} className="py-4 flex justify-between items-center">
                     <div>
                       <b className="text-base font-bold text-ops-ink block">{d.dishName}</b>
-                      <span className="text-xs text-ops-muted">Còn {d.remainingPortions} phần</span>
+                      {!isLiveMode && (
+                        <span className="text-xs text-ops-muted">Còn {d.remainingPortions} phần</span>
+                      )}
                     </div>
                     <button
                       type="button"

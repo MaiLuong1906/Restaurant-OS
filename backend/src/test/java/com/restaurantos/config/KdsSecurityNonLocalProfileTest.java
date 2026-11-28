@@ -12,6 +12,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(KdsController.class)
@@ -30,6 +31,10 @@ class KdsSecurityNonLocalProfileTest {
     void nonLocalProfile_blocksKdsEndpointsWithoutAuth() throws Exception {
         // Sau khi cấu hình AuthenticationEntryPoint trả JSON 401 theo Rule 06, request không token trả 401 Unauthorized
         mockMvc.perform(get("/api/v1/kds/tickets"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/kds/order-changes"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/kds/order-changes/00000000-0000-0000-0000-000000000001/acknowledge"))
                 .andExpect(status().isUnauthorized());
     }
 }
