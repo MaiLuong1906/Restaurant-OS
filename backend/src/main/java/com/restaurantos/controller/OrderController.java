@@ -82,4 +82,22 @@ public class OrderController {
         customerTableAuthService.verifyCanViewOrder(order.tableId(), tableToken, authentication);
         return ResponseEntity.ok(ApiResponse.success(order));
     }
+
+    /**
+     * PATCH /api/v1/orders/items/{itemId}/serve — Phục vụ xác nhận đã giao món cho khách (READY -> SERVED).
+     */
+    @PatchMapping("/items/{itemId}/serve")
+    @PreAuthorize("hasAuthority('ORDER:ITEM_SERVE_EXPEDITE:UPDATE')")
+    public ResponseEntity<ApiResponse<OrderDtos.OrderItemResponse>> serveOrderItem(
+            @PathVariable String itemId) {
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(itemId);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("BAD_REQUEST", "Order Item ID không hợp lệ: " + itemId, null));
+        }
+        OrderDtos.OrderItemResponse served = orderService.serveOrderItem(uuid);
+        return ResponseEntity.ok(ApiResponse.success(served, "Đã xác nhận giao món thành công"));
+    }
 }

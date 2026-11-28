@@ -3,6 +3,7 @@ package com.restaurantos.controller;
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.dto.OrderDtos;
 import com.restaurantos.service.TableService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,5 +48,24 @@ public class TableController {
                 .map(t -> ResponseEntity.ok(ApiResponse.success(t)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy bàn: " + id, null)));
+    }
+
+    /**
+     * PATCH /api/v1/tables/{id}/status — Cập nhật trạng thái bàn (có kiểm tra nghiệp vụ & chống race condition).
+     */
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('TABLE:STATE:UPDATE')")
+    public ResponseEntity<ApiResponse<OrderDtos.TableResponse>> updateTableStatus(
+            @PathVariable String id,
+            @Valid @RequestBody OrderDtos.UpdateTableStatusRequest request) {
+        UUID tableId;
+        try {
+            tableId = UUID.fromString(id);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("BAD_REQUEST", "Table ID không hợp lệ: " + id, null));
+        }
+        OrderDtos.TableResponse updated = tableService.updateTableStatus(tableId, request.status());
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái bàn thành công"));
     }
 }
