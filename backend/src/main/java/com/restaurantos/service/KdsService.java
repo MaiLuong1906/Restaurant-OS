@@ -24,6 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -386,10 +388,14 @@ public class KdsService {
     }
 
     /**
-     * A6: Lấy danh sách cảnh báo hủy/sửa đơn chờ bếp xác nhận từ bảng order_item_voids.
+     * A6: Lấy danh sách cảnh báo hủy/sửa đơn trong ngày hôm nay chờ bếp xác nhận từ bảng order_item_voids.
      */
     public List<OrderChangeAlertDto> getPendingOrderChanges() {
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(zone);
         return orderItemVoidRepository.findAllWithOrderDetailsOrderByApprovedAtDesc().stream()
+                .filter(v -> v.getApprovedAt() != null
+                        && v.getApprovedAt().atZone(zone).toLocalDate().equals(today))
                 .filter(v -> !acknowledgedAlertIds.contains(v.getId()))
                 .map(v -> toOrderChangeAlertDto(v, false))
                 .collect(Collectors.toList());

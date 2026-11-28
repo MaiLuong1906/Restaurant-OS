@@ -14,15 +14,19 @@ describe('ApiKdsService — Case 4 Dish Availability (Sold-Out / Reopen)', () =>
     service = new ApiKdsService();
   });
 
-  it('listDishAvailability gọi GET /dishes và map đúng trạng thái AVAILABLE / SOLD_OUT', async () => {
-    vi.mocked(fetchApi).mockResolvedValueOnce([
-      { id: 'dish-1', name: 'Phở Bò', category: 'Món chính', isAvailable: true },
-      { id: 'dish-2', name: 'Bún Chả', category: 'Món chính', isAvailable: false, soldOutReason: 'Hết thịt' },
-    ]);
+  it('listDishAvailability gọi 2 lần GET /dishes?isAvailable=true và false rồi gộp cả AVAILABLE lẫn SOLD_OUT', async () => {
+    vi.mocked(fetchApi)
+      .mockResolvedValueOnce([
+        { id: 'dish-1', name: 'Phở Bò', category: 'Món chính', isAvailable: true },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'dish-2', name: 'Bún Chả', category: 'Món chính', isAvailable: false, soldOutReason: 'Hết thịt' },
+      ]);
 
     const list = await service.listDishAvailability();
 
-    expect(fetchApi).toHaveBeenCalledWith('/dishes');
+    expect(fetchApi).toHaveBeenCalledWith('/dishes?isAvailable=true');
+    expect(fetchApi).toHaveBeenCalledWith('/dishes?isAvailable=false');
     expect(list).toEqual([
       { dishId: 'dish-1', dishName: 'Phở Bò', status: 'AVAILABLE', remainingPortions: 1, waitingTables: [] },
       { dishId: 'dish-2', dishName: 'Bún Chả', status: 'SOLD_OUT', remainingPortions: 0, waitingTables: [] },

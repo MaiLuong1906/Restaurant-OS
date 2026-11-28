@@ -638,7 +638,7 @@ class KdsServiceTest {
                 .wasted(false)
                 .requestedBy(UUID.randomUUID())
                 .approvedBy(UUID.randomUUID())
-                .approvedAt(now)
+                .approvedAt(Instant.now())
                 .isPostCooking(false)
                 .build();
 
@@ -669,7 +669,7 @@ class KdsServiceTest {
                 .wasted(false)
                 .requestedBy(UUID.randomUUID())
                 .approvedBy(UUID.randomUUID())
-                .approvedAt(now)
+                .approvedAt(Instant.now())
                 .isPostCooking(false)
                 .build();
 
@@ -698,7 +698,7 @@ class KdsServiceTest {
                 .wasted(false)
                 .requestedBy(UUID.randomUUID())
                 .approvedBy(UUID.randomUUID())
-                .approvedAt(now)
+                .approvedAt(Instant.now())
                 .isPostCooking(false)
                 .build();
 
@@ -711,5 +711,50 @@ class KdsServiceTest {
 
         List<OrderChangeAlertDto> pendingAfterDefer = kdsService.getPendingOrderChanges();
         assertThat(pendingAfterDefer).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("A6: getPendingOrderChanges chỉ trả về void trong ngày hôm nay, bỏ qua void hôm qua")
+    void getPendingOrderChanges_filtersOutYesterdayVoids() {
+        UUID yesterdayVoidId = UUID.randomUUID();
+        UUID todayVoidId = UUID.randomUUID();
+        OrderItemEntity item = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+
+        OrderItemVoidEntity yesterdayVoid = OrderItemVoidEntity.builder()
+                .id(yesterdayVoidId)
+                .orderItemId(item.getId())
+                .orderItem(item)
+                .quantityVoided(1)
+                .reason("Hủy hôm qua")
+                .wasted(false)
+                .requestedBy(UUID.randomUUID())
+                .approvedBy(UUID.randomUUID())
+                .approvedAt(Instant.now().minus(Duration.ofDays(1)))
+                .isPostCooking(false)
+                .build();
+
+        OrderItemVoidEntity todayVoid = OrderItemVoidEntity.builder()
+                .id(todayVoidId)
+                .orderItemId(item.getId())
+                .orderItem(item)
+                .quantityVoided(1)
+                .reason("Hủy hôm nay")
+                .wasted(false)
+                .requestedBy(UUID.randomUUID())
+                .approvedBy(UUID.randomUUID())
+                .approvedAt(Instant.now())
+                .isPostCooking(false)
+                .build();
+
+        when(orderItemVoidRepository.findAllWithOrderDetailsOrderByApprovedAtDesc())
+                .thenReturn(List.of(todayVoid, yesterdayVoid));
+        when(orderItemVoidRepository.findById(todayVoidId)).thenReturn(Optional.of(todayVoid));
+
+        List<OrderChangeAlertDto> pending = kdsService.getPendingOrderChanges();
+        assertThat(pending).hasSize(1);
+        assertThat(pending.get(0).getId()).isEqualTo(todayVoidId);
+
+        kdsService.acknowledgeOrderChange(todayVoidId);
+        assertThat(kdsService.getPendingOrderChanges()).isEmpty();
     }
 }

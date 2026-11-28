@@ -114,8 +114,11 @@ export class ApiKdsService implements KdsService {
       isAvailable: boolean;
       soldOutReason?: string | null;
     }
-    const dishes = await fetchApi<BackendDishItem[]>('/dishes');
-    return dishes.map((d) => ({
+    const [availableDishes, soldOutDishes] = await Promise.all([
+      fetchApi<BackendDishItem[]>('/dishes?isAvailable=true'),
+      fetchApi<BackendDishItem[]>('/dishes?isAvailable=false'),
+    ]);
+    return [...availableDishes, ...soldOutDishes].map((d) => ({
       dishId: d.id,
       dishName: d.name,
       status: d.isAvailable ? 'AVAILABLE' : 'SOLD_OUT',

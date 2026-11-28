@@ -367,7 +367,9 @@ export default function SoldOutPage() {
                   <div key={d.dishId} className="py-4 flex justify-between items-center">
                     <div>
                       <b className="text-base font-bold text-ops-ink block">{d.dishName}</b>
-                      <span className="text-xs text-ops-muted">Còn {d.remainingPortions} phần</span>
+                      {!isLiveMode && (
+                        <span className="text-xs text-ops-muted">Còn {d.remainingPortions} phần</span>
+                      )}
                     </div>
                     <button
                       type="button"
