@@ -7,6 +7,9 @@ import { getPermissionsForRole, KDS_TABLET_PERMISSIONS } from './rbac';
 // Mock mode is kept strictly for offline/unit-test development without breaking existing tests.
 
 const isLiveAuthMode = () => process.env.NEXT_PUBLIC_AUTH_MODE === 'live';
+const isMockAllowed = () =>
+  process.env.NODE_ENV === 'test' ||
+  (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ALLOW_MOCK_AUTH === 'true');
 
 interface BackendLoginPayload {
   accessToken: string;
@@ -49,8 +52,9 @@ export const authService = {
    * - Mock mode: giữ nguyên tương thích unit test cục bộ
    */
   async loginStaff(req: LoginRequest): Promise<LoginResponse> {
-    if (!req.phoneNumber?.trim()) {
-      throw new ApiError('VALIDATION_ERROR', 'Số điện thoại không được để trống', 400);
+    const rawIdentifier = (req.identifier || req.phoneNumber || '').trim();
+    if (!rawIdentifier) {
+      throw new ApiError('VALIDATION_ERROR', 'Vui lòng nhập số điện thoại hoặc tên đăng nhập', 400);
     }
     if (!req.password || req.password.length < 4) {
       throw new ApiError('VALIDATION_ERROR', 'Mật khẩu không hợp lệ', 400);
@@ -60,7 +64,7 @@ export const authService = {
       const data = await fetchApi<BackendLoginPayload>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
-          identifier: req.phoneNumber.trim(),
+          identifier: rawIdentifier,
           password: req.password,
         }),
       });
@@ -82,24 +86,31 @@ export const authService = {
       return response;
     }
 
-    // Mock fallback cho môi trường dev/test không bật backend auth
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const mockToken = `mock-jwt-${crypto.randomUUID()}`;
-    const response: LoginResponse & { permissions: string[] } = {
-      token: mockToken,
-      user: {
-        id: `usr-${crypto.randomUUID().slice(0, 8)}`,
-        fullName: 'Nhân Viên Vận Hành',
-        phoneNumber: req.phoneNumber,
-        role: 'STAFF',
-        isActive: true,
-      },
-      expiresIn: 86400,
-      permissions: [...getPermissionsForRole('STAFF')],
-    };
+    if (isMockAllowed()) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const mockToken = `mock-jwt-${crypto.randomUUID()}`;
+      const response: LoginResponse & { permissions: string[] } = {
+        token: mockToken,
+        user: {
+          id: `usr-${crypto.randomUUID().slice(0, 8)}`,
+          fullName: 'Nhân Viên Vận Hành',
+          phoneNumber: rawIdentifier,
+          role: 'STAFF',
+          isActive: true,
+        },
+        expiresIn: 86400,
+        permissions: [...getPermissionsForRole('STAFF')],
+      };
 
-    useAuthStore.getState().setStaffSession(response);
-    return response;
+      useAuthStore.getState().setStaffSession(response);
+      return response;
+    }
+
+    throw new ApiError(
+      'AUTH_MODE_INVALID',
+      'Xác thực thất bại: Hệ thống chưa cấu hình kết nối API xác thực (NEXT_PUBLIC_AUTH_MODE=live).',
+      403
+    );
   },
 
   /**
@@ -131,17 +142,25 @@ export const authService = {
       return session;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const session: KdsSession = {
-      token: `mock-kds-${crypto.randomUUID()}`,
-      tabletId: req.tabletId || 'tablet-main-kitchen',
-      authenticatedAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 12 * 3600 * 1000).toISOString(),
-      permissions: [...KDS_TABLET_PERMISSIONS],
-    };
+    if (isMockAllowed()) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const session: KdsSession = {
+        token: `mock-kds-${crypto.randomUUID()}`,
+        tabletId: req.tabletId || 'tablet-main-kitchen',
+        authenticatedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 12 * 3600 * 1000).toISOString(),
+        permissions: [...KDS_TABLET_PERMISSIONS],
+      };
 
-    useAuthStore.getState().setKdsSession(session);
-    return session;
+      useAuthStore.getState().setKdsSession(session);
+      return session;
+    }
+
+    throw new ApiError(
+      'AUTH_MODE_INVALID',
+      'Đăng nhập KDS thất bại: Hệ thống chưa cấu hình kết nối API xác thực (NEXT_PUBLIC_AUTH_MODE=live).',
+      403
+    );
   },
 
   /**

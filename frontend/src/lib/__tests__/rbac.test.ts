@@ -53,13 +53,20 @@ describe('Frontend RBAC Permission Catalog & Route Guards', () => {
     expect(canAccessRoute('/menu', null)).toBe(true);
     expect(canAccessRoute('/login', null)).toBe(true);
 
-    // Owner-only routes (bao gồm /menu-bom không bị khớp nhầm public /menu)
+    // Owner-only routes & Menu-BOM access
     expect(canAccessRoute('/pnl', 'OWNER')).toBe(true);
     expect(canAccessRoute('/pnl', 'MANAGER')).toBe(false);
     expect(canAccessRoute('/payroll', 'MANAGER')).toBe(false);
     expect(canAccessRoute('/menu-bom', 'OWNER')).toBe(true);
-    expect(canAccessRoute('/menu-bom', 'MANAGER')).toBe(false);
+    expect(canAccessRoute('/menu-bom', 'MANAGER')).toBe(true);
+    expect(canAccessRoute('/menu-bom', 'WAITER')).toBe(false);
     expect(canAccessRoute('/menu-bom', null)).toBe(false);
+    expect(canAccessRoute('/users', 'OWNER')).toBe(true);
+    expect(canAccessRoute('/users', 'MANAGER')).toBe(true);
+    expect(canAccessRoute('/users', 'CASHIER')).toBe(false);
+    expect(canAccessRoute('/users', 'WAITER')).toBe(false);
+    expect(canAccessRoute('/ai-hub', 'OWNER')).toBe(true);
+    expect(canAccessRoute('/ai-hub', 'MANAGER')).toBe(false);
 
     // Manager routes
     expect(canAccessRoute('/dashboard', 'MANAGER')).toBe(true);
@@ -78,8 +85,24 @@ describe('Frontend RBAC Permission Catalog & Route Guards', () => {
     expect(canAccessRoute('/waiter', 'WAITER')).toBe(true);
     expect(canAccessRoute('/waiter', 'CHEF')).toBe(false);
 
-    // Staff portal
+    // Staff portal & Personal Profile
     expect(canAccessRoute('/staff/schedule', 'STAFF')).toBe(true);
     expect(canAccessRoute('/staff/schedule', null)).toBe(false);
+    expect(canAccessRoute('/profile', 'OWNER')).toBe(true);
+    expect(canAccessRoute('/profile', 'MANAGER')).toBe(true);
+    expect(canAccessRoute('/profile', 'CASHIER')).toBe(true);
+    expect(canAccessRoute('/profile', 'CHEF')).toBe(true);
+    expect(canAccessRoute('/profile', 'WAITER')).toBe(true);
+    expect(canAccessRoute('/profile', 'STAFF')).toBe(true);
+    expect(canAccessRoute('/profile', null)).toBe(false);
+  });
+
+  it('xác thực nguyên tắc Zero-Trust: chỉ OWNER có quyền thêm/sửa/xóa catalog (MENU_CATALOG_CREATE_UPDATE)', () => {
+    expect(hasPermission('OWNER', PERMISSIONS.MENU_CATALOG_CREATE_UPDATE)).toBe(true);
+    expect(hasPermission('MANAGER', PERMISSIONS.MENU_CATALOG_CREATE_UPDATE)).toBe(false);
+    expect(hasPermission('CASHIER', PERMISSIONS.MENU_CATALOG_CREATE_UPDATE)).toBe(false);
+    expect(hasPermission('CHEF', PERMISSIONS.MENU_CATALOG_CREATE_UPDATE)).toBe(false);
+    expect(hasPermission('WAITER', PERMISSIONS.MENU_CATALOG_CREATE_UPDATE)).toBe(false);
+    expect(hasPermission('STAFF', PERMISSIONS.MENU_CATALOG_CREATE_UPDATE)).toBe(false);
   });
 });

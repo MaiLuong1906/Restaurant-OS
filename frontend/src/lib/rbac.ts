@@ -286,15 +286,17 @@ export function hasAnyPermission(
  * Quy tắc bảo vệ đường dẫn (Route Access Rules) dùng chung cho Middleware và RoleGuard.
  */
 export const ROUTE_REQUIRED_PERMISSIONS: { prefix: string; anyOf: PermissionCode[]; allowKds?: boolean }[] = [
+  // Khối Owner & Manager chung
+  { prefix: '/menu-bom', anyOf: [PERMISSIONS.MENU_BOM_RECIPE_VIEW, PERMISSIONS.MENU_AVAILABILITY_UPDATE] },
   // Khối Owner-only
   { prefix: '/pnl', anyOf: [PERMISSIONS.REPORT_FINANCE_PNL_BCG_VIEW] },
   { prefix: '/bcg', anyOf: [PERMISSIONS.REPORT_FINANCE_PNL_BCG_VIEW] },
   { prefix: '/payroll', anyOf: [PERMISSIONS.HR_PAYROLL_TIP_POOL_APPROVE] },
-  { prefix: '/menu-bom', anyOf: [PERMISSIONS.MENU_CATALOG_CREATE_UPDATE, PERMISSIONS.MENU_BOM_RECIPE_UPDATE] },
-  { prefix: '/ai-hub', anyOf: [PERMISSIONS.SYS_STORE_PROFILE_LAN_UPDATE, PERMISSIONS.AI_VOICE_FORECAST_SENTIMENT_EXECUTE] },
-  // Khối Admin / Manager vận hành
-  { prefix: '/dashboard', anyOf: [PERMISSIONS.REPORT_OPERATIONS_KPI_VIEW] },
+  { prefix: '/ai-hub', anyOf: [PERMISSIONS.SYS_STORE_PROFILE_LAN_UPDATE] },
   { prefix: '/users', anyOf: [PERMISSIONS.USER_ACCOUNT_VIEW] },
+  // Khối Admin / Manager vận hành
+  { prefix: '/profile', anyOf: [PERMISSIONS.REPORT_OPERATIONS_KPI_VIEW, PERMISSIONS.AUTH_STAFF_PORTAL_EXECUTE] },
+  { prefix: '/dashboard', anyOf: [PERMISSIONS.REPORT_OPERATIONS_KPI_VIEW] },
   { prefix: '/tables', anyOf: [PERMISSIONS.TABLE_FLOOR_LAYOUT_UPDATE] },
   { prefix: '/bills', anyOf: [PERMISSIONS.POS_BILL_REFUND_VOID_APPROVE, PERMISSIONS.POS_BILL_VIEW] },
   { prefix: '/cash', anyOf: [PERMISSIONS.POS_CASH_SHIFT_APPROVE, PERMISSIONS.POS_PETTY_CASH_APPROVE] },
