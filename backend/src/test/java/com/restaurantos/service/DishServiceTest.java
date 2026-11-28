@@ -3,6 +3,8 @@ package com.restaurantos.service;
 import com.restaurantos.common.dto.PageResponse;
 import com.restaurantos.common.dto.dish.ComboItemRequest;
 import com.restaurantos.common.dto.dish.CreateDishRequest;
+import com.restaurantos.common.dto.dish.DishOptionGroupDto;
+import com.restaurantos.common.dto.dish.DishOptionItemDto;
 import com.restaurantos.common.dto.dish.DishResponseDto;
 import com.restaurantos.common.dto.dish.UpdateDishAvailabilityRequest;
 import com.restaurantos.common.dto.dish.UpdateDishRequest;
@@ -42,6 +44,9 @@ class DishServiceTest {
 
     @Mock
     private DishComboRepository dishComboRepository;
+
+    @org.mockito.Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
     @InjectMocks
     private DishServiceImpl dishService;
@@ -356,5 +361,228 @@ class DishServiceTest {
 
         assertThat(ex.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST);
         assertThat(ex.getReason()).contains("trùng lặp dishId");
+    }
+
+    // =========================================================================
+    // Tests for Dish Options & Modifiers (UC_MGR_01 & Review Feedback #53)
+    // =========================================================================
+
+    private List<DishOptionGroupDto> createSampleOptions() {
+        return List.of(
+                new DishOptionGroupDto(
+                        "grp_size",
+                        "Kích cỡ",
+                        true,
+                        1,
+                        1,
+                        List.of(
+                                new DishOptionItemDto("opt_regular", "Vừa", 0L, true, true),
+                                new DishOptionItemDto("opt_large", "Lớn", 30000L, false, true)
+                        )
+                ),
+                new DishOptionGroupDto(
+                        "grp_topping",
+                        "Topping thêm",
+                        false,
+                        0,
+                        3,
+                        List.of(
+                                new DishOptionItemDto("opt_egg", "Trứng ốp la", 15000L, false, true),
+                                new DishOptionItemDto("opt_cheese", "Phô mai", 20000L, false, true)
+                        )
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("Tạo món kèm nhóm tùy chọn thành công và serialize JSONB chính xác")
+    void createDish_WithOptions_Success() {
+        List<DishOptionGroupDto> options = createSampleOptions();
+        CreateDishRequest request = new CreateDishRequest(
+                "Phở Bò Đặc Biệt",
+                "Phở bò kèm các tùy chọn",
+                85000L,
+                "MAIN",
+                "https://example.com/pho.jpg",
+                true,
+                false,
+                null,
+                options
+        );
+
+        when(dishRepository.existsByNameIgnoreCase("Phở Bò Đặc Biệt")).thenReturn(false);
+        when(dishRepository.save(any(DishEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DishResponseDto result = dishService.createDish(request);
+
+        assertThat(result).isNotNull();
+        assertThat(result.name()).isEqualTo("Phở Bò Đặc Biệt");
+        assertThat(result.optionGroups()).hasSize(2);
+        assertThat(result.optionGroups().get(0).name()).isEqualTo("Kích cỡ");
+        assertThat(result.optionGroups().get(0).items()).hasSize(2);
+        assertThat(result.optionGroups().get(1).name()).isEqualTo("Topping thêm");
+
+        verify(dishRepository).save(argThat(entity -> {
+            assertThat(entity.getOptions()).contains("grp_size");
+            assertThat(entity.getOptions()).contains("Kích cỡ");
+            assertThat(entity.getOptions()).contains("grp_topping");
+            return true;
+        }));
+    }
+
+    @Test
+    @DisplayName("getDishById trả về đầy đủ nhóm tùy chọn đã lưu (Round-trip)")
+    void getDishById_WithOptions_Success() throws Exception {
+        String jsonOptions = objectMapper.writeValueAsString(createSampleOptions());
+        sampleDish.setOptions(jsonOptions);
+
+        when(dishRepository.findById(sampleId)).thenReturn(Optional.of(sampleDish));
+
+        DishResponseDto result = dishService.getDishById(sampleId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.optionGroups()).hasSize(2);
+        assertThat(result.optionGroups().get(0).id()).isEqualTo("grp_size");
+        assertThat(result.optionGroups().get(0).items().get(1).extraPrice()).isEqualTo(30000L);
+    }
+
+    @Test
+    @DisplayName("Cập nhật món: options null thì giữ nguyên danh sách cũ")
+    void updateDish_KeepExistingOptions_WhenOptionsIsNull() throws Exception {
+        String originalJson = objectMapper.writeValueAsString(createSampleOptions());
+        sampleDish.setOptions(originalJson);
+
+        when(dishRepository.findById(sampleId)).thenReturn(Optional.of(sampleDish));
+        when(dishRepository.existsByNameIgnoreCaseAndIdNot(any(), eq(sampleId))).thenReturn(false);
+        when(dishRepository.save(any(DishEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateDishRequest keepReq = new UpdateDishRequest(
+                "Tên mới", "Mô tả mới", 500000L, "MAIN", null, true, false, null, null, null
+        );
+        DishResponseDto keepRes = dishService.updateDish(sampleId, keepReq);
+        assertThat(keepRes.optionGroups()).hasSize(2);
+        assertThat(sampleDish.getOptions()).isEqualTo(originalJson);
+    }
+
+    @Test
+    @DisplayName("Cập nhật món: options rỗng [] thì xóa sạch options (lưu '[]')")
+    void updateDish_ClearOptions_WhenOptionsIsEmptyList() throws Exception {
+        String originalJson = objectMapper.writeValueAsString(createSampleOptions());
+        sampleDish.setOptions(originalJson);
+
+        when(dishRepository.findById(sampleId)).thenReturn(Optional.of(sampleDish));
+        when(dishRepository.existsByNameIgnoreCaseAndIdNot(any(), eq(sampleId))).thenReturn(false);
+        when(dishRepository.save(any(DishEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateDishRequest clearReq = new UpdateDishRequest(
+                "Tên mới", "Mô tả mới", 500000L, "MAIN", null, true, false, null, null, List.of()
+        );
+        DishResponseDto clearRes = dishService.updateDish(sampleId, clearReq);
+        assertThat(clearRes.optionGroups()).isEmpty();
+        verify(dishRepository).save(argThat(entity -> "[]".equals(entity.getOptions())));
+    }
+
+    @Test
+    @DisplayName("Cập nhật món: options mới thì thay thế options")
+    void updateDish_ReplaceOptions_WhenNewOptionsProvided() throws Exception {
+        String originalJson = objectMapper.writeValueAsString(createSampleOptions());
+        sampleDish.setOptions(originalJson);
+
+        when(dishRepository.findById(sampleId)).thenReturn(Optional.of(sampleDish));
+        when(dishRepository.existsByNameIgnoreCaseAndIdNot(any(), eq(sampleId))).thenReturn(false);
+        when(dishRepository.save(any(DishEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<DishOptionGroupDto> newOptions = List.of(
+                new DishOptionGroupDto("grp_ice", "Đá", false, 0, 1, List.of(
+                        new DishOptionItemDto("opt_ice_100", "100% Đá", 0L, true, true)
+                ))
+        );
+        UpdateDishRequest updateReq = new UpdateDishRequest(
+                "Tên mới", "Mô tả mới", 500000L, "MAIN", null, true, false, null, null, newOptions
+        );
+        DishResponseDto updateRes = dishService.updateDish(sampleId, updateReq);
+        assertThat(updateRes.optionGroups()).hasSize(1);
+        assertThat(updateRes.optionGroups().get(0).name()).isEqualTo("Đá");
+        verify(dishRepository).save(argThat(entity -> entity.getOptions().contains("grp_ice")));
+    }
+
+    @Test
+    @DisplayName("updateAvailability bảo toàn optionGroups đầy đủ (Regression test cho Must-fix 1)")
+    void updateAvailability_PreservesOptionGroups() throws Exception {
+        String jsonOptions = objectMapper.writeValueAsString(createSampleOptions());
+        sampleDish.setOptions(jsonOptions);
+
+        when(dishRepository.findById(sampleId)).thenReturn(Optional.of(sampleDish));
+        when(dishRepository.save(any(DishEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateDishAvailabilityRequest req = new UpdateDishAvailabilityRequest(false, "Hết nguyên liệu");
+        DishResponseDto result = dishService.updateAvailability(sampleId, req);
+
+        assertThat(result.isAvailable()).isFalse();
+        assertThat(result.soldOutReason()).isEqualTo("Hết nguyên liệu");
+        assertThat(result.optionGroups()).hasSize(2);
+        assertThat(result.optionGroups().get(0).name()).isEqualTo("Kích cỡ");
+    }
+
+    @Test
+    @DisplayName("Validation ném 400 Bad Request cho các trường hợp options không hợp lệ")
+    void validateOptions_InvalidScenarios_ThrowsBadRequest() {
+        when(dishRepository.existsByNameIgnoreCase("Test")).thenReturn(false);
+
+        // 1. extraPrice âm
+        CreateDishRequest negPriceReq = new CreateDishRequest(
+                "Test", null, 50000L, "MAIN", null, true, false, null,
+                List.of(new DishOptionGroupDto("g1", "Nhóm", false, 0, 1,
+                        List.of(new DishOptionItemDto("i1", "Item", -5000L, false, true))))
+        );
+        assertThatThrownBy(() -> dishService.createDish(negPriceReq))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Giá phụ thu không được âm");
+
+        // 2. minSelections > maxSelections
+        CreateDishRequest minMaxReq = new CreateDishRequest(
+                "Test", null, 50000L, "MAIN", null, true, false, null,
+                List.of(new DishOptionGroupDto("g1", "Nhóm", false, 3, 2,
+                        List.of(new DishOptionItemDto("i1", "Item", 0L, false, true))))
+        );
+        assertThatThrownBy(() -> dishService.createDish(minMaxReq))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("maxSelections không được nhỏ hơn minSelections");
+
+        // 3. Trùng ID nhóm
+        CreateDishRequest dupGroupReq = new CreateDishRequest(
+                "Test", null, 50000L, "MAIN", null, true, false, null,
+                List.of(
+                        new DishOptionGroupDto("dup_g", "Nhóm 1", false, 0, 1, List.of(new DishOptionItemDto("i1", "Item", 0L, false, true))),
+                        new DishOptionGroupDto("dup_g", "Nhóm 2", false, 0, 1, List.of(new DishOptionItemDto("i2", "Item", 0L, false, true)))
+                )
+        );
+        assertThatThrownBy(() -> dishService.createDish(dupGroupReq))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Trùng ID nhóm tùy chọn");
+
+        // 4. Trùng ID item trong cùng 1 nhóm
+        CreateDishRequest dupItemReq = new CreateDishRequest(
+                "Test", null, 50000L, "MAIN", null, true, false, null,
+                List.of(new DishOptionGroupDto("g1", "Nhóm", false, 0, 1, List.of(
+                        new DishOptionItemDto("dup_i", "Item 1", 0L, false, true),
+                        new DishOptionItemDto("dup_i", "Item 2", 0L, false, true)
+                )))
+        );
+        assertThatThrownBy(() -> dishService.createDish(dupItemReq))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Trùng ID lựa chọn");
+
+        // 5. maxSelections == 1 nhưng có nhiều hơn 1 default
+        CreateDishRequest multiDefReq = new CreateDishRequest(
+                "Test", null, 50000L, "MAIN", null, true, false, null,
+                List.of(new DishOptionGroupDto("g1", "Nhóm", false, 0, 1, List.of(
+                        new DishOptionItemDto("i1", "Item 1", 0L, true, true),
+                        new DishOptionItemDto("i2", "Item 2", 0L, true, true)
+                )))
+        );
+        assertThatThrownBy(() -> dishService.createDish(multiDefReq))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("không được có quá 1 lựa chọn mặc định");
     }
 }

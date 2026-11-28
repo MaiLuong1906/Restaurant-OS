@@ -1,9 +1,13 @@
 package com.restaurantos.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurantos.common.dto.PageResponse;
 import com.restaurantos.common.dto.dish.ComboItemRequest;
 import com.restaurantos.common.dto.dish.ComboItemResponse;
 import com.restaurantos.common.dto.dish.CreateDishRequest;
+import com.restaurantos.common.dto.dish.DishOptionGroupDto;
+import com.restaurantos.common.dto.dish.DishOptionItemDto;
 import com.restaurantos.common.dto.dish.DishResponseDto;
 import com.restaurantos.common.dto.dish.UpdateDishAvailabilityRequest;
 import com.restaurantos.common.dto.dish.UpdateDishRequest;
@@ -36,12 +40,46 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DishServiceImpl implements DishService {
 
     private final DishRepository dishRepository;
     private final DishComboRepository dishComboRepository;
+    private final ObjectMapper objectMapper;
+
+    public DishServiceImpl(
+            DishRepository dishRepository,
+            DishComboRepository dishComboRepository,
+            ObjectMapper objectMapper
+    ) {
+        this.dishRepository = dishRepository;
+        this.dishComboRepository = dishComboRepository;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
+
+    private List<DishOptionGroupDto> parseOptions(String optionsJson) {
+        if (optionsJson == null || optionsJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(optionsJson, new TypeReference<List<DishOptionGroupDto>>() {});
+        } catch (Exception e) {
+            log.warn("Lỗi parse JSON options món ăn: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private String serializeOptions(List<DishOptionGroupDto> options) {
+        if (options == null || options.isEmpty()) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(options);
+        } catch (Exception e) {
+            log.warn("Lỗi serialize options sang JSON: {}", e.getMessage());
+            return "[]";
+        }
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -54,7 +92,11 @@ public class DishServiceImpl implements DishService {
                 pageable
         );
 
-        return PageResponse.from(dishPage, d -> DishResponseDto.fromEntity(d, Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList()));
+        return PageResponse.from(dishPage, d -> DishResponseDto.fromEntity(
+                d,
+                Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList(),
+                parseOptions(d.getOptions())
+        ));
     }
 
     @Override
@@ -64,7 +106,11 @@ public class DishServiceImpl implements DishService {
                 normalizeFilter(category),
                 normalizeSearch(search),
                 isAvailable
-        ).stream().map(d -> DishResponseDto.fromEntity(d, Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList())).toList();
+        ).stream().map(d -> DishResponseDto.fromEntity(
+                d,
+                Boolean.TRUE.equals(d.getIsCombo()) ? loadComboItems(d.getId()) : Collections.emptyList(),
+                parseOptions(d.getOptions())
+        )).toList();
     }
 
     @Override
@@ -72,7 +118,11 @@ public class DishServiceImpl implements DishService {
     public DishResponseDto getDishById(UUID id) {
         DishEntity dish = dishRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy món ăn với ID: " + id));
-        return DishResponseDto.fromEntity(dish, Boolean.TRUE.equals(dish.getIsCombo()) ? loadComboItems(dish.getId()) : Collections.emptyList());
+        return DishResponseDto.fromEntity(
+                dish,
+                Boolean.TRUE.equals(dish.getIsCombo()) ? loadComboItems(dish.getId()) : Collections.emptyList(),
+                parseOptions(dish.getOptions())
+        );
     }
 
     @Override
@@ -87,6 +137,8 @@ public class DishServiceImpl implements DishService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Danh mục không hợp lệ: '" + request.category() + "'. Danh mục hợp lệ: " + Arrays.toString(DishCategory.values())));
 
+        validateAndNormalizeOptions(request.options());
+
         Instant now = Instant.now();
         DishEntity dish = DishEntity.builder()
                 .id(UUID.randomUUID())
@@ -99,6 +151,7 @@ public class DishServiceImpl implements DishService {
                 .isAvailable(request.isAvailable() != null ? request.isAvailable() : true)
                 .isCombo(request.isCombo() != null ? request.isCombo() : false)
                 .soldOutReason(Boolean.FALSE.equals(request.isAvailable()) ? "Tạm ngưng phục vụ" : null)
+                .options(serializeOptions(request.options()))
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -113,7 +166,7 @@ public class DishServiceImpl implements DishService {
         log.info("Đã tạo mới món ăn ID: {}, Tên: '{}', Giá: {} VND, Danh mục: {}, isCombo: {}",
                 saved.getId(), saved.getName(), saved.getPrice(), saved.getCategory(), saved.getIsCombo());
 
-        return DishResponseDto.fromEntity(saved, comboItems);
+        return DishResponseDto.fromEntity(saved, comboItems, parseOptions(saved.getOptions()));
     }
 
     @Override
@@ -151,6 +204,11 @@ public class DishServiceImpl implements DishService {
             dish.setIsCombo(request.isCombo());
         }
 
+        if (request.options() != null) {
+            validateAndNormalizeOptions(request.options());
+            dish.setOptions(serializeOptions(request.options()));
+        }
+
         dish.setUpdatedAt(Instant.now());
         DishEntity updated = dishRepository.save(dish);
 
@@ -166,7 +224,7 @@ public class DishServiceImpl implements DishService {
 
         log.info("Đã cập nhật món ăn ID: {}, Tên: '{}', Giá: {} VND", updated.getId(), updated.getName(), updated.getPrice());
 
-        return DishResponseDto.fromEntity(updated, comboItems);
+        return DishResponseDto.fromEntity(updated, comboItems, parseOptions(updated.getOptions()));
     }
 
     @Override
@@ -190,7 +248,7 @@ public class DishServiceImpl implements DishService {
                 updated.getId(), updated.getIsAvailable(), updated.getSoldOutReason());
 
         List<ComboItemResponse> comboItems = Boolean.TRUE.equals(updated.getIsCombo()) ? loadComboItems(id) : Collections.emptyList();
-        return DishResponseDto.fromEntity(updated, comboItems);
+        return DishResponseDto.fromEntity(updated, comboItems, parseOptions(updated.getOptions()));
     }
 
     @Override
@@ -292,5 +350,68 @@ public class DishServiceImpl implements DishService {
             return null;
         }
         return search.trim();
+    }
+
+    private void validateAndNormalizeOptions(List<DishOptionGroupDto> options) {
+        if (options == null || options.isEmpty()) {
+            return;
+        }
+
+        Set<String> groupIds = new HashSet<>();
+        for (DishOptionGroupDto group : options) {
+            if (group.id() == null || group.id().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID nhóm tùy chọn không được để trống");
+            }
+            if (!groupIds.add(group.id())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trùng ID nhóm tùy chọn: " + group.id());
+            }
+            if (group.name() == null || group.name().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên nhóm tùy chọn không được để trống");
+            }
+
+            int minSel = group.minSelections() != null ? group.minSelections() : (Boolean.TRUE.equals(group.isRequired()) ? 1 : 0);
+            int maxSel = group.maxSelections() != null ? group.maxSelections() : 1;
+
+            if (minSel < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minSelections không được nhỏ hơn 0");
+            }
+            if (maxSel < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxSelections phải từ 1 trở lên");
+            }
+            if (maxSel < minSel) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxSelections không được nhỏ hơn minSelections");
+            }
+            if (Boolean.TRUE.equals(group.isRequired()) && minSel < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nhóm bắt buộc chọn phải có minSelections >= 1");
+            }
+
+            if (group.items() == null || group.items().isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nhóm tùy chọn '" + group.name() + "' phải có ít nhất 1 lựa chọn con");
+            }
+
+            Set<String> itemIds = new HashSet<>();
+            int defaultCount = 0;
+            for (DishOptionItemDto item : group.items()) {
+                if (item.id() == null || item.id().isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID lựa chọn không được để trống");
+                }
+                if (!itemIds.add(item.id())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trùng ID lựa chọn trong cùng một nhóm: " + item.id());
+                }
+                if (item.name() == null || item.name().isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên lựa chọn con không được để trống");
+                }
+                if (item.extraPrice() == null || item.extraPrice() < 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Giá phụ thu không được âm");
+                }
+                if (Boolean.TRUE.equals(item.isDefault())) {
+                    defaultCount++;
+                }
+            }
+
+            if (maxSel == 1 && defaultCount > 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nhóm chọn 1 duy nhất không được có quá 1 lựa chọn mặc định");
+            }
+        }
     }
 }

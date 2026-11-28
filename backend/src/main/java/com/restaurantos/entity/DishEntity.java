@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -49,6 +51,10 @@ public class DishEntity {
 
     @Column(name = "sold_out_reason")
     private String soldOutReason;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "options", columnDefinition = "jsonb")
+    private String options;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

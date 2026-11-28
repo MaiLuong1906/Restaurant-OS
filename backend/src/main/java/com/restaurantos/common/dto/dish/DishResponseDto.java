@@ -45,13 +45,35 @@ public record DishResponseDto(
         Instant updatedAt,
 
         @Schema(description = "Danh sách món con cấu thành nếu là món Combo")
-        java.util.List<ComboItemResponse> comboItems
+        java.util.List<ComboItemResponse> comboItems,
+
+        @Schema(description = "Danh sách các nhóm tùy chọn (Kích cỡ, Độ cay, Topping)")
+        java.util.List<DishOptionGroupDto> optionGroups
 ) {
-    public static DishResponseDto fromEntity(DishEntity entity) {
-        return fromEntity(entity, null);
+    // Secondary constructor giữ tương thích ngược với code cũ và unit tests
+    public DishResponseDto(
+            UUID id,
+            String name,
+            String description,
+            Long price,
+            String category,
+            UUID categoryId,
+            String imageUrl,
+            Boolean isAvailable,
+            Boolean isCombo,
+            String soldOutReason,
+            Instant createdAt,
+            Instant updatedAt,
+            java.util.List<ComboItemResponse> comboItems
+    ) {
+        this(id, name, description, price, category, categoryId, imageUrl, isAvailable, isCombo, soldOutReason, createdAt, updatedAt, comboItems, java.util.Collections.emptyList());
     }
 
-    public static DishResponseDto fromEntity(DishEntity entity, java.util.List<ComboItemResponse> comboItems) {
+    public static DishResponseDto fromEntity(
+            DishEntity entity,
+            java.util.List<ComboItemResponse> comboItems,
+            java.util.List<DishOptionGroupDto> optionGroups
+    ) {
         if (entity == null) {
             return null;
         }
@@ -68,7 +90,8 @@ public record DishResponseDto(
                 entity.getSoldOutReason(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
-                comboItems != null ? comboItems : java.util.Collections.emptyList()
+                comboItems != null ? comboItems : java.util.Collections.emptyList(),
+                optionGroups != null ? optionGroups : java.util.Collections.emptyList()
         );
     }
 }

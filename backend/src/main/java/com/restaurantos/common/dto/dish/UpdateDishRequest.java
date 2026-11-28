@@ -39,6 +39,24 @@ public record UpdateDishRequest(
         String soldOutReason,
 
         @Schema(description = "Danh sách món con cấu thành nếu là món Combo")
-        java.util.List<ComboItemRequest> comboItems
+        java.util.List<ComboItemRequest> comboItems,
+
+        @Schema(description = "Danh sách các nhóm tùy chọn (Kích cỡ, Độ cay, Topping)")
+        @com.fasterxml.jackson.annotation.JsonAlias({"optionGroups", "options"})
+        java.util.List<@jakarta.validation.Valid DishOptionGroupDto> options
 ) {
+    // Secondary constructor giữ tương thích ngược với code cũ và unit tests
+    public UpdateDishRequest(
+            String name,
+            String description,
+            Long price,
+            String category,
+            String imageUrl,
+            Boolean isAvailable,
+            Boolean isCombo,
+            String soldOutReason,
+            java.util.List<ComboItemRequest> comboItems
+    ) {
+        this(name, description, price, category, imageUrl, isAvailable, isCombo, soldOutReason, comboItems, null);
+    }
 }
