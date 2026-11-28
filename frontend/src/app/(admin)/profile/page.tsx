@@ -78,7 +78,7 @@ function ProfileContent() {
           setPayslips(ps);
           setTipMonths(tms);
         }
-      } catch (err: unknown) {
+      } catch {
         if (isMounted) {
           setPayrollError('Không thể tải thông tin phiếu lương. Vui lòng thử lại sau.');
         }
