@@ -4,11 +4,11 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import {
-  PHO_CO_DISHES,
   CustomerDish,
   FALLBACK_DISH_IMAGE,
   triggerHaptic,
 } from '@/lib/customer-menu-data';
+import { customerMenuService } from '@/services/customerMenuService';
 import { formatVND } from '@/lib/utils';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import {
@@ -35,6 +35,9 @@ import {
   Coffee,
   Cake,
   X,
+  AlertCircle,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 type CategoryFilter = 'ALL' | 'APPETIZER' | 'MAIN' | 'SOUP' | 'DESSERT' | 'DRINK';
@@ -106,6 +109,45 @@ function MenuCustomerContent() {
     useState<CustomerDish | null>(null);
   const [isCallStaffOpen, setIsCallStaffOpen] = useState(false);
 
+  // Danh sách thực đơn kết nối API thật từ Backend
+  const [dishes, setDishes] = useState<CustomerDish[]>([]);
+  const [loadingDishes, setLoadingDishes] = useState(true);
+  const [menuError, setMenuError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const fetchDishes = async () => {
+    setLoadingDishes(true);
+    setMenuError(null);
+    try {
+      const data = await customerMenuService.getPublicDishes();
+      setDishes(data || []);
+    } catch {
+      setMenuError('Không thể đồng bộ thực đơn từ máy chủ nhà hàng. Vui lòng thử lại.');
+    } finally {
+      setLoadingDishes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDishes();
+
+    // Reconnect sync khi user quay lại tab hoặc kết nối mạng phục hồi
+    const handleSync = () => {
+      fetchDishes();
+    };
+
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('online', handleSync);
+    return () => {
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('online', handleSync);
+    };
+  }, []);
+
   useEffect(() => {
     if (urlTab === 'search') {
       setActiveTab('search');
@@ -124,10 +166,10 @@ function MenuCustomerContent() {
     getPlacedItemCount,
   } = useCartStore();
 
-  const displayTable = tableNumber || 'Bàn 04';
-  const cartCount = getTotalItemCount();
-  const cartTotal = getTotalAmount();
-  const placedCount = getPlacedItemCount();
+  const displayTable = mounted ? (tableNumber || 'Bàn 04') : 'Bàn 04';
+  const cartCount = mounted ? getTotalItemCount() : 0;
+  const cartTotal = mounted ? getTotalAmount() : 0;
+  const placedCount = mounted ? getPlacedItemCount() : 0;
 
   const handleTabChange = (tab: CustomerTabKey) => {
     setActiveTab(tab);
@@ -139,7 +181,7 @@ function MenuCustomerContent() {
   };
 
   // Filter dishes for Menu view
-  const menuDishes = PHO_CO_DISHES.filter((dish) => {
+  const menuDishes = dishes.filter((dish) => {
     if (activeCategory !== 'ALL' && dish.subCategory !== activeCategory) {
       return false;
     }
@@ -154,7 +196,7 @@ function MenuCustomerContent() {
   });
 
   // Filter dishes for Search & Discovery view
-  const searchResults = PHO_CO_DISHES.filter((dish) => {
+  const searchResults = dishes.filter((dish) => {
     if (activeMood === 'VEG' && !dish.isVegetarian) return false;
     if (activeMood === 'SPICY' && !dish.isSpicy) return false;
     if (activeMood === 'HOT_SOUP' && !dish.isHotSoup) return false;
@@ -187,16 +229,19 @@ function MenuCustomerContent() {
   };
 
   const renderDishCard = (dish: CustomerDish) => {
-    const qtyInCart = getDishQuantityInCart(dish.id);
+    const qtyInCart = mounted ? getDishQuantityInCart(dish.id) : 0;
+    const isAvailable = dish.isAvailable !== false;
 
     return (
       <article
         key={dish.id}
         onClick={() => setSelectedDishForDetail(dish)}
-        className={`gpu-accelerated cursor-pointer rounded-2xl bg-white p-3 shadow-[0_2px_8px_-2px_rgba(41,37,36,0.06)] transition-all flex gap-3 items-center border ${
-          qtyInCart > 0
-            ? 'border-[#9a401c]/50 ring-1 ring-[#9a401c]/20'
-            : 'border-[#dcc1b8]/40 hover:border-[#9a401c]/30'
+        className={`gpu-accelerated cursor-pointer rounded-2xl p-3 transition-all flex gap-3 items-center border ${
+          !isAvailable
+            ? 'bg-stone-50/80 border-stone-200 opacity-65'
+            : qtyInCart > 0
+              ? 'bg-white border-[#9a401c]/50 ring-1 ring-[#9a401c]/20 shadow-[0_2px_8px_-2px_rgba(41,37,36,0.06)]'
+              : 'bg-white border-[#dcc1b8]/40 hover:border-[#9a401c]/30 shadow-[0_2px_8px_-2px_rgba(41,37,36,0.06)]'
         }`}
       >
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-[#f5ecea]">
@@ -209,11 +254,15 @@ function MenuCustomerContent() {
             onError={(e) => {
               e.currentTarget.src = FALLBACK_DISH_IMAGE;
             }}
-            className="h-full w-full object-cover"
+            className={`h-full w-full object-cover ${!isAvailable ? 'grayscale-[35%]' : ''}`}
           />
-          {dish.badge ? (
+          {!isAvailable ? (
+            <span className="absolute top-1.5 left-1.5 flex items-center rounded-md bg-stone-700/90 px-2 py-0.5 text-xs font-bold text-white shadow-xs tracking-tight uppercase whitespace-nowrap z-10">
+              Hết món
+            </span>
+          ) : dish.badge ? (
             <span
-              className={`absolute top-1 left-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
+              className={`absolute top-1.5 left-1.5 flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold tracking-tight uppercase shadow-xs whitespace-nowrap z-10 ${
                 dish.badgeVariant === 'recommend'
                   ? 'bg-[#00873a] text-white'
                   : dish.badgeVariant === 'bestseller'
@@ -229,27 +278,34 @@ function MenuCustomerContent() {
               {dish.badgeVariant === 'recommend' && (
                 <Sparkles className="h-2.5 w-2.5" />
               )}
-              <span>{dish.badge}</span>
+              {dish.badgeVariant === 'special' && (
+                <Utensils className="h-2.5 w-2.5" />
+              )}
+              <span>{dish.badge?.toLowerCase().includes('combo') ? 'Combo' : dish.badge}</span>
             </span>
           ) : null}
         </div>
 
-        <div className="flex h-24 min-w-0 flex-1 flex-col justify-between py-0.5">
+        <div className="flex min-h-[96px] min-w-0 flex-1 flex-col justify-between py-0.5">
           <div>
-            <h3 className="truncate font-display text-sm font-bold text-[#1e1b1a]">
+            <h3 className={`line-clamp-2 leading-snug font-display text-sm font-bold ${!isAvailable ? 'text-stone-500 line-through' : 'text-[#1e1b1a]'}`}>
               {dish.name}
             </h3>
-            <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-[#56423c]">
+            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[#56423c]">
               {dish.description}
             </p>
           </div>
 
           <div className="mt-auto flex items-center justify-between pt-1">
-            <span className="ops-nums font-display text-sm font-extrabold text-[#9a401c]">
+            <span className={`ops-nums font-display text-sm font-extrabold ${!isAvailable ? 'text-stone-500' : 'text-[#9a401c]'}`}>
               {formatVND(dish.price)}
             </span>
 
-            {qtyInCart > 0 ? (
+            {!isAvailable ? (
+              <span className="inline-flex min-h-[30px] items-center rounded-full bg-stone-200 px-2.5 py-1 text-xs font-semibold text-stone-600">
+                Tạm hết
+              </span>
+            ) : qtyInCart > 0 ? (
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="flex items-center rounded-full bg-[#efe6e4] p-0.5 shadow-inner"
@@ -335,9 +391,11 @@ function MenuCustomerContent() {
                   <Utensils className="h-3.5 w-3.5 text-[#9a401c]" />
                   <span>Đang phục vụ {displayTable} • Tầng 1</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#00873a]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#00873a]" />
-                  <span>Bếp sẵn sàng</span>
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <span className={`h-1.5 w-1.5 rounded-full ${loadingDishes ? 'bg-amber-500 animate-pulse' : menuError ? 'bg-rose-500' : 'bg-[#00873a]'}`} />
+                  <span className={loadingDishes ? 'text-amber-700' : menuError ? 'text-rose-700' : 'text-[#00873a]'}>
+                    {loadingDishes ? 'Đang đồng bộ thực đơn...' : menuError ? 'Mất kết nối' : 'Bếp sẵn sàng'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -349,13 +407,13 @@ function MenuCustomerContent() {
                   {
                     id: 'ALL',
                     label: 'Tất cả',
-                    count: PHO_CO_DISHES.length,
+                    count: dishes.length,
                     icon: Utensils,
                   },
                   {
                     id: 'APPETIZER',
                     label: 'Khai vị',
-                    count: PHO_CO_DISHES.filter(
+                    count: dishes.filter(
                       (d) => d.subCategory === 'APPETIZER'
                     ).length,
                     icon: Sparkles,
@@ -363,21 +421,21 @@ function MenuCustomerContent() {
                   {
                     id: 'MAIN',
                     label: 'Món chính',
-                    count: PHO_CO_DISHES.filter((d) => d.subCategory === 'MAIN')
+                    count: dishes.filter((d) => d.subCategory === 'MAIN')
                       .length,
                     icon: Flame,
                   },
                   {
                     id: 'SOUP',
                     label: 'Món Nước & Lẩu',
-                    count: PHO_CO_DISHES.filter((d) => d.subCategory === 'SOUP')
+                    count: dishes.filter((d) => d.subCategory === 'SOUP')
                       .length,
                     icon: Soup,
                   },
                   {
                     id: 'DESSERT',
                     label: 'Tráng miệng',
-                    count: PHO_CO_DISHES.filter(
+                    count: dishes.filter(
                       (d) => d.subCategory === 'DESSERT'
                     ).length,
                     icon: Cake,
@@ -385,7 +443,7 @@ function MenuCustomerContent() {
                   {
                     id: 'DRINK',
                     label: 'Thức uống',
-                    count: PHO_CO_DISHES.filter(
+                    count: dishes.filter(
                       (d) => d.subCategory === 'DRINK'
                     ).length,
                     icon: Coffee,
@@ -411,7 +469,7 @@ function MenuCustomerContent() {
                       <span>{cat.label}</span>
                       {cat.count ? (
                         <span
-                          className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                          className={`rounded-full px-1.5 py-0.2 text-xs font-bold ${
                             isActive
                               ? 'bg-[#ba5831] text-white'
                               : 'bg-[#efe6e4] text-[#56423c]'
@@ -449,7 +507,7 @@ function MenuCustomerContent() {
                             {sec.subtitle}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-[#ffdbcf] px-2.5 py-1 text-[11px] font-bold text-[#380d00]">
+                        <span className="shrink-0 rounded-full bg-[#ffdbcf] px-2.5 py-1 text-xs font-bold text-[#380d00]">
                           {sec.badgeText}
                         </span>
                       </div>
@@ -465,7 +523,7 @@ function MenuCustomerContent() {
                           {sec.subtitle}
                         </span>
                       </div>
-                      <span className="shrink-0 text-[11px] font-bold text-[#9a401c]">
+                      <span className="shrink-0 text-xs font-bold text-[#9a401c]">
                         {sectionDishes.length} món
                       </span>
                     </div>
@@ -477,6 +535,56 @@ function MenuCustomerContent() {
                 </section>
               );
             })}
+
+            {loadingDishes && dishes.length === 0 && (
+              <div className="py-16 px-4 text-center space-y-3">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#9a401c]" />
+                <p className="text-xs font-semibold text-[#56423c]">
+                  Đang đồng bộ thực đơn trực tiếp từ nhà hàng...
+                </p>
+              </div>
+            )}
+
+            {!loadingDishes && menuError && dishes.length === 0 && (
+              <div className="py-12 px-6 text-center space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <h3 className="font-display text-base font-bold text-[#1e1b1a]">Không thể kết nối thực đơn</h3>
+                <p className="text-xs text-[#56423c] max-w-xs mx-auto">
+                  {menuError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fetchDishes()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#9a401c] text-white font-bold text-xs shadow-md active:scale-95 transition-transform"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Thử lại</span>
+                </button>
+              </div>
+            )}
+
+            {!loadingDishes && !menuError && menuDishes.length === 0 && (
+              <div className="py-12 px-4 text-center space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f5ecea] text-[#9a401c]">
+                  <Utensils className="h-6 w-6" />
+                </div>
+                <h3 className="font-display text-base font-bold text-[#1e1b1a]">Không tìm thấy món phù hợp</h3>
+                <p className="text-xs text-[#56423c] max-w-xs mx-auto">
+                  Vui lòng thử tìm từ khóa khác hoặc đổi danh mục thực đơn.
+                </p>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="text-xs font-bold text-[#9a401c] underline"
+                  >
+                    Xóa tìm kiếm
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Reassurance & Custom Taste Note Banner */}
             <div className="px-4 pt-4 pb-2">
