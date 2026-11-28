@@ -1,9 +1,17 @@
 package com.restaurantos.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.restaurantos.common.dto.ApiResponse;
+import com.restaurantos.repository.UserRepository;
+import com.restaurantos.security.JwtAuthenticationFilter;
+import com.restaurantos.security.JwtTokenProvider;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,10 +21,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Cấu hình bảo mật tầng nền (Sprint 0 Baseline Security).
- * Khóa các endpoint nhạy cảm, chỉ mở công khai Menu QR, Health check và WebSocket handshake.
+ * Cấu hình bảo mật tầng nền (RBAC + JWT Stateless Security).
+ * Khóa các endpoint nhạy cảm, chỉ mở công khai Menu QR, Auth Login/KDS-PIN,
+ * Health check và WebSocket handshake.
  */
 @Configuration
 @EnableWebSecurity
@@ -29,48 +39,99 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            ObjectProvider<JwtTokenProvider> jwtTokenProvider,
+            ObjectProvider<UserRepository> userRepositoryProvider,
+            ObjectProvider<ObjectMapper> objectMapperProvider) throws Exception {
+        ObjectMapper objectMapper = objectMapperProvider.getIfAvailable(
+                () -> new ObjectMapper().findAndRegisterModules());
+
         http
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(Customizer.withDefaults())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                // 1. Hạ tầng kiểm tra trạng thái sống/chết (Health checks) & Xử lý lỗi (Error dispatch)
-                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info", "/error", "/error/**").permitAll()
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(
+                                    response.getWriter(),
+                                    ApiResponse.error("UNAUTHORIZED", "Vui lòng đăng nhập để truy cập tài nguyên này.", null)
+                            );
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(
+                                    response.getWriter(),
+                                    ApiResponse.error("FORBIDDEN", "Bạn không có quyền thực hiện thao tác này.", null)
+                            );
+                        })
+                )
+                .authorizeHttpRequests(auth -> auth
+                        // 1. Hạ tầng kiểm tra trạng thái sống/chết (Health checks) & Xử lý lỗi (Error
+                        // dispatch)
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info", "/error", "/error/**")
+                        .permitAll()
 
-                // 2. Tài liệu Swagger / OpenAPI 3 UI
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        // 2. Tài liệu Swagger / OpenAPI 3 UI
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
 
-                // 3. Cổng kết nối WebSocket STOMP handshake
-                .requestMatchers("/ws/**").permitAll()
+                        // 3. Cổng kết nối WebSocket STOMP handshake
+                        .requestMatchers("/ws/**").permitAll()
 
-                // 4. Menu công khai qua quét mã QR bàn (UC01, UC02)
-                .requestMatchers(HttpMethod.GET, "/api/v1/dishes/**").permitAll()
+                        // 4. Menu công khai qua quét mã QR bàn (UC01, UC02) - Chỉ cho phép GET
+                        .requestMatchers(HttpMethod.GET, "/api/v1/dishes/**").permitAll()
 
-                // 5. Xác thực người dùng (Auth endpoints)
-                .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Bếp & Quản lý cập nhật nhanh trạng thái còn/hết món (UC20)
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/dishes/*/availability")
+                        .hasAuthority("MENU:AVAILABILITY:UPDATE")
 
-                // 6. Quản trị nhân sự nội bộ (Admin User Management)
-                .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").permitAll()
+                        // 5. Xác thực người dùng (Auth endpoints): Login & KDS-PIN công khai; /me &
+                        // /verify-manager-pin yêu cầu đăng nhập
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/kds-pin").permitAll()
+                        .requestMatchers("/api/v1/auth/**").authenticated()
 
-                // 7. Quản lý ca mở & Đăng ký ca làm việc cho nhân viên (Staff Schedule - UC_STF_03)
-                .requestMatchers("/api/v1/staff/schedule/**").permitAll()
+                        // 6. KDS Bếp chính (non-local; profile local dùng KdsLocalSecurityConfig @Order(1))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/kds/**").hasAuthority("KDS:QUEUE:VIEW")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/kds/**").hasAuthority("KDS:COOKING_STATUS:UPDATE")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/kds/batches/complete").hasAuthority("KDS:COOKING_STATUS:UPDATE")
 
-                // 8. Đặt bàn & Check-in POS (UC_CASH_01, UC_CASH_02)
-                // TODO: Khi merge JWT Authentication Filter, đổi sang .hasAnyRole("CASHIER", "MANAGER", "OWNER")
-                .requestMatchers("/api/v1/reservations/**").permitAll()
-                // 8. Waiter – tạo đơn và xem đơn (tạm thời permitAll cho Sprint hiện tại)
-                .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").permitAll()
+                        // 7. Quản trị nhân sự & thực đơn (kết hợp @PreAuthorize chi tiết theo từng method)
+                        .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").authenticated()
+                        .requestMatchers("/api/v1/admin/dishes", "/api/v1/admin/dishes/**").authenticated()
 
-                // 9. Danh sách bàn & Cập nhật trạng thái bàn (Waiter & POS FloorPlan)
-                .requestMatchers(HttpMethod.GET, "/api/v1/tables/**").permitAll()
-                .requestMatchers(HttpMethod.PATCH, "/api/v1/tables/**").permitAll()
+                        // 8. Quản lý ca mở, Đơn xin nghỉ phép & Phiếu lương/Tip nhân viên (kết hợp @PreAuthorize & chống IDOR)
+                        .requestMatchers("/api/v1/staff/schedule/**", "/api/v1/staff/leaves/**", "/api/v1/staff/payroll/**", "/api/v1/admin/leaves/**").authenticated()
 
-                // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
-                .anyRequest().authenticated()
-            );
+                        // 9. Đặt bàn & Check-in POS (kết hợp @PreAuthorize chi tiết theo từng method)
+                        .requestMatchers("/api/v1/reservations/**").authenticated()
+
+                        // 10. Đơn hàng: /active & /items/*/serve bắt buộc đăng nhập đúng quyền; POST /orders & GET /orders/{id} hỗ trợ thêm Customer QR Token
+                        .requestMatchers(HttpMethod.GET, "/api/v1/orders/active").hasAuthority("ORDER:ACTIVE:VIEW")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/items/*/serve").hasAuthority("ORDER:ITEM_SERVE_EXPEDITE:UPDATE")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
+
+                        // 11. Danh sách bàn: GET /api/v1/tables & PATCH /api/v1/tables/*/status bắt buộc đăng nhập đúng quyền; GET /api/v1/tables/{id} mở cho QR bàn
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tables").hasAuthority("TABLE:FLOOR_PLAN:VIEW")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/tables/*/status").hasAuthority("TABLE:STATE:UPDATE")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tables/*").permitAll()
+
+                        // Mọi endpoint nghiệp vụ còn lại bắt buộc phải xác thực Token
+                        .anyRequest().authenticated());
+
+        JwtTokenProvider tokenProvider = jwtTokenProvider.getIfAvailable();
+        UserRepository userRepo = userRepositoryProvider.getIfAvailable();
+        if (tokenProvider != null && userRepo != null) {
+            http.addFilterBefore(
+                    new JwtAuthenticationFilter(tokenProvider, userRepo),
+                    UsernamePasswordAuthenticationFilter.class);
+        }
 
         return http.build();
     }

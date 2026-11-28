@@ -1,12 +1,113 @@
 import { create } from 'zustand';
 import {
   AllergyAlert,
+  WaiterItemProgressStatus,
   WaiterMenuItem,
   WaiterOrderItem,
   WaiterTab,
   WaiterTable,
   WaiterTableStatus,
 } from '@/types/waiter';
+import {
+  BackendDishDto,
+  BackendOrderDto,
+  BackendOrderItemDto,
+  BackendTableDto,
+  waiterApi,
+} from '../services/waiter/waiterApi';
+
+function mapBackendDishCategory(raw?: string): WaiterMenuItem['category'] {
+  const upper = (raw || '').toUpperCase();
+  if (upper.includes('APPETIZER') || upper.includes('KHAI')) return 'Khai vị';
+  if (upper.includes('HOTPOT') || upper.includes('LAU') || upper.includes('LẨU')) return 'Lẩu';
+  if (upper.includes('DRINK') || upper.includes('BEVERAGE') || upper.includes('UỐNG')) return 'Đồ uống';
+  if (upper.includes('DESSERT') || upper.includes('TRÁNG')) return 'Tráng miệng';
+  return 'Món chính';
+}
+
+function mapBackendDishStation(category: WaiterMenuItem['category']): WaiterMenuItem['station'] {
+  switch (category) {
+    case 'Đồ uống':
+      return 'Quầy Bar';
+    case 'Lẩu':
+      return 'Bếp Lẩu';
+    case 'Tráng miệng':
+      return 'Bếp Tráng miệng';
+    case 'Khai vị':
+      return 'Bếp lạnh';
+    default:
+      return 'Bếp nóng';
+  }
+}
+
+function mapBackendDish(d: BackendDishDto): WaiterMenuItem {
+  const category = mapBackendDishCategory(d.category || d.categoryName);
+  return {
+    id: d.id,
+    sku: d.sku || d.id.slice(0, 6).toUpperCase(),
+    name: d.name,
+    category,
+    price: d.price ?? d.basePrice ?? 0,
+    description: d.description || '',
+    station: mapBackendDishStation(category),
+    isAvailable: d.isAvailable !== false,
+    image: d.imageUrl || undefined,
+  };
+}
+
+function mapBackendTableStatus(status: string): { status: WaiterTableStatus; text: string } {
+  const upper = (status || 'VACANT').toUpperCase();
+  switch (upper) {
+    case 'SERVING':
+      return { status: 'serving', text: 'Đang dùng bữa' };
+    case 'BILLING':
+      return { status: 'billing', text: 'Chờ thanh toán' };
+    case 'CLEANING':
+      return { status: 'cleaning', text: 'Đang dọn bàn' };
+    case 'RESERVED':
+      return { status: 'reserved', text: 'Đã đặt trước' };
+    default:
+      return { status: 'vacant', text: 'Bàn trống' };
+  }
+}
+
+function mapBackendItemStatus(
+  item: BackendOrderItemDto,
+  nowMs: number
+): { status: WaiterItemProgressStatus; text: string; isUrgent?: boolean } {
+  const upper = (item.status || 'WAITING').toUpperCase();
+  if (upper === 'READY') {
+    return { status: 'ready', text: 'Bếp xong — Chờ giao' };
+  }
+  if (upper === 'SERVED') {
+    return { status: 'served', text: 'Đã phục vụ' };
+  }
+  if (upper === 'REJECTED') {
+    return { status: 'rejected', text: 'Bếp từ chối', isUrgent: true };
+  }
+  if (item.slaDeadline) {
+    const deadlineMs = Date.parse(item.slaDeadline);
+    if (!Number.isNaN(deadlineMs) && deadlineMs < nowMs) {
+      const overMin = Math.max(1, Math.round((nowMs - deadlineMs) / 60000));
+      return { status: 'delayed', text: `Quá hạn SLA ${overMin}p`, isUrgent: true };
+    }
+  }
+  return { status: 'sent', text: 'Chờ bếp / Đang nấu' };
+}
+
+function formatTimeHHmm(iso?: string | null): string {
+  if (!iso) return '--:--';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '--:--';
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function calcElapsedMinutes(iso?: string | null, nowMs: number = Date.now()): number {
+  if (!iso) return 0;
+  const ts = Date.parse(iso);
+  if (Number.isNaN(ts)) return 0;
+  return Math.max(0, Math.round((nowMs - ts) / 60000));
+}
 
 export function removeVietnameseTones(str: string): string {
   if (!str) return '';
@@ -699,8 +800,20 @@ interface WaiterState {
   isSoundAlertEnabled: boolean;
   searchQuery: string;
   toastMessage: string | null;
+  isSyncing: boolean;
+  isSendingOrder: boolean;
+  hasSyncedBackend: boolean;
+  lastSyncedAt: string | null;
+  syncError: string | null;
+  servingItemIds: Record<string, boolean>;
+  pendingIdempotencyKeys: Record<string, string>;
 
   // Actions
+  syncFromBackend: () => Promise<void>;
+  updateTableStatusApi: (
+    tableId: string,
+    targetStatus: 'VACANT' | 'RESERVED' | 'SERVING' | 'BILLING' | 'CLEANING'
+  ) => Promise<boolean>;
   setSelectedTable: (tableId: string) => void;
   setActiveTab: (tab: WaiterTab) => void;
   setZoneFilter: (filter: string) => void;
@@ -714,8 +827,8 @@ interface WaiterState {
   clearPendingOrder: (tableId: string) => void;
   openSendKitchenModal: () => boolean;
   closeSendKitchenModal: () => void;
-  sendPendingOrderToKitchen: (tableId: string, note?: string) => number;
-  confirmItemServed: (tableId: string, itemId: string) => void;
+  sendPendingOrderToKitchen: (tableId: string, note?: string) => Promise<number>;
+  confirmItemServed: (tableId: string, itemId: string) => Promise<boolean>;
   pingKitchenItem: (tableId: string, itemId: string) => void;
   transferTable: (sourceId: string, targetId: string) => void;
   mergeTable: (sourceId: string, targetId: string) => void;
@@ -726,14 +839,14 @@ interface WaiterState {
 
 export const useWaiterStore = create<WaiterState>((set, get) => {
   // Sync initial table from localStorage safely in browser
-  let initialTable = '04';
+  let initialTable = '';
   if (typeof window !== 'undefined') {
     try {
       const saved = localStorage.getItem('restaurant_os_selected_table');
-      if (saved && INITIAL_TABLES[saved.replace(/\D/g, '')]) {
-        initialTable = saved.replace(/\D/g, '');
+      if (saved) {
+        initialTable = saved;
       }
-    } catch {}
+    } catch { }
   }
 
   return {
@@ -741,21 +854,180 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
     activeTab: 'floor',
     activeZoneFilter: 'all',
     trackingTableFilter: 'all',
-    tables: INITIAL_TABLES,
-    menuItems: INITIAL_MENU_ITEMS,
-    allergyAlerts: INITIAL_ALLERGY_ALERTS,
+    tables: {},
+    menuItems: [],
+    allergyAlerts: [],
     isSendKitchenModalOpen: false,
     isTransferModalOpen: false,
     isSoundAlertEnabled: true,
     searchQuery: '',
     toastMessage: null,
+    isSyncing: false,
+    isSendingOrder: false,
+    hasSyncedBackend: false,
+    lastSyncedAt: null,
+    syncError: null,
+    servingItemIds: {},
+    pendingIdempotencyKeys: {},
+
+    syncFromBackend: async () => {
+      if (get().isSyncing) return;
+      set({ isSyncing: true, syncError: null });
+      try {
+        const [backendTables, activeOrders, backendDishes] = await Promise.all([
+          waiterApi.fetchTables(),
+          waiterApi.fetchActiveOrders(),
+          waiterApi.fetchDishes().catch(() => [] as BackendDishDto[]),
+        ]);
+
+        const nowMs = Date.now();
+        const prevTables = get().tables;
+        const ordersByTableId = new Map<string, BackendOrderDto[]>();
+        for (const order of activeOrders) {
+          if (order.tableId) {
+            const list = ordersByTableId.get(order.tableId) || [];
+            list.push(order);
+            ordersByTableId.set(order.tableId, list);
+          }
+        }
+
+        const nextTables: Record<string, WaiterTable> = {};
+        const nextAllergies: AllergyAlert[] = [];
+
+        backendTables.forEach((t: BackendTableDto) => {
+          const tableOrders = ordersByTableId.get(t.id) || [];
+          const primaryOrder = tableOrders[0];
+          const mappedStatus = mapBackendTableStatus(t.status);
+          const existingLocal = prevTables[t.id];
+          const elapsedMin = primaryOrder
+            ? calcElapsedMinutes(primaryOrder.openedAt || primaryOrder.createdAt, nowMs)
+            : 0;
+
+          const confirmedItems: WaiterOrderItem[] = tableOrders.flatMap((order) =>
+            (order.items || []).map((item) => {
+              const st = mapBackendItemStatus(item, nowMs);
+              if (item.allergyNote) {
+                nextAllergies.push({
+                  id: `alg-${item.id}`,
+                  tableId: t.id,
+                  title: `Dị ứng — ${item.dishNameSnapshot}`,
+                  details: item.allergyNote,
+                  severity: 'strict',
+                  time: formatTimeHHmm(item.createdAt),
+                  status: 'acknowledged',
+                  stationRecipient: 'Bếp KDS',
+                });
+              }
+              return {
+                id: item.id,
+                dishId: item.dishId,
+                name: item.dishNameSnapshot,
+                sku: item.portionNameSnapshot || 'STD',
+                price: item.unitPrice,
+                qty: item.quantity,
+                category: 'Thực đơn',
+                station: 'Bếp KDS',
+                status: st.status,
+                statusText: st.text,
+                note: item.notes || undefined,
+                allergyNote: item.allergyNote || undefined,
+                waitMinutes: calcElapsedMinutes(item.createdAt, nowMs),
+                isUrgent: st.isUrgent,
+                tableId: t.id,
+                orderId: order.id,
+                orderCode: order.orderCode,
+                sentAt: formatTimeHHmm(item.createdAt),
+                slaDeadline: item.slaDeadline || undefined,
+              };
+            })
+          );
+
+          const mergedNotes = tableOrders
+            .map((o) => o.customerNotes)
+            .filter(Boolean)
+            .join(' | ');
+
+          nextTables[t.id] = {
+            id: t.id,
+            name: t.tableNumber.startsWith('Bàn') ? t.tableNumber : `Bàn ${t.tableNumber}`,
+            seats: t.capacity,
+            guests: mappedStatus.status === 'vacant' ? 0 : t.capacity,
+            zone: 'Sảnh chính',
+            status: mappedStatus.status,
+            statusText: mappedStatus.text,
+            server: existingLocal?.server || 'Phục vụ',
+            timeIn: primaryOrder ? formatTimeHHmm(primaryOrder.openedAt || primaryOrder.createdAt) : '--:--',
+            elapsed: primaryOrder ? `${elapsedMin} phút` : '0 phút',
+            orderId: primaryOrder?.id ?? t.currentOrderId ?? null,
+            orderCode: primaryOrder?.orderCode ?? null,
+            orderStatus: primaryOrder?.status ?? null,
+            pendingItems: existingLocal?.pendingItems || [],
+            confirmedItems,
+            generalNote: mergedNotes || existingLocal?.generalNote,
+          };
+        });
+
+        const currentSelected = get().selectedTableId;
+        const nextSelected = nextTables[currentSelected]
+          ? currentSelected
+          : Object.keys(nextTables)[0] || currentSelected;
+
+        const mappedDishes =
+          Array.isArray(backendDishes) && backendDishes.length > 0
+            ? backendDishes.map(mapBackendDish)
+            : get().menuItems;
+
+        set({
+          tables: nextTables,
+          menuItems: mappedDishes,
+          allergyAlerts: nextAllergies,
+          selectedTableId: nextSelected,
+          isSyncing: false,
+          hasSyncedBackend: true,
+          lastSyncedAt: new Date().toISOString(),
+          syncError: null,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Không thể đồng bộ dữ liệu từ máy chủ';
+        set({ isSyncing: false, syncError: message });
+      }
+    },
+
+    updateTableStatusApi: async (tableId, targetStatus) => {
+      try {
+        const updated = await waiterApi.updateTableStatus(tableId, targetStatus);
+        const mapped = mapBackendTableStatus(updated.status);
+        set((state) => {
+          const existing = state.tables[tableId];
+          if (!existing) return state;
+          return {
+            tables: {
+              ...state.tables,
+              [tableId]: {
+                ...existing,
+                status: mapped.status,
+                statusText: mapped.text,
+              },
+            },
+          };
+        });
+        get().showToast(`Đã cập nhật trạng thái bàn thành ${mapped.text}`);
+        await get().syncFromBackend();
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Cập nhật trạng thái bàn thất bại';
+        get().showToast(`⚠️ ${message}`);
+        return false;
+      }
+    },
 
     setSelectedTable: (tableId: string) => {
-      const id = tableId.replace(/\D/g, '').padStart(2, '0');
+      const isUuid = /^[0-9a-f-]{32,36}$/i.test(tableId);
+      const id = isUuid ? tableId : tableId.replace(/\D/g, '').padStart(2, '0');
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('restaurant_os_selected_table', id);
-        } catch {}
+        } catch { }
       }
       set({ selectedTableId: id });
     },
@@ -786,6 +1058,7 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
           billing: 'Chờ thanh toán',
           cleaning: 'Cần dọn vệ sinh',
           vacant: 'Bàn trống',
+          reserved: 'Đã đặt trước',
         };
 
         const updatedTable: WaiterTable = {
@@ -902,8 +1175,11 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
       set((state) => {
         const table = state.tables[tableId];
         if (!table) return state;
+        const nextKeys = { ...state.pendingIdempotencyKeys };
+        delete nextKeys[tableId];
 
         return {
+          pendingIdempotencyKeys: nextKeys,
           tables: {
             ...state.tables,
             [tableId]: {
@@ -919,8 +1195,11 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
       set((state) => {
         const table = state.tables[tableId];
         if (!table) return state;
+        const nextKeys = { ...state.pendingIdempotencyKeys };
+        delete nextKeys[tableId];
 
         return {
+          pendingIdempotencyKeys: nextKeys,
           tables: {
             ...state.tables,
             [tableId]: {
@@ -947,8 +1226,9 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
       set({ isSendKitchenModalOpen: false });
     },
 
-    sendPendingOrderToKitchen: (tableId: string, note?: string) => {
+    sendPendingOrderToKitchen: async (tableId: string, note?: string) => {
       const state = get();
+      if (state.isSendingOrder) return 0;
       const table = state.tables[tableId];
       if (!table || table.pendingItems.length === 0) {
         set({ isSendKitchenModalOpen: false });
@@ -956,64 +1236,125 @@ export const useWaiterStore = create<WaiterState>((set, get) => {
       }
 
       const pendingCount = table.pendingItems.length;
-      const now = new Date();
-      const sentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(
-        now.getMinutes()
-      ).padStart(2, '0')}`;
+      const totalQty = table.pendingItems.reduce((acc, i) => acc + i.qty, 0);
 
-      // Chuyển toàn bộ pendingItems sang confirmedItems
-      const newConfirmed: WaiterOrderItem[] = [
-        ...table.confirmedItems,
-        ...table.pendingItems.map((p) => ({
-          ...p,
-          id: `c-${Date.now()}-${p.id}`,
-          status: 'sent' as const,
-          statusText: 'Bếp đã tiếp nhận',
-          waitMinutes: 1,
-          sentAt: sentTimeStr,
-        })),
-      ];
+      // Tái sử dụng idempotencyKey theo giỏ hiện tại của bàn để chống tạo đơn trùng khi retry mạng lỗi
+      let idempotencyKey = state.pendingIdempotencyKeys[tableId];
+      if (!idempotencyKey) {
+        idempotencyKey =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? `waiter-ord-${crypto.randomUUID()}`
+            : `waiter-ord-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
 
       set((s) => ({
-        isSendKitchenModalOpen: false,
-        tables: {
-          ...s.tables,
-          [tableId]: {
-            ...table,
-            status: 'serving',
-            statusText: 'Đang dùng bữa',
-            timeIn: table.timeIn === '--:--' ? sentTimeStr : table.timeIn,
-            generalNote: note || table.generalNote,
-            pendingItems: [],
-            confirmedItems: newConfirmed,
-          },
+        isSendingOrder: true,
+        pendingIdempotencyKeys: {
+          ...s.pendingIdempotencyKeys,
+          [tableId]: idempotencyKey,
         },
       }));
 
-      return pendingCount;
+      try {
+        await waiterApi.createOrder({
+          tableId,
+          items: table.pendingItems.map((p) => ({
+            dishId: p.dishId,
+            quantity: p.qty,
+            notes: p.note || undefined,
+            allergyNote: p.allergyNote || undefined,
+          })),
+          customerNotes: note?.trim() || undefined,
+          idempotencyKey,
+        });
+
+        set((s) => {
+          const current = s.tables[tableId];
+          const nextKeys = { ...s.pendingIdempotencyKeys };
+          delete nextKeys[tableId];
+          return {
+            isSendingOrder: false,
+            isSendKitchenModalOpen: false,
+            pendingIdempotencyKeys: nextKeys,
+            tables: current
+              ? {
+                ...s.tables,
+                [tableId]: {
+                  ...current,
+                  pendingItems: [],
+                  generalNote: note?.trim() || current.generalNote,
+                },
+              }
+              : s.tables,
+          };
+        });
+
+        get().showToast(`Đã gửi đơn (${pendingCount} món / ${totalQty} phần) vào Bếp thành công!`);
+        await get().syncFromBackend();
+        return pendingCount;
+      } catch (err) {
+        set({ isSendingOrder: false });
+        const message = err instanceof Error ? err.message : 'Gửi đơn vào Bếp thất bại';
+        get().showToast(`⚠️ ${message}`);
+        return 0;
+      }
     },
 
-    confirmItemServed: (tableId: string, itemId: string) => {
-      set((state) => {
-        const table = state.tables[tableId];
-        if (!table) return state;
+    confirmItemServed: async (tableId: string, itemId: string) => {
+      const state = get();
+      if (state.servingItemIds[itemId]) {
+        return false;
+      }
+      const table = state.tables[tableId];
+      const targetItem = table?.confirmedItems.find((i) => i.id === itemId);
+      if (targetItem && targetItem.status !== 'ready') {
+        state.showToast('⚠️ Chỉ có thể xác nhận giao các món đã chế biến xong (READY).');
+        return false;
+      }
 
-        const updatedConfirmed = table.confirmedItems.map((item) =>
-          item.id === itemId
-            ? { ...item, status: 'served' as const, statusText: 'Đã lên món' }
-            : item
-        );
+      set((s) => ({
+        servingItemIds: { ...s.servingItemIds, [itemId]: true },
+      }));
 
-        return {
-          tables: {
-            ...state.tables,
-            [tableId]: {
-              ...table,
-              confirmedItems: updatedConfirmed,
+      try {
+        await waiterApi.serveOrderItem(itemId);
+        set((s) => {
+          const nextServing = { ...s.servingItemIds };
+          delete nextServing[itemId];
+          const currentTable = s.tables[tableId];
+          if (!currentTable) return { servingItemIds: nextServing };
+
+          const updatedConfirmed = currentTable.confirmedItems.map((item) =>
+            item.id === itemId
+              ? { ...item, status: 'served' as const, statusText: 'Đã phục vụ' }
+              : item
+          );
+
+          return {
+            servingItemIds: nextServing,
+            tables: {
+              ...s.tables,
+              [tableId]: {
+                ...currentTable,
+                confirmedItems: updatedConfirmed,
+              },
             },
-          },
-        };
-      });
+          };
+        });
+        get().showToast(
+          `Đã xác nhận giao món ${targetItem?.name || ''} cho ${table?.name || `Bàn ${tableId}`}!`
+        );
+        return true;
+      } catch (err) {
+        set((s) => {
+          const nextServing = { ...s.servingItemIds };
+          delete nextServing[itemId];
+          return { servingItemIds: nextServing };
+        });
+        const message = err instanceof Error ? err.message : 'Xác nhận giao món thất bại';
+        get().showToast(`⚠️ ${message}`);
+        return false;
+      }
     },
 
     pingKitchenItem: (tableId: string, itemId: string) => {

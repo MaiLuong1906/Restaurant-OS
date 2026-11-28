@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Ticket } from '../../../../types';
-import { filterActiveTickets, sortKdsTickets } from '../../../../services/kds';
+import {
+  applyKdsOrderStatusEvent,
+  deriveTicketStatus,
+  filterActiveTickets,
+  sortKdsTickets,
+} from '../../../../services/kds';
 
 describe('KDS Ticket Ordering & Active Filter', () => {
-  it('lọc bỏ các ticket có tất cả món đã SERVED hoặc REJECTED', () => {
+  it('lọc bỏ ticket đã SERVED hết món nhưng giữ lại ticket chỉ còn món REJECTED (§1.3b)', () => {
     const rawTickets: Ticket[] = [
       {
         id: 't-served',
@@ -21,6 +26,26 @@ describe('KDS Ticket Ordering & Active Filter', () => {
             modifiers: [],
             status: 'SERVED',
             createdAt: '2026-11-20T10:00:00Z',
+          },
+        ],
+      },
+      {
+        id: 't-rejected-only',
+        tableId: 'tbl-3',
+        tableNo: 'Bàn 03',
+        status: 'REJECTED',
+        createdAt: '2026-11-20T10:02:00Z',
+        items: [
+          {
+            id: 'i-3',
+            orderId: 'o-3',
+            dishId: 'd-3',
+            dishName: 'Cơm Chiên Hải Sản',
+            quantity: 1,
+            unitPrice: 75000,
+            modifiers: [],
+            status: 'REJECTED',
+            createdAt: '2026-11-20T10:02:00Z',
           },
         ],
       },
@@ -46,8 +71,8 @@ describe('KDS Ticket Ordering & Active Filter', () => {
     ];
 
     const active = filterActiveTickets(rawTickets);
-    expect(active.length).toBe(1);
-    expect(active[0].id).toBe('t-active');
+    expect(active.length).toBe(2);
+    expect(active.map((t) => t.id)).toEqual(['t-rejected-only', 't-active']);
   });
 
   it('sắp xếp ưu tiên ticket có cảnh báo dị ứng lên đầu tiên', () => {
@@ -174,5 +199,62 @@ describe('KDS Ticket Ordering & Active Filter', () => {
     expect(ticket.items.length).toBe(1);
     expect(ticket.tableNo).toBe('Bàn 04');
     expect(ticket.items[0].notes).toBe('Khong hanh');
+  });
+
+  it('applyKdsOrderStatusEvent: đổi đúng 1 món và suy lại ticket status (WAITING -> READY khi hết WAITING)', () => {
+    const tickets: Ticket[] = [
+      {
+        id: 't-1',
+        tableId: 'tbl-1',
+        tableNo: 'Bàn 01',
+        status: 'WAITING',
+        createdAt: '2026-11-25T10:00:00Z',
+        items: [
+          { id: 'i-1', orderId: 't-1', dishId: 'd-1', dishName: 'Bún Chả', quantity: 1, unitPrice: 65000, modifiers: [], status: 'WAITING', createdAt: '2026-11-25T10:00:00Z' },
+          { id: 'i-2', orderId: 't-1', dishId: 'd-2', dishName: 'Cà Phê', quantity: 1, unitPrice: 35000, modifiers: [], status: 'WAITING', createdAt: '2026-11-25T10:00:00Z' },
+        ],
+      },
+    ];
+
+    const step1 = applyKdsOrderStatusEvent(tickets, 'i-1', 'READY');
+    expect(step1[0].items[0].status).toBe('READY');
+    expect(step1[0].items[1].status).toBe('WAITING');
+    expect(step1[0].status).toBe('WAITING');
+
+    const step2 = applyKdsOrderStatusEvent(step1, 'i-2', 'READY');
+    expect(step2[0].items[1].status).toBe('READY');
+    expect(step2[0].status).toBe('READY');
+  });
+
+  it('applyKdsOrderStatusEvent: giữ REJECTED cho ticket chỉ còn món REJECTED và không đổi gì với id lạ', () => {
+    const tickets: Ticket[] = [
+      {
+        id: 't-rej',
+        tableId: 'tbl-2',
+        tableNo: 'Bàn 02',
+        status: 'WAITING',
+        createdAt: '2026-11-25T10:00:00Z',
+        items: [
+          { id: 'i-3', orderId: 't-rej', dishId: 'd-1', dishName: 'Phở Bò', quantity: 1, unitPrice: 75000, modifiers: [], status: 'WAITING', createdAt: '2026-11-25T10:00:00Z' },
+        ],
+      },
+    ];
+
+    const afterReject = applyKdsOrderStatusEvent(tickets, 'i-3', 'REJECTED');
+    expect(afterReject[0].status).toBe('REJECTED');
+
+    const unknown = applyKdsOrderStatusEvent(afterReject, 'non-existent-id', 'READY');
+    expect(unknown).toBe(afterReject);
+  });
+
+  it('deriveTicketStatus khi hoàn tất mẻ: giữ WAITING nếu ticket còn món WAITING, chuyển READY khi hết món WAITING', () => {
+    const partialBatchItems: Ticket['items'] = [
+      { id: 'i-1', orderId: 't-1', dishId: 'd-1', dishName: 'Bún Chả', quantity: 1, unitPrice: 65000, modifiers: [], status: 'READY', createdAt: '2026-11-26T10:00:00Z' },
+      { id: 'i-2', orderId: 't-1', dishId: 'd-2', dishName: 'Cà Phê', quantity: 1, unitPrice: 35000, modifiers: [], status: 'WAITING', createdAt: '2026-11-26T10:00:00Z' },
+    ];
+    expect(deriveTicketStatus(partialBatchItems)).toBe('WAITING');
+
+    const fullBatchItems: Ticket['items'] = partialBatchItems.map((i) => ({ ...i, status: 'READY' }));
+    expect(deriveTicketStatus(fullBatchItems)).toBe('READY');
   });
 });

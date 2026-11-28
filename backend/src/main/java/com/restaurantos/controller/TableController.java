@@ -3,9 +3,11 @@ package com.restaurantos.controller;
 import com.restaurantos.common.dto.ApiResponse;
 import com.restaurantos.dto.OrderDtos;
 import com.restaurantos.service.TableService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +24,7 @@ public class TableController {
      * GET /api/v1/tables — Lấy danh sách tất cả bàn.
      */
     @GetMapping
+    @PreAuthorize("hasAuthority('TABLE:FLOOR_PLAN:VIEW')")
     public ResponseEntity<ApiResponse<List<OrderDtos.TableResponse>>> getAllTables() {
         List<OrderDtos.TableResponse> tables = tableService.getAllTables();
         return ResponseEntity.ok(ApiResponse.success(tables));
@@ -48,12 +51,13 @@ public class TableController {
     }
 
     /**
-     * PATCH /api/v1/tables/{id}/status — Cập nhật trạng thái bàn trên Sơ đồ bàn POS (Khóa bàn, Mở khóa, Đã dọn xong).
+     * PATCH /api/v1/tables/{id}/status — Cập nhật trạng thái bàn (có kiểm tra nghiệp vụ & chống race condition).
      */
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('TABLE:STATE:UPDATE')")
     public ResponseEntity<ApiResponse<OrderDtos.TableResponse>> updateTableStatus(
             @PathVariable String id,
-            @RequestBody OrderDtos.UpdateTableStatusRequest request) {
+            @Valid @RequestBody OrderDtos.UpdateTableStatusRequest request) {
         UUID tableId;
         try {
             tableId = UUID.fromString(id);
@@ -61,10 +65,7 @@ public class TableController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("BAD_REQUEST", "Table ID không hợp lệ: " + id, null));
         }
-
-        return tableService.updateTableStatus(tableId, request != null ? request.status() : null)
-                .map(t -> ResponseEntity.ok(ApiResponse.success(t, "Cập nhật trạng thái bàn thành công")))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy bàn: " + id, null)));
+        OrderDtos.TableResponse updated = tableService.updateTableStatus(tableId, request != null ? request.status() : null);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái bàn thành công"));
     }
 }

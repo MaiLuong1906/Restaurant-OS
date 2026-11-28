@@ -31,10 +31,10 @@ class KdsSecurityProfileTest {
     private KdsService kdsService;
 
     @Test
-    @DisplayName("Local profile permits unauthenticated access to /api/v1/kds/tickets")
+    @DisplayName("Local profile enforces JWT and denies unauthenticated access to /api/v1/kds/tickets with 401")
     void localProfile_permitsKdsEndpoints() throws Exception {
         assertThat(context.containsBean("kdsSecurityFilterChain")).isTrue();
         mockMvc.perform(get("/api/v1/kds/tickets"))
-                .andExpect(status().isOk());
+                .andExpect(status().isUnauthorized());
     }
 }

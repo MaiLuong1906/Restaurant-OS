@@ -415,7 +415,7 @@ export default function PosFloorPage() {
                   </h2>
                   <p className="mt-0.5 text-xs text-muted">
                     Sức chứa {selectedTable.seats} ghế • Đang ngồi:{' '}
-                    <strong>{selectedTable.guests} khách</strong> • Phục vụ:{' '}
+                    <strong>{selectedTable.guests > 0 ? `${selectedTable.guests} khách` : '—'}</strong> • Phục vụ:{' '}
                     <strong>{selectedTable.staff || '—'}</strong>
                   </p>
                 </div>
@@ -563,27 +563,47 @@ export default function PosFloorPage() {
                   </div>
                 ) : (
                   <ul className="divide-y divide-sand-200/80 rounded-xl border border-sand-200 bg-cream/30 px-4">
-                    {selectedTable.items.map((item) => (
-                      <li
-                        key={item.id}
-                        className="flex items-baseline justify-between gap-2 py-3 text-sm"
-                      >
-                        <div>
-                          <span className="font-bold text-ink">{item.name}</span>
-                          <span className="ops-nums ml-1.5 text-xs font-semibold text-muted">
-                            ×{item.qty}
+                    {selectedTable.items.map((item) => {
+                      const isRejected = item.status === 'REJECTED';
+                      return (
+                        <li
+                          key={item.id}
+                          className={`flex items-baseline justify-between gap-2 py-3 text-sm ${
+                            isRejected ? 'opacity-65' : ''
+                          }`}
+                        >
+                          <div>
+                            <span
+                              className={`font-bold ${
+                                isRejected ? 'text-muted line-through' : 'text-ink'
+                              }`}
+                            >
+                              {item.name}
+                            </span>
+                            <span className="ops-nums ml-1.5 text-xs font-semibold text-muted">
+                              ×{item.qty}
+                            </span>
+                            {isRejected ? (
+                              <span className="ml-2 inline-flex rounded bg-kds-overdue-bg px-1.5 py-0.5 text-[10px] font-bold text-danger-600">
+                                Bếp báo hủy
+                              </span>
+                            ) : null}
+                            {item.note ? (
+                              <p className="text-xs font-medium text-danger-600">
+                                Ghi chú: {item.note}
+                              </p>
+                            ) : null}
+                          </div>
+                          <span
+                            className={`ops-nums shrink-0 font-bold ${
+                              isRejected ? 'text-muted line-through' : 'text-ink'
+                            }`}
+                          >
+                            {isRejected ? '0 ₫' : formatVND(item.qty * item.unitPrice)}
                           </span>
-                          {item.note ? (
-                            <p className="text-xs font-medium text-danger-600">
-                              Ghi chú: {item.note}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span className="ops-nums shrink-0 font-bold text-ink">
-                          {formatVND(item.qty * item.unitPrice)}
-                        </span>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

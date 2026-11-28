@@ -1,14 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { staffService } from '@/services/mock/mockStaffService';
+import { staffLeavePayrollService } from '@/services/staffLeavePayrollService';
 import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus } from '@/types';
-import { parseDateKey } from '@/lib/dateKey';
-import {
-  AlertCircle,
-  CheckCircle2,
-  ArrowLeft,
-} from 'lucide-react';
+import { addDays, parseDateKey } from '@/lib/dateKey';
+import { formatIsoDate, generateIdempotencyKey } from '@/lib/utils';
+import { LeaveListView } from '@/components/staff/leave/LeaveListView';
+import { LeaveFormView } from '@/components/staff/leave/LeaveFormView';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+
+function getDefaultDateRange(): { start: string; end: string } {
+  const todayKey = formatIsoDate(new Date());
+  return {
+    start: todayKey,
+    end: addDays(todayKey, 1),
+  };
+}
 
 export default function LeavePage() {
   // Navigation / Views: 'B9' (Danh sách đơn) | 'B10' (Form xin nghỉ)
@@ -21,22 +28,43 @@ export default function LeavePage() {
   const [, setLoading] = React.useState<boolean>(true);
   const [, setError] = React.useState<string | null>(null);
 
-  // B10 Form states (3 bước)
+  // Modal xác nhận rút đơn & Toast thông báo
+  const [withdrawTargetId, setWithdrawTargetId] = React.useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = React.useState<boolean>(false);
+  const [toast, setToast] = React.useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  // B10 Form states (3 bước) — khởi tạo ngày mặc định theo ngày hiện tại
   const [selectedType, setSelectedType] = React.useState<LeaveType | null>(null);
-  const [startDate, setStartDate] = React.useState<string>('2026-11-16');
-  const [endDate, setEndDate] = React.useState<string>('2026-11-17');
+  const [startDate, setStartDate] = React.useState<string>(() => getDefaultDateRange().start);
+  const [endDate, setEndDate] = React.useState<string>(() => getDefaultDateRange().end);
   const [reason, setReason] = React.useState<string>('');
+  const [leaveIdempotencyKey, setLeaveIdempotencyKey] = React.useState<string>(() =>
+    generateIdempotencyKey()
+  );
   const [submitting, setSubmitting] = React.useState<boolean>(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [successReq, setSuccessReq] = React.useState<LeaveRequest | null>(null);
+
+  const showToast = React.useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+  }, []);
+
+  React.useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const loadData = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const [b, reqs] = await Promise.all([
-        staffService.getLeaveBalance(),
-        staffService.getLeaveRequests(),
+        staffLeavePayrollService.getLeaveBalance(),
+        staffLeavePayrollService.getLeaveRequests(),
       ]);
       setBalance(b);
       setRequests(reqs);
@@ -70,16 +98,40 @@ export default function LeavePage() {
     return Math.max(0, balance.remainingDays - calculatedDays);
   }, [balance, selectedType, calculatedDays]);
 
+  // Mở form B10: sinh idempotencyKey 1 lần cho phiên thao tác
   const handleOpenForm = () => {
+    const defaults = getDefaultDateRange();
     setView('B10');
-    setSelectedType(null); // Không chọn sẵn theo quyết định locked
-    setStartDate('2026-11-16');
-    setEndDate('2026-11-17');
+    setSelectedType(null);
+    setStartDate(defaults.start);
+    setEndDate(defaults.end);
     setReason('');
     setFormError(null);
     setSuccessReq(null);
+    setLeaveIdempotencyKey(generateIdempotencyKey());
   };
 
+  const handleSelectType = (type: LeaveType) => {
+    setSelectedType((prev) => {
+      if (prev !== type) {
+        setLeaveIdempotencyKey(generateIdempotencyKey());
+      }
+      return type;
+    });
+    setFormError(null);
+  };
+
+  const handleChangeStartDate = (newStart: string) => {
+    setStartDate(newStart);
+    setLeaveIdempotencyKey(generateIdempotencyKey());
+  };
+
+  const handleChangeEndDate = (newEnd: string) => {
+    setEndDate(newEnd);
+    setLeaveIdempotencyKey(generateIdempotencyKey());
+  };
+
+  // Gửi đơn xin nghỉ: dùng lại leaveIdempotencyKey cho mọi lần retry của cùng 1 thao tác
   const handleSubmitLeave = async () => {
     if (!selectedType) {
       setFormError('Vui lòng chọn loại nghỉ để tiếp tục.');
@@ -108,12 +160,12 @@ export default function LeavePage() {
     setFormError(null);
 
     try {
-      const newReq = await staffService.createLeaveRequest({
+      const newReq = await staffLeavePayrollService.createLeaveRequest({
         type: selectedType,
         startDate,
         endDate,
         reason: reason.trim(),
-        idempotencyKey: `leave-${Date.now()}`,
+        idempotencyKey: leaveIdempotencyKey,
       });
       setSuccessReq(newReq);
       loadData();
@@ -124,389 +176,121 @@ export default function LeavePage() {
     }
   };
 
-  const handleWithdraw = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn rút đơn xin nghỉ này?')) return;
+  const handleRequestWithdraw = (id: string) => {
+    setWithdrawTargetId(id);
+  };
+
+  const handleConfirmWithdraw = async () => {
+    if (!withdrawTargetId || withdrawing) return;
+    setWithdrawing(true);
     try {
-      await staffService.withdrawLeaveRequest({ id });
+      await staffLeavePayrollService.withdrawLeaveRequest({ id: withdrawTargetId });
+      setWithdrawTargetId(null);
+      showToast('success', 'Đã rút đơn xin nghỉ thành công.');
       loadData();
     } catch (err) {
-      alert((err as Error).message || 'Không thể rút đơn xin nghỉ');
-    }
-  };
-
-  // Filter requests
-  const filteredRequests = requests.filter((r) => {
-    if (filter === 'ALL') return true;
-    return r.status === filter;
-  });
-
-  const getTypeName = (type: LeaveType) => {
-    switch (type) {
-      case 'ANNUAL':
-        return 'Phép năm';
-      case 'SICK':
-        return 'Nghỉ ốm';
-      case 'UNPAID':
-        return 'Việc riêng';
-      default:
-        return type;
-    }
-  };
-
-  const getStatusBadge = (status: LeaveStatus) => {
-    switch (status) {
-      case 'PENDING':
-        return (
-          <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full">
-            Chờ duyệt
-          </span>
-        );
-      case 'APPROVED':
-        return (
-          <span className="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded-full">
-            Đã duyệt
-          </span>
-        );
-      case 'REJECTED':
-        return (
-          <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 text-[#D14B3A] rounded-full">
-            Từ chối
-          </span>
-        );
-      case 'CANCELLED':
-        return (
-          <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-[#7A6A58] rounded-full">
-            Đã rút đơn
-          </span>
-        );
+      setWithdrawTargetId(null);
+      showToast('error', (err as Error).message || 'Không thể rút đơn xin nghỉ.');
+    } finally {
+      setWithdrawing(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F6F4F0] text-[#141210] pb-24">
-      {/* ===================== B9: DANH SÁCH ĐƠN NGHỈ ===================== */}
-      {view === 'B9' && (
-        <div className="max-w-xl mx-auto px-4 py-4 space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-[#2B2118]">Đơn xin nghỉ</h1>
-              <p className="text-xs text-[#7A6A58] mt-0.5">Đơn của bạn và trạng thái duyệt</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleOpenForm}
-              className="px-4 py-2 bg-[#8C1D2C] hover:bg-[#6F1623] text-white text-sm font-semibold rounded-lg shadow-sm min-h-[48px] flex items-center justify-center transition-colors"
-            >
-              Xin nghỉ mới
-            </button>
-          </div>
-
-          {/* Quỹ phép năm card */}
-          <div className="bg-white rounded-lg border border-[#E9E4DC] p-4 shadow-xs">
-            <h2 className="text-sm font-semibold text-[#2B2118]">Quỹ phép năm 2026</h2>
-            <div className="text-2xl font-bold text-[#8C1D2C] mt-1">
-              Còn {balance ? balance.remainingDays : '—'} ngày
-            </div>
-            <p className="text-xs text-[#7A6A58] mt-1">
-              {balance
-                ? `Đã dùng ${balance.usedDays} / ${balance.totalDays} ngày · ${balance.pendingRequestsCount} đơn đang chờ duyệt`
-                : 'Đang tải...'}
-            </p>
-          </div>
-
-          {/* Thanh lọc trạng thái */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {[
-              { id: 'ALL', label: 'Tất cả' },
-              { id: 'PENDING', label: 'Chờ duyệt' },
-              { id: 'APPROVED', label: 'Đã duyệt' },
-              { id: 'REJECTED', label: 'Từ chối' },
-            ].map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFilter(f.id as LeaveStatus | 'ALL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold min-h-[40px] shrink-0 border transition-all ${
-                  filter === f.id
-                    ? 'bg-[#8C1D2C] text-white border-[#8C1D2C]'
-                    : 'bg-white text-[#2B2118] border-[#E9E4DC] hover:border-[#8C1D2C]/40'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Danh sách đơn */}
-          {filteredRequests.length === 0 ? (
-            <div className="bg-white rounded-lg border border-[#E9E4DC] p-8 text-center space-y-3">
-              <h2 className="text-base font-bold text-[#2B2118]">Bạn chưa có đơn xin nghỉ nào</h2>
-              <p className="text-xs text-[#7A6A58]">
-                Gửi đơn mới khi cần nghỉ phép, nghỉ ốm hoặc việc riêng.
-              </p>
-              <button
-                type="button"
-                onClick={handleOpenForm}
-                className="px-4 py-2 bg-[#8C1D2C] hover:bg-[#6F1623] text-white text-sm font-semibold rounded-lg min-h-[48px] transition-colors"
-              >
-                Xin nghỉ mới
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="bg-white rounded-lg border border-[#E9E4DC] p-4 shadow-xs space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-[#2B2118]">{getTypeName(req.type)}</span>
-                    {getStatusBadge(req.status)}
-                  </div>
-                  <div className="text-xs text-[#7A6A58]">
-                    {req.startDate} {req.startDate !== req.endDate ? `– ${req.endDate}` : ''} ·{' '}
-                    {req.calendarDays || 1} ngày ({req.affectedShifts || 1} ca làm việc)
-                  </div>
-                  <div className="text-xs text-[#141210] bg-[#F6F4F0] p-2 rounded-md">
-                    Lý do: {req.reason}
-                  </div>
-                  {req.status === 'PENDING' && (
-                    <div className="pt-2 flex justify-end border-t border-[#F6F4F0]">
-                      <button
-                        type="button"
-                        onClick={() => handleWithdraw(req.id)}
-                        className="text-xs font-semibold text-[#D14B3A] hover:underline min-h-[36px] flex items-center"
-                      >
-                        Rút đơn
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===================== B10: FORM XIN NGHỈ (3 BƯỚC) ===================== */}
-      {view === 'B10' && (
-        <div className="max-w-xl mx-auto px-4 py-4 space-y-4">
-          <button
-            type="button"
-            onClick={() => setView('B9')}
-            className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-[#E9E4DC] bg-white px-4 py-3 text-[#2B2118] font-semibold text-sm no-underline hover:bg-neutral-50 active:scale-98 transition-transform"
+      <div className="max-w-xl mx-auto px-4 py-4 space-y-4">
+        {/* Toast thông báo chuẩn UI */}
+        {toast && (
+          <div
+            role="status"
+            className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 shadow-xs ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-red-50 border-red-200 text-[#D14B3A]'
+            }`}
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Danh sách đơn</span>
-          </button>
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-[#D14B3A] shrink-0" />
+            )}
+            <span>{toast.message}</span>
+          </div>
+        )}
 
-          {!successReq ? (
-            <div className="space-y-5">
+        {view === 'B9' && (
+          <LeaveListView
+            balance={balance}
+            requests={requests}
+            filter={filter}
+            onChangeFilter={setFilter}
+            onOpenForm={handleOpenForm}
+            onWithdraw={handleRequestWithdraw}
+          />
+        )}
+
+        {view === 'B10' && (
+          <LeaveFormView
+            balance={balance}
+            selectedType={selectedType}
+            startDate={startDate}
+            endDate={endDate}
+            reason={reason}
+            calculatedDays={calculatedDays}
+            quotaAfterApproval={quotaAfterApproval}
+            submitting={submitting}
+            formError={formError}
+            successReq={successReq}
+            onBackToList={() => setView('B9')}
+            onSelectType={handleSelectType}
+            onChangeStartDate={handleChangeStartDate}
+            onChangeEndDate={handleChangeEndDate}
+            onChangeReason={setReason}
+            onSubmit={handleSubmitLeave}
+            onResetForm={handleOpenForm}
+          />
+        )}
+
+        {/* Modal xác nhận rút đơn chuẩn UI (thay thế confirm/alert trình duyệt) */}
+        {withdrawTargetId && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="withdraw-modal-title"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          >
+            <div className="w-full max-w-sm rounded-xl bg-white border border-[#E9E4DC] p-5 shadow-lg space-y-4">
               <div>
-                <h1 className="text-xl font-bold text-[#2B2118]">Xin nghỉ mới</h1>
-                <p className="text-xs text-[#7A6A58] mt-0.5">
-                  Gửi yêu cầu nghỉ để quản lý xem xét.
+                <h2 id="withdraw-modal-title" className="text-base font-bold text-[#2B2118]">
+                  Xác nhận rút đơn xin nghỉ
+                </h2>
+                <p className="text-xs text-[#7A6A58] mt-1">
+                  Bạn có chắc chắn muốn rút đơn xin nghỉ này? Đơn sau khi rút sẽ chuyển sang trạng
+                  thái Đã rút đơn.
                 </p>
               </div>
-
-              {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-[#D14B3A] text-xs rounded-lg flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* BƯỚC 01: LOẠI NGHỈ */}
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-[#8C1D2C] uppercase tracking-wider">
-                  01 · Loại nghỉ
-                </p>
-                <p className="text-xs text-[#7A6A58]">
-                  Chọn hình thức nghỉ phù hợp với nhu cầu của bạn.
-                </p>
-
-                <div className="space-y-2">
-                  {[
-                    {
-                      id: 'ANNUAL' as LeaveType,
-                      title: 'Phép năm',
-                      desc: 'Trừ vào quỹ phép năm hàng năm của bạn.',
-                      quotaText: balance ? `Quỹ phép còn ${balance.remainingDays} ngày` : null,
-                    },
-                    {
-                      id: 'SICK' as LeaveType,
-                      title: 'Nghỉ ốm',
-                      desc: 'Nghỉ dưỡng bệnh. Không trừ quỹ phép năm.',
-                      quotaText: null,
-                    },
-                    {
-                      id: 'UNPAID' as LeaveType,
-                      title: 'Việc riêng',
-                      desc: 'Nghỉ không lương giải quyết việc cá nhân.',
-                      quotaText: null,
-                    },
-                  ].map((item) => {
-                    const isSelected = selectedType === item.id;
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => {
-                          setSelectedType(item.id);
-                          setFormError(null);
-                        }}
-                        className={`p-3 rounded-lg border min-h-[64px] flex items-center justify-between cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-red-50/60 border-[#8C1D2C]'
-                            : 'bg-white border-[#E9E4DC] hover:border-[#8C1D2C]/40'
-                        }`}
-                      >
-                        <div>
-                          <div className="text-sm font-bold text-[#2B2118]">{item.title}</div>
-                          <div className="text-xs text-[#7A6A58] mt-0.5">{item.desc}</div>
-                          {isSelected && item.quotaText && (
-                            <div className="text-xs font-semibold text-[#8C1D2C] mt-1">
-                              {item.quotaText}
-                            </div>
-                          )}
-                        </div>
-                        <input
-                          type="radio"
-                          name="leave-type"
-                          checked={isSelected}
-                          onChange={() => setSelectedType(item.id)}
-                          className="w-4 h-4 accent-[#8C1D2C]"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* BƯỚC 02: THỜI GIAN NGHỈ */}
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-[#8C1D2C] uppercase tracking-wider">
-                  02 · Thời gian nghỉ
-                </p>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#7A6A58] mb-1">
-                      Từ ngày
-                    </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-[#E9E4DC] rounded-lg text-sm focus:outline-none focus:border-[#8C1D2C] min-h-[44px]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#7A6A58] mb-1">
-                      Tới ngày
-                    </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-[#E9E4DC] rounded-lg text-sm focus:outline-none focus:border-[#8C1D2C] min-h-[44px]"
-                    />
-                  </div>
-                </div>
-
-                {/* Card tính toán số ngày / số ca */}
-                <div className="bg-white rounded-lg border border-[#E9E4DC] p-3 text-xs space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-[#7A6A58]">Số ngày nghỉ dự kiến</span>
-                    <span className="font-semibold text-[#141210]">{calculatedDays} ngày</span>
-                  </div>
-                  <div className="flex justify-between border-t border-[#F6F4F0] pt-1">
-                    <span className="text-[#7A6A58]">Số ca bị ảnh hưởng</span>
-                    <span className="font-semibold text-[#141210]">{calculatedDays} ca</span>
-                  </div>
-                  <div className="flex justify-between border-t border-[#F6F4F0] pt-1">
-                    <span className="text-[#7A6A58]">Quỹ phép sau khi được duyệt</span>
-                    <span className="font-semibold text-[#141210]">
-                      {selectedType === 'ANNUAL'
-                        ? `${quotaAfterApproval} ngày`
-                        : 'Không trừ quỹ phép năm'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* BƯỚC 03: LÝ DO XIN NGHỈ */}
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-[#8C1D2C] uppercase tracking-wider">
-                  03 · Lý do xin nghỉ
-                </p>
-                <label className="block text-xs text-[#7A6A58]">
-                  Vui lòng mô tả ngắn gọn lý do xin nghỉ.
-                </label>
-                <textarea
-                  value={reason}
-                  maxLength={500}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Nhập lý do xin nghỉ của bạn..."
-                  className="w-full p-3 bg-white border border-[#E9E4DC] rounded-lg text-sm focus:outline-none focus:border-[#8C1D2C] min-h-[96px]"
-                />
-                <div className="flex justify-end text-[11px] text-[#7A6A58]">
-                  {reason.length} / 500
-                </div>
-              </div>
-
-              {/* Nút gửi */}
-              <button
-                type="button"
-                disabled={!selectedType || submitting}
-                onClick={handleSubmitLeave}
-                className="w-full py-3 bg-[#8C1D2C] hover:bg-[#6F1623] disabled:opacity-50 text-white font-semibold rounded-lg shadow-sm min-h-[48px] flex items-center justify-center transition-colors"
-              >
-                {submitting ? 'Đang gửi...' : 'Gửi đơn xin nghỉ'}
-              </button>
-              <p className="text-xs text-[#7A6A58] text-center">
-                Gửi xong đơn chuyển sang trạng thái chờ duyệt — quản lý duyệt thì quỹ phép mới trừ.
-              </p>
-            </div>
-          ) : (
-            /* Màn hình thành công B10 */
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg border border-[#E9E4DC] p-6 text-center space-y-3">
-                <CheckCircle2 className="w-12 h-12 text-[#8C1D2C] mx-auto" />
-                <h2 className="text-lg font-bold text-[#2B2118]">Đã gửi đơn xin nghỉ</h2>
-                <p className="text-sm text-[#7A6A58]">
-                  {getTypeName(successReq.type)} · {successReq.startDate} – {successReq.endDate} ·{' '}
-                  {successReq.calendarDays} ngày · {successReq.affectedShifts} ca
-                </p>
-                <div>
-                  <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">
-                    Chờ duyệt
-                  </span>
-                </div>
-                <p className="text-xs text-[#7A6A58]">
-                  Đơn đã được chuyển đến quản lý để phê duyệt.
-                </p>
-              </div>
-
-              <div className="space-y-2">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setView('B9')}
-                  className="w-full py-3 bg-[#8C1D2C] hover:bg-[#6F1623] text-white font-semibold rounded-lg min-h-[48px] flex items-center justify-center transition-colors"
+                  disabled={withdrawing}
+                  onClick={() => setWithdrawTargetId(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-[#E9E4DC] bg-white text-[#2B2118] hover:bg-[#F6F4F0] min-h-[44px]"
                 >
-                  Xem danh sách đơn
+                  Đóng
                 </button>
                 <button
                   type="button"
-                  onClick={handleOpenForm}
-                  className="w-full py-3 text-[#7A6A58] hover:text-[#2B2118] text-sm font-semibold min-h-[44px] flex items-center justify-center"
+                  disabled={withdrawing}
+                  onClick={handleConfirmWithdraw}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-[#D14B3A] hover:bg-red-700 text-white min-h-[44px] disabled:opacity-50"
                 >
-                  Xin nghỉ thêm
+                  {withdrawing ? 'Đang rút...' : 'Xác nhận rút đơn'}
                 </button>
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

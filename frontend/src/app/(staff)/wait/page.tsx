@@ -3,9 +3,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { usePosStore } from '@/stores/usePosStore';
+import { useWaiterStore } from '@/stores/useWaiterStore';
 import { staffService } from '@/services/mock/mockStaffService';
-import { kdsService } from '@/services/mock/mockKdsService';
 import { Shift, Payslip, TipRecord, LeaveBalance, Ticket } from '@/types';
 import {
   Check,
@@ -21,14 +20,14 @@ import {
 
 export default function WaiterHomePage() {
   const staffUser = useAuthStore((s) => s.staffUser);
-  const tables = usePosStore((s) => s.tables);
+  const waiterTablesMap = useWaiterStore((s) => s.tables);
+  const syncFromBackend = useWaiterStore((s) => s.syncFromBackend);
 
   // States dữ liệu
   const [shifts, setShifts] = React.useState<Shift[]>([]);
   const [payslips, setPayslips] = React.useState<Payslip[]>([]);
   const [tips, setTips] = React.useState<TipRecord[]>([]);
   const [leaveBalance, setLeaveBalance] = React.useState<LeaveBalance | null>(null);
-  const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -36,24 +35,23 @@ export default function WaiterHomePage() {
     try {
       setLoading(true);
       setError(null);
-      const [shiftsData, payslipsData, tipsData, leaveData, ticketsData] = await Promise.all([
+      const [shiftsData, payslipsData, tipsData, leaveData] = await Promise.all([
         staffService.getMySchedule(),
         staffService.getPayslips(),
         staffService.getTips(),
         staffService.getLeaveBalance(),
-        kdsService.getTickets(),
+        syncFromBackend(),
       ]);
       setShifts(shiftsData);
       setPayslips(payslipsData);
       setTips(tipsData);
       setLeaveBalance(leaveData);
-      setTickets(ticketsData);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Không thể nạp dữ liệu trang phục vụ');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncFromBackend]);
 
   React.useEffect(() => {
     loadData();
@@ -67,40 +65,61 @@ export default function WaiterHomePage() {
   const t11Payslip = payslips.find((p) => p.month === '2026-11') || payslips[0];
   const t11TipTotal = tips.reduce((sum, t) => sum + t.allocatedAmount, 0);
 
-  // Cảnh báo dị ứng: lọc các ticket có món dị ứng
-  const allergyTickets = React.useMemo(() => {
-    return tickets.filter(
-      (t) =>
-        t.status !== 'SERVED' &&
-        t.status !== 'REJECTED' &&
-        t.items.some(
-          (i) =>
-            i.allergy?.toLowerCase().includes('đậu phộng') ||
-            i.allergy?.toLowerCase().includes('peanut')
+  // Tính 3 metrics nghiệp vụ phục vụ từ dữ liệu thật (useWaiterStore <-> Backend API):
+  const waiterTables = React.useMemo(() => Object.values(waiterTablesMap), [waiterTablesMap]);
+
+  // Cảnh báo dị ứng thực tế từ các món đang hoạt động trong useWaiterStore
+  const allergyTickets = React.useMemo<Ticket[]>(() => {
+    return waiterTables
+      .filter((t) =>
+        t.confirmedItems.some(
+          (i) => i.status !== 'served' && i.status !== 'rejected' && Boolean(i.allergyNote)
         )
-    );
-  }, [tickets]);
+      )
+      .map((t) => ({
+        id: t.orderId || t.id,
+        orderId: t.orderId || t.id,
+        tableId: t.id,
+        tableNo: t.name,
+        status: 'WAITING' as const,
+        createdAt: new Date().toISOString(),
+        slaMinutes: 15,
+        items: t.confirmedItems
+          .filter((i) => i.status !== 'served' && i.status !== 'rejected' && Boolean(i.allergyNote))
+          .map((i) => ({
+            id: i.id,
+            orderId: i.orderId || t.orderId || t.id,
+            dishId: i.dishId,
+            dishName: i.name,
+            quantity: i.qty,
+            unitPrice: i.price,
+            modifiers: [],
+            status: (i.status === 'ready' ? 'READY' : 'WAITING') as 'READY' | 'WAITING',
+            allergy: i.allergyNote,
+            note: i.note,
+            createdAt: new Date().toISOString(),
+          })),
+      }));
+  }, [waiterTables]);
 
-  // Tính 3 metrics nghiệp vụ phục vụ:
-  // 1. Số bàn đang phục vụ: các bàn có trạng thái OCCUPIED hoặc OVERDUE
+  // 1. Số bàn đang phục vụ: các bàn có trạng thái serving hoặc billing
   const servingTablesCount = React.useMemo(() => {
-    return tables.filter((t) => t.status === 'OCCUPIED' || t.status === 'OVERDUE').length;
-  }, [tables]);
+    return waiterTables.filter((t) => t.status === 'serving' || t.status === 'billing').length;
+  }, [waiterTables]);
 
-  // 2. Món chờ giao: các items trong active ticket có trạng thái READY
+  // 2. Món chờ giao: các items trong đơn active có trạng thái ready (READY)
   const itemsWaitingDeliveryCount = React.useMemo(() => {
-    return tickets
-      .filter((t) => t.status !== 'SERVED' && t.status !== 'REJECTED')
-      .flatMap((t) => t.items)
-      .filter((item) => item.status === 'READY').length;
-  }, [tickets]);
+    return waiterTables
+      .flatMap((t) => t.confirmedItems)
+      .filter((item) => item.status === 'ready').length;
+  }, [waiterTables]);
 
-  // 3. Món đã giao: các items có trạng thái SERVED
+  // 3. Món đã giao: các items có trạng thái served (SERVED)
   const itemsDeliveredCount = React.useMemo(() => {
-    return tickets
-      .flatMap((t) => t.items)
-      .filter((item) => item.status === 'SERVED').length;
-  }, [tickets]);
+    return waiterTables
+      .flatMap((t) => t.confirmedItems)
+      .filter((item) => item.status === 'served').length;
+  }, [waiterTables]);
 
   const now = Date.now();
 

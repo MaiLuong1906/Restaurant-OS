@@ -3,16 +3,17 @@
 // Tuân thủ: Design System v6, Tiền tệ số nguyên VND, Phân quyền Waiter
 // ====================================================================
 
-export type WaiterTableStatus = 'serving' | 'vacant' | 'billing' | 'cleaning';
+export type WaiterTableStatus = 'serving' | 'vacant' | 'reserved' | 'billing' | 'cleaning';
 
 export type WaiterTab = 'floor' | 'order' | 'tracking';
 
 export type WaiterItemProgressStatus =
   | 'pending'   // Mới thêm, chưa gửi bếp
-  | 'sent'      // Đã gửi vào KDS, chờ tiếp nhận
+  | 'sent'      // Đã gửi vào KDS, chờ tiếp nhận / đang chế biến (WAITING)
   | 'cooking'   // Bếp đang nấu
-  | 'ready'     // Đã nấu xong, chờ nhân viên lên món
-  | 'served'    // Đã phục vụ tới bàn
+  | 'ready'     // Đã nấu xong, chờ nhân viên lên món (READY)
+  | 'served'    // Đã phục vụ tới bàn (SERVED)
+  | 'rejected'  // Bếp từ chối (REJECTED)
   | 'delayed';  // Quá hạn SLA
 
 export interface WaiterOrderItem {
@@ -27,14 +28,18 @@ export interface WaiterOrderItem {
   status: WaiterItemProgressStatus;
   statusText: string;
   note?: string;
+  allergyNote?: string;
   waitMinutes?: number;
   isUrgent?: boolean;
   tableId: string;
+  orderId?: string;
+  orderCode?: string;
   sentAt?: string;
+  slaDeadline?: string;
 }
 
 export interface WaiterTable {
-  id: string; // '01', '02', '03'...
+  id: string; // UUID từ DB hoặc mã bàn
   name: string; // 'Bàn 01'
   seats: number; // 2, 4, 6, 8
   guests: number; // Số khách thực tế
@@ -44,6 +49,9 @@ export interface WaiterTable {
   server: string; // 'Huy'
   timeIn: string; // '11:30'
   elapsed: string; // '28 phút'
+  orderId?: string | null;
+  orderCode?: string | null;
+  orderStatus?: string | null;
   pendingItems: WaiterOrderItem[];
   confirmedItems: WaiterOrderItem[];
   generalNote?: string;

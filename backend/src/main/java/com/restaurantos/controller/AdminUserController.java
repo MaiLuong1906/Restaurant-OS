@@ -21,7 +21,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @Tag(name = "Admin User Management", description = "Quản trị danh sách nhân sự, phân quyền RBAC & mã PIN trạm")
-@PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
 public class AdminUserController {
 
     private final UserService userService;
@@ -31,6 +30,7 @@ public class AdminUserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('USER:ACCOUNT:VIEW')")
     @Operation(summary = "Lấy danh sách tài khoản nhân sự có phân trang", description = "Trả về danh sách nhân viên có phân trang, hỗ trợ lọc theo roleCode, trạng thái isActive và tìm kiếm theo tên, username, mã nhân viên")
     public ResponseEntity<ApiResponse<PageResponse<UserResponseDto>>> getAllUsers(
             @Parameter(description = "Lọc theo mã vai trò (OWNER, MANAGER, CASHIER, CHEF, WAITER, STAFF) hoặc ALL") @RequestParam(required = false) String role,
@@ -43,6 +43,7 @@ public class AdminUserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER:ACCOUNT:VIEW')")
     @Operation(summary = "Lấy thông tin chi tiết một nhân viên", description = "Xem chi tiết tài khoản nhân sự theo UUID, Mã nhân viên (e.g. TN001) hoặc Username")
     public ResponseEntity<ApiResponse<UserResponseDto>> getUserById(
             @Parameter(description = "Mã UUID, Mã nhân viên (e.g. TN001) hoặc Username") @PathVariable String id) {
@@ -51,6 +52,7 @@ public class AdminUserController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('USER:ACCOUNT:CREATE')")
     @Operation(summary = "Cấp tài khoản nhân sự mới", description = "Tạo mới tài khoản, tự động sinh mã nhân sự theo vai trò (TN001, PV001...), mã hóa mật khẩu và mã PIN trạm nếu có")
     public ResponseEntity<ApiResponse<UserResponseDto>> createUser(
             @Valid @RequestBody CreateUserRequest request) {
@@ -60,6 +62,7 @@ public class AdminUserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER:ACCOUNT:UPDATE')")
     @Operation(summary = "Cập nhật thông tin nhân viên", description = "Chỉnh sửa họ tên, email, số điện thoại hoặc đổi vai trò theo UUID hoặc Mã nhân viên")
     public ResponseEntity<ApiResponse<UserResponseDto>> updateUser(
             @Parameter(description = "Mã UUID, Mã nhân viên hoặc Username") @PathVariable String id,
@@ -69,6 +72,7 @@ public class AdminUserController {
     }
 
     @PutMapping("/{id}/pin")
+    @PreAuthorize("hasAuthority('USER:PIN:UPDATE')")
     @Operation(summary = "Đổi mã PIN trạm", description = "Cập nhật mã PIN 4-6 số cho nhân sự xác thực trạm POS/KDS theo UUID hoặc Mã nhân viên")
     public ResponseEntity<ApiResponse<UserResponseDto>> updatePin(
             @Parameter(description = "Mã UUID, Mã nhân viên hoặc Username") @PathVariable String id,
@@ -78,6 +82,7 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/toggle-status")
+    @PreAuthorize("hasAuthority('USER:STATUS:UPDATE')")
     @Operation(summary = "Khóa hoặc mở khóa tài khoản", description = "Chuyển đổi trạng thái isActive giữa true và false theo UUID hoặc Mã nhân viên")
     public ResponseEntity<ApiResponse<UserResponseDto>> toggleStatus(
             @Parameter(description = "Mã UUID, Mã nhân viên hoặc Username") @PathVariable String id) {
@@ -89,7 +94,7 @@ public class AdminUserController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAuthority('USER:ACCOUNT:DELETE')")
     @Operation(summary = "Xóa mềm tài khoản nhân sự", description = "Đánh dấu thời điểm deleted_at và vô hiệu hóa tài khoản theo UUID hoặc Mã nhân viên")
     public ResponseEntity<ApiResponse<UserResponseDto>> deleteUser(
             @Parameter(description = "Mã UUID, Mã nhân viên hoặc Username") @PathVariable String id) {

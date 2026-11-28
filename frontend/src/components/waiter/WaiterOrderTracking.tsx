@@ -12,7 +12,6 @@ import {
   Flame,
   ArrowLeft,
   ShieldAlert,
-  BellRing,
 } from 'lucide-react';
 import { useWaiterStore } from '@/stores/useWaiterStore';
 import { WaiterOrderItem } from '@/types/waiter';
@@ -28,9 +27,19 @@ export function WaiterOrderTracking() {
   const isSoundAlertEnabled = useWaiterStore((s) => s.isSoundAlertEnabled);
   const toggleSoundAlert = useWaiterStore((s) => s.toggleSoundAlert);
   const confirmItemServed = useWaiterStore((s) => s.confirmItemServed);
+  const servingItemIds = useWaiterStore((s) => s.servingItemIds);
+  const syncFromBackend = useWaiterStore((s) => s.syncFromBackend);
   const pingKitchenItem = useWaiterStore((s) => s.pingKitchenItem);
   const setActiveTab = useWaiterStore((s) => s.setActiveTab);
   const showToast = useWaiterStore((s) => s.showToast);
+
+  React.useEffect(() => {
+    void syncFromBackend();
+    const timer = setInterval(() => {
+      void syncFromBackend();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [syncFromBackend]);
 
   const tableList = React.useMemo(() => Object.values(tables), [tables]);
 
@@ -49,11 +58,11 @@ export function WaiterOrderTracking() {
     return list;
   }, [tableList, trackingTableFilter]);
 
-  // 4 Kanban Columns
-  const pendingItems = filteredDishes.filter((d) => d.status === 'sent' || d.status === 'pending');
-  const cookingItems = filteredDishes.filter((d) => d.status === 'cooking');
+  // 4 Kanban Columns chuẩn mô hình KDS V3 (WAITING, READY, SERVED, DELAYED/REJECTED)
+  const pendingItems = filteredDishes.filter((d) => d.status === 'sent' || d.status === 'pending' || d.status === 'cooking');
   const readyItems = filteredDishes.filter((d) => d.status === 'ready');
-  const delayedItems = filteredDishes.filter((d) => d.status === 'delayed');
+  const servedItems = filteredDishes.filter((d) => d.status === 'served');
+  const delayedOrRejectedItems = filteredDishes.filter((d) => d.status === 'delayed' || d.status === 'rejected');
 
   // Filter allergy alerts by tracking table filter
   const filteredAllergies = React.useMemo(() => {
@@ -127,7 +136,10 @@ export function WaiterOrderTracking() {
 
           <button
             type="button"
-            onClick={() => showToast('Đang kết nối lại trạm KDS... Dữ liệu đã đồng bộ mới nhất')}
+            onClick={() => {
+              void syncFromBackend();
+              showToast('Đang đồng bộ tiến độ món mới nhất từ Bếp KDS...');
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ops-brand hover:bg-ops-brand-dark text-white text-xs font-bold transition-colors shadow-xs"
           >
             <RefreshCw className="h-4 w-4" />
@@ -211,7 +223,7 @@ export function WaiterOrderTracking() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="px-2 py-0.5 rounded bg-ops-brand-light text-ops-brand text-[11px] font-bold">
-                      Bàn {item.tableId}
+                      {tables[item.tableId]?.name || `Bàn ${item.tableId}`}
                     </span>
                     <span className="text-[11px] text-ops-muted flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -235,61 +247,45 @@ export function WaiterOrderTracking() {
           </div>
         </div>
 
-        {/* COLUMN 2: BẾP ĐANG NẤU */}
+        {/* COLUMN 2: ĐÃ PHỤC VỤ (SERVED) */}
         <div className="flex flex-col gap-3 rounded-xl bg-ops-bg p-3.5 border border-ops-border">
           <div className="flex items-center justify-between border-b border-ops-border/70 pb-2">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-ink">Bếp đang nấu</h4>
+              <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-ink">Đã phục vụ</h4>
             </div>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-              {cookingItems.length} món
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
+              {servedItems.length} món
             </span>
           </div>
 
           <div className="flex flex-col gap-2.5 min-h-[140px]">
-            {cookingItems.length === 0 ? (
+            {servedItems.length === 0 ? (
               <div className="p-4 text-center text-xs text-ops-muted bg-white/60 rounded-lg border border-dashed border-ops-border">
-                Không có món nào đang nấu.
+                Chưa có món nào đã phục vụ.
               </div>
             ) : (
-              cookingItems.map((item) => (
+              servedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3 bg-white rounded-xl border border-amber-200/80 shadow-xs flex flex-col gap-2 text-left"
+                  className="p-3 bg-white rounded-xl border border-sky-200/80 shadow-xs flex flex-col gap-2 text-left"
                 >
                   <div className="flex items-start justify-between">
-                    <span className="px-2 py-0.5 rounded bg-ops-brand-light text-ops-brand text-[11px] font-bold">
-                      Bàn {item.tableId}
+                    <span className="px-2 py-0.5 rounded bg-sky-50 text-sky-800 text-[11px] font-bold">
+                      {tables[item.tableId]?.name || `Bàn ${item.tableId}`}
                     </span>
-                    <span className="text-[11px] text-amber-700 font-semibold flex items-center gap-1">
-                      <Clock className="h-3 w-3 animate-spin" />
-                      {item.waitMinutes || 6}p
+                    <span className="text-[11px] text-sky-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Đã giao
                     </span>
                   </div>
                   <div className="flex flex-col leading-tight">
                     <span className="text-xs font-bold text-ink">
                       {item.qty}x {item.name}
                     </span>
-                    <span className="text-[11px] text-ops-muted mt-0.5">{item.station}</span>
-                    {item.note ? (
-                      <span className="text-[10px] text-amber-700 bg-amber-50 p-1 rounded mt-1">
-                        Ghi chú: {item.note}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="pt-2 border-t border-ops-border/50 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        pingKitchenItem(item.tableId, item.id);
-                        showToast(`Đã hối bếp cho ${item.name} (Bàn ${item.tableId})!`);
-                      }}
-                      className="px-2.5 py-1 rounded bg-ops-bg hover:bg-sand-200 text-ink text-[11px] font-semibold flex items-center gap-1 transition-colors"
-                    >
-                      <BellRing className="h-3 w-3 text-ops-brand" />
-                      <span>Hối bếp</span>
-                    </button>
+                    <span className="text-[11px] text-ops-muted mt-0.5">
+                      {item.orderCode ? `${item.orderCode} • ` : ''}{item.station}
+                    </span>
                   </div>
                 </div>
               ))
@@ -322,7 +318,7 @@ export function WaiterOrderTracking() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[11px] font-bold">
-                      Bàn {item.tableId}
+                      {tables[item.tableId]?.name || `Bàn ${item.tableId}`}
                     </span>
                     <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -338,14 +334,14 @@ export function WaiterOrderTracking() {
                   <div className="pt-2 border-t border-ops-border/50">
                     <button
                       type="button"
+                      disabled={Boolean(servingItemIds[item.id])}
                       onClick={() => {
-                        confirmItemServed(item.tableId, item.id);
-                        showToast(`Đã xác nhận phục vụ ${item.name} cho Bàn ${item.tableId}!`);
+                        void confirmItemServed(item.tableId, item.id);
                       }}
-                      className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                      className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
                     >
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>Xác nhận lên món</span>
+                      <span>{servingItemIds[item.id] ? 'Đang cập nhật...' : 'Xác nhận lên món'}</span>
                     </button>
                   </div>
                 </div>
@@ -354,62 +350,82 @@ export function WaiterOrderTracking() {
           </div>
         </div>
 
-        {/* COLUMN 4: CẢNH BÁO TRỄ SLA */}
+        {/* COLUMN 4: QUÁ HẠN SLA / BẾP TỪ CHỐI */}
         <div className="flex flex-col gap-3 rounded-xl bg-ops-bg p-3.5 border border-ops-border">
           <div className="flex items-center justify-between border-b border-ops-border/70 pb-2">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-ops-alert animate-ping" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-ops-alert">Quá hạn SLA</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-ops-alert">Trễ SLA / Từ chối</h4>
             </div>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-ops-alert border border-rose-200">
-              {delayedItems.length} món
+              {delayedOrRejectedItems.length} món
             </span>
           </div>
 
           <div className="flex flex-col gap-2.5 min-h-[140px]">
-            {delayedItems.length === 0 ? (
+            {delayedOrRejectedItems.length === 0 ? (
               <div className="p-4 text-center text-xs text-ops-muted bg-white/60 rounded-lg border border-dashed border-ops-border">
-                Không có món nào bị trễ SLA.
+                Không có món nào bị trễ SLA hoặc từ chối.
               </div>
             ) : (
-              delayedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 bg-white rounded-xl border border-rose-300 shadow-xs flex flex-col gap-2 text-left"
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="px-2 py-0.5 rounded bg-rose-50 text-ops-alert text-[11px] font-bold">
-                      Bàn {item.tableId}
-                    </span>
-                    <span className="text-[11px] text-ops-alert font-bold flex items-center gap-1">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Trễ {item.waitMinutes || 20}p
-                    </span>
+              delayedOrRejectedItems.map((item) => {
+                const isRejected = item.status === 'rejected';
+                const tableName = tables[item.tableId]?.name || `Bàn ${item.tableId}`;
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      'p-3 bg-white rounded-xl shadow-xs flex flex-col gap-2 text-left border',
+                      isRejected ? 'border-neutral-300' : 'border-rose-300'
+                    )}
+                  >
+                    <div className="flex items-start justify-between">
+                      <span className="px-2 py-0.5 rounded bg-rose-50 text-ops-alert text-[11px] font-bold">
+                        {tableName}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-[11px] font-bold flex items-center gap-1',
+                          isRejected ? 'text-neutral-700' : 'text-ops-alert'
+                        )}
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        {isRejected ? 'Bếp từ chối' : `Trễ ${item.waitMinutes || 20}p`}
+                      </span>
+                    </div>
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-xs font-bold text-ink">
+                        {item.qty}x {item.name}
+                      </span>
+                      <span className="text-[11px] text-ops-muted mt-0.5">{item.station}</span>
+                      {isRejected ? (
+                        <span className="text-[10px] text-neutral-700 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold mt-1">
+                          Món bị bếp từ chối — cần thông báo khách
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-ops-alert font-semibold mt-1">
+                          ⚠️ Quá hạn thời gian cam kết của trạm
+                        </span>
+                      )}
+                    </div>
+                    {!isRejected ? (
+                      <div className="pt-2 border-t border-ops-border/50">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            pingKitchenItem(item.tableId, item.id);
+                            showToast(`⚡ ĐÃ BẮN TÍN HIỆU HỐI BẾP KHẨN CẤP: ${item.name} (${tableName})!`);
+                          }}
+                          className="w-full py-1.5 px-3 rounded-lg bg-ops-alert hover:bg-rose-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                        >
+                          <Flame className="h-4 w-4" />
+                          <span>Hối bếp khẩn cấp</span>
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-xs font-bold text-ink">
-                      {item.qty}x {item.name}
-                    </span>
-                    <span className="text-[11px] text-ops-muted mt-0.5">{item.station}</span>
-                    <span className="text-[10px] text-ops-alert font-semibold mt-1">
-                      ⚠️ Quá hạn thời gian cam kết của trạm
-                    </span>
-                  </div>
-                  <div className="pt-2 border-t border-ops-border/50">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        pingKitchenItem(item.tableId, item.id);
-                        showToast(`⚡ ĐÃ BẮN TÍN HIỆU HỐI BẾP KHẨN CẤP: ${item.name} (Bàn ${item.tableId})!`);
-                      }}
-                      className="w-full py-1.5 px-3 rounded-lg bg-ops-alert hover:bg-rose-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
-                    >
-                      <Flame className="h-4 w-4" />
-                      <span>Hối bếp khẩn cấp</span>
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -442,7 +458,7 @@ export function WaiterOrderTracking() {
               >
                 <div className="flex items-start justify-between">
                   <span className="px-2 py-0.5 rounded bg-ops-brand-light text-ops-brand text-xs font-bold">
-                    Bàn {alert.tableId}
+                    {tables[alert.tableId]?.name || alert.tableId}
                   </span>
                   <span className="text-[11px] text-ops-muted">{alert.time}</span>
                 </div>

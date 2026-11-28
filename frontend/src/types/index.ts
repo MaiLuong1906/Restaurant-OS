@@ -90,7 +90,7 @@ export interface Batch {
 // DTOs & Models cho Staff Portal & KDS Authentication
 // --------------------------------------------------------------------
 
-export type StaffRole = 'MANAGER' | 'CHEF' | 'STAFF' | 'CASHIER' | 'WAITER';
+export type StaffRole = 'OWNER' | 'MANAGER' | 'CHEF' | 'STAFF' | 'CASHIER' | 'WAITER';
 
 export interface StaffUser {
   id: string;
@@ -299,7 +299,7 @@ export interface CashierInvoiceItem {
   name: string;
   qty: number;
   unitPrice: number; // VND integer
-  status: 'WAITING' | 'READY' | 'SERVED';
+  status: 'WAITING' | 'READY' | 'SERVED' | 'REJECTED';
   note?: string;
 }
 

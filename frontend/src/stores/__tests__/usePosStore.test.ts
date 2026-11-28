@@ -356,7 +356,7 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
     expect(usePosStore.getState().shift.status).toBe('OPEN');
   });
 
-  it('Sơ đồ bàn trực quan: syncWithBackend phải đồng bộ danh sách bàn thật từ /tables, gắn món từ /orders/active và cảnh báo dị ứng', async () => {
+  it('Sơ đồ bàn trực quan: syncWithBackend phải đồng bộ danh sách bàn thật từ /tables, gắn món từ /orders/active, giữ món REJECTED (không tính tiền), không suy đoán số khách/dị ứng sai', async () => {
     usePosStore.setState({ tables: [], reservations: [], hasBackendTableUuids: false });
 
     const table1Uuid = '11111111-1111-4111-8111-111111111111';
@@ -392,7 +392,8 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
             tableId: table4Uuid,
             orderCode: 'ORD-004',
             status: 'PLACED',
-            totalAmount: 190000,
+            totalAmount: 275000,
+            customerNotes: 'Không dị ứng',
             openedAt: opened50MinAgo,
             items: [
               {
@@ -404,6 +405,16 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
                 status: 'SERVED',
                 notes: 'Ít hành',
                 allergyNote: 'Dị ứng đậu phộng nghiêm ngặt',
+              },
+              {
+                id: 'item-2',
+                dishId: 'dish-2',
+                dishNameSnapshot: 'Nem Rán Phố Cổ',
+                quantity: 1,
+                unitPrice: 85000,
+                status: 'REJECTED',
+                notes: 'Hết nguyên liệu',
+                allergyNote: null,
               },
             ],
           },
@@ -427,12 +438,49 @@ describe('usePosStore - Nghiệp vụ Thu ngân (5 Cashier Use Cases & Số nguy
     // Ngồi 50 phút >= 45 phút SLA -> OVERDUE
     expect(t4.status).toBe('OVERDUE');
     expect(t4.area).toBe('Tầng 2 VIP');
-    expect(t4.items).toHaveLength(1);
+    // Không tự bịa số khách từ số lượng món khi khách vãng lai chưa có partySize
+    expect(t4.guests).toBe(0);
+    // Cả món SERVED và món REJECTED đều được giữ lại trên hóa đơn, nhưng REJECTED không tính vào subtotal
+    expect(t4.items).toHaveLength(2);
     expect(t4.items[0].name).toBe('Phở Bò Đặc Biệt');
-    expect(t4.items[0].qty).toBe(2);
-    expect(t4.items[0].unitPrice).toBe(95000);
-    expect(t4.allergyAlert).toContain('Dị ứng đậu phộng nghiêm ngặt');
+    expect(t4.items[0].status).toBe('SERVED');
+    expect(t4.items[1].name).toBe('Nem Rán Phố Cổ');
+    expect(t4.items[1].status).toBe('REJECTED');
+    expect(t4.allergyAlert).toBe('Dị ứng đậu phộng nghiêm ngặt');
     expect(computeTableSubtotal(t4)).toBe(190000);
+
+    spy.mockRestore();
+  });
+
+  it('lockTableForSettlement / unlockTableState / markTableCleanDone phải hoàn tác (revert) trạng thái khi PATCH lỗi', async () => {
+    const table2Uuid = '22222222-2222-4222-8222-222222222222';
+    usePosStore.setState({
+      tables: [
+        {
+          id: table2Uuid,
+          label: 'Bàn 02',
+          seats: 4,
+          area: 'Sảnh Tầng 1',
+          status: 'OCCUPIED',
+          guests: 2,
+          seatedMin: 20,
+          staff: 'Phục vụ',
+          depositAmount: 0,
+          discountAmount: 0,
+          items: [{ id: 'i_1', name: 'Phở Bò', qty: 1, unitPrice: 95000, status: 'SERVED' }],
+        },
+      ],
+    });
+
+    const spy = vi.spyOn(apiClient, 'fetchApi').mockRejectedValue(new Error('403 Forbidden'));
+
+    usePosStore.getState().lockTableForSettlement(table2Uuid);
+    // Đợi promise catch xử lý revert
+    await new Promise((r) => setTimeout(r, 10));
+
+    const revertedTable = usePosStore.getState().tables.find((t) => t.id === table2Uuid)!;
+    expect(revertedTable.status).toBe('OCCUPIED');
+    expect(usePosStore.getState().lastActionToast).toContain('Không thể khóa trạng thái');
 
     spy.mockRestore();
   });

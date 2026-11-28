@@ -375,20 +375,43 @@ export function SettlementSheet({
 
               {/* Danh sách món */}
               <div className="my-3 max-h-48 divide-y divide-dashed divide-sand-300 overflow-y-auto text-xs">
-                {table.items.map((it) => (
-                  <div key={it.id} className="flex items-baseline justify-between py-2">
-                    <div className="pr-2">
-                      <span className="font-bold text-ink">{it.name}</span>
-                      <span className="ops-nums ml-1 text-muted">×{it.qty}</span>
-                      {it.note ? (
-                        <p className="text-[11px] italic text-primary-600">({it.note})</p>
-                      ) : null}
+                {table.items.map((it) => {
+                  const isRejected = it.status === 'REJECTED';
+                  return (
+                    <div
+                      key={it.id}
+                      className={`flex items-baseline justify-between py-2 ${
+                        isRejected ? 'opacity-65' : ''
+                      }`}
+                    >
+                      <div className="pr-2">
+                        <span
+                          className={`font-bold ${
+                            isRejected ? 'text-muted line-through' : 'text-ink'
+                          }`}
+                        >
+                          {it.name}
+                        </span>
+                        <span className="ops-nums ml-1 text-muted">×{it.qty}</span>
+                        {isRejected ? (
+                          <span className="ml-1.5 rounded bg-kds-overdue-bg px-1.5 py-0.5 text-[10px] font-bold text-danger-600">
+                            Bếp báo hủy
+                          </span>
+                        ) : null}
+                        {it.note ? (
+                          <p className="text-[11px] italic text-primary-600">({it.note})</p>
+                        ) : null}
+                      </div>
+                      <span
+                        className={`ops-nums shrink-0 font-bold ${
+                          isRejected ? 'text-muted line-through' : 'text-ink'
+                        }`}
+                      >
+                        {isRejected ? '0 ₫' : formatVND(it.qty * it.unitPrice)}
+                      </span>
                     </div>
-                    <span className="ops-nums shrink-0 font-bold text-ink">
-                      {formatVND(it.qty * it.unitPrice)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Tổng hợp tiền tệ VND */}

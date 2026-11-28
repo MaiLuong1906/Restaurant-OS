@@ -125,8 +125,9 @@ function mapBackendTableStatus(
 
 function mapBackendItemStatus(
   status?: string | null
-): 'WAITING' | 'READY' | 'SERVED' {
+): 'WAITING' | 'READY' | 'SERVED' | 'REJECTED' {
   const normalized = (status || '').toUpperCase();
+  if (normalized === 'REJECTED') return 'REJECTED';
   if (normalized === 'SERVED') return 'SERVED';
   if (normalized === 'READY') return 'READY';
   return 'WAITING';
@@ -345,7 +346,10 @@ function createInitialAttendance(
 }
 
 export function computeTableSubtotal(table: CashierTable): number {
-  return table.items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
+  return table.items.reduce(
+    (sum, item) => (item.status === 'REJECTED' ? sum : sum + item.qty * item.unitPrice),
+    0
+  );
 }
 
 export function computeTablePayable(table: CashierTable): number {
@@ -602,20 +606,20 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
           const activeOrder = activeOrderByTableId.get(bt.id);
 
           const orderItems = activeOrder
-            ? (activeOrder.items ?? [])
-                .filter((it) => (it.status || '').toUpperCase() !== 'REJECTED')
-                .map((it) => {
-                  const noteParts = [it.notes?.trim(), it.allergyNote ? `Dị ứng: ${it.allergyNote.trim()}` : '']
-                    .filter(Boolean);
-                  return {
-                    id: it.id,
-                    name: it.dishNameSnapshot || 'Món ăn',
-                    qty: Math.max(1, Math.round(Number(it.quantity) || 1)),
-                    unitPrice: Math.max(0, Math.round(Number(it.unitPrice) || 0)),
-                    status: mapBackendItemStatus(it.status),
-                    note: noteParts.length > 0 ? noteParts.join(' • ') : undefined,
-                  };
-                })
+            ? (activeOrder.items ?? []).map((it) => {
+                const noteParts = [
+                  it.notes?.trim(),
+                  it.allergyNote ? `Dị ứng: ${it.allergyNote.trim()}` : '',
+                ].filter(Boolean);
+                return {
+                  id: it.id,
+                  name: it.dishNameSnapshot || 'Món ăn',
+                  qty: Math.max(1, Math.round(Number(it.quantity) || 1)),
+                  unitPrice: Math.max(0, Math.round(Number(it.unitPrice) || 0)),
+                  status: mapBackendItemStatus(it.status),
+                  note: noteParts.length > 0 ? noteParts.join(' • ') : undefined,
+                };
+              })
             : prev?.items ?? [];
 
           const allergyNotes = activeOrder
@@ -652,8 +656,6 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
                 ? 0
                 : prev?.guests && prev.guests > 0
                 ? prev.guests
-                : activeOrder
-                ? Math.min(bt.capacity || 4, Math.max(1, orderItems.reduce((s, i) => s + i.qty, 0)))
                 : 0,
             seatedMin,
             staff:
@@ -668,8 +670,8 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
             allergyAlert:
               allergyNotes.length > 0
                 ? allergyNotes.join(' | ')
-                : activeOrder?.customerNotes?.toLowerCase().includes('dị ứng')
-                ? activeOrder.customerNotes
+                : activeOrder
+                ? undefined
                 : prev?.allergyAlert,
             mergedIntoTableId: prev?.mergedIntoTableId,
             mergedIntoTableLabel: prev?.mergedIntoTableLabel,
@@ -814,7 +816,9 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
         client.subscribe('/topic/pos/tables', (message: { body: string }) => {
           try {
             const event = JSON.parse(message.body);
-            if (event.type === 'TABLE_UPDATED' && event.table) {
+            const eventType = String(event.type ?? event.eventType ?? '').toUpperCase();
+
+            if (eventType === 'TABLE_UPDATED' && event.table) {
               set((state) => ({
                 tables: state.tables.map((t) =>
                   t.id === event.table.id ? { ...t, ...event.table } : t
@@ -824,8 +828,22 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
               return;
             }
 
-            // Xử lý PosTableEvent từ ReservationServiceImpl (RESERVATION_CREATED, RESERVATION_UPDATED, RESERVATION_CHECKED_IN, RESERVATION_CANCELLED, RESERVATION_NO_SHOW)
+            if (eventType === 'ORDER_ITEM_SERVED' && event.itemId) {
+              set((state) => ({
+                tables: state.tables.map((t) => ({
+                  ...t,
+                  items: t.items.map((it) =>
+                    it.id === event.itemId ? { ...it, status: 'SERVED' } : it
+                  ),
+                })),
+                lastSyncedAt: Date.now(),
+              }));
+              return;
+            }
+
+            // Xử lý PosTableEvent / TABLE_STATUS_UPDATED / ORDER_UPDATED / RESERVATION_*
             if (event.tableId || event.tableNumber) {
+              const rawTableStatus = event.tableStatus ?? event.status;
               set((state) => ({
                 tables: state.tables.map((t) => {
                   const match =
@@ -833,29 +851,44 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
                     (event.tableNumber &&
                       t.label.trim().toLowerCase() === String(event.tableNumber).trim().toLowerCase());
                   if (!match) return t;
-                  const nextStatus = mapBackendTableStatus(event.tableStatus);
+                  const mappedNextStatus = rawTableStatus
+                    ? mapBackendTableStatus(rawTableStatus)
+                    : t.status;
+                  // Nếu chỉ là ORDER_UPDATED trên bàn đang LOCKED bởi thu ngân thì giữ nguyên LOCKED
+                  const nextStatus =
+                    eventType === 'ORDER_UPDATED' && t.status === 'LOCKED'
+                      ? 'LOCKED'
+                      : mappedNextStatus;
                   return {
                     ...t,
                     id: event.tableId ?? t.id,
                     status: nextStatus,
                     guests:
-                      nextStatus === 'IDLE'
+                      nextStatus === 'IDLE' || nextStatus === 'CLEANING'
                         ? 0
                         : typeof event.guestCount === 'number'
                         ? event.guestCount
                         : t.guests,
                     depositAmount:
-                      nextStatus === 'IDLE'
+                      nextStatus === 'IDLE' || nextStatus === 'CLEANING'
                         ? 0
                         : typeof event.depositAmount === 'number'
                         ? event.depositAmount
                         : t.depositAmount,
-                    reservationId: nextStatus === 'IDLE' ? undefined : event.reservationId ?? t.reservationId,
+                    reservationId:
+                      nextStatus === 'IDLE' || nextStatus === 'CLEANING'
+                        ? undefined
+                        : event.reservationId ?? t.reservationId,
                   };
                 }),
                 lastSyncedAt: Date.now(),
               }));
-              void get().syncWithBackend();
+
+              // Chỉ gọi syncWithBackend khi có món mới (ORDER_UPDATED) hoặc thay đổi danh sách đơn đặt bàn (RESERVATION_*)
+              // Tránh refetch toàn bộ 4 endpoint mỗi khi lock/unlock/dọn bàn (TABLE_STATUS_CHANGED / TABLE_STATUS_UPDATED)
+              if (eventType === 'ORDER_UPDATED' || eventType.startsWith('RESERVATION_')) {
+                void get().syncWithBackend();
+              }
             }
           } catch (err) {
             console.error('[POS STOMP] Lỗi đọc frame:', err);
@@ -1370,6 +1403,9 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     const target = tables.find((t) => t.id === tableId);
     if (!target || target.status === 'IDLE' || target.status === 'CLEANING') return;
 
+    const prevTables = tables.map((t) => ({ ...t }));
+    const isUuidTable = UUID_V4_REGEX.test(tableId);
+
     set({
       tables: tables.map((t) =>
         t.id === tableId
@@ -1380,21 +1416,41 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
             }
           : t
       ),
-      lastActionToast: `Đã khóa trạng thái ${target.label} (Lock Table State) để quyết toán an toàn.`,
+      lastActionToast: isUuidTable
+        ? `Đang khóa trạng thái ${target.label} trên máy chủ...`
+        : `Đã khóa trạng thái ${target.label} (Lock Table State) để quyết toán an toàn.`,
     });
 
-    if (UUID_V4_REGEX.test(tableId)) {
+    if (isUuidTable) {
       fetchApi(`/tables/${tableId}/status`, {
         method: 'PATCH',
         headers: { 'X-Idempotency-Key': idempotencyKey },
         body: JSON.stringify({ status: 'BILLING' }),
-      }).catch(() => {});
+      })
+        .then(() => {
+          set({
+            lastActionToast: `Đã khóa trạng thái ${target.label} (Lock Table State) để quyết toán an toàn.`,
+          });
+        })
+        .catch((err) => {
+          const reason = err instanceof Error ? err.message : 'Lỗi máy chủ khi khóa bàn';
+          set({
+            tables: prevTables,
+            lastActionToast: `Không thể khóa trạng thái ${target.label}: ${reason}. Vui lòng thử lại.`,
+          });
+        });
     }
   },
 
   unlockTableState: (tableId) => {
     const idempotencyKey = generateIdempotencyKey();
     const { tables } = get();
+    const target = tables.find((t) => t.id === tableId);
+    if (!target || target.status !== 'LOCKED') return;
+
+    const prevTables = tables.map((t) => ({ ...t }));
+    const isUuidTable = UUID_V4_REGEX.test(tableId);
+
     set({
       tables: tables.map((t) =>
         t.id === tableId && t.status === 'LOCKED'
@@ -1405,15 +1461,29 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
             }
           : t
       ),
-      lastActionToast: 'Đã mở khóa trạng thái bàn.',
+      lastActionToast: isUuidTable
+        ? `Đang mở khóa trạng thái ${target.label} trên máy chủ...`
+        : 'Đã mở khóa trạng thái bàn.',
     });
 
-    if (UUID_V4_REGEX.test(tableId)) {
+    if (isUuidTable) {
       fetchApi(`/tables/${tableId}/status`, {
         method: 'PATCH',
         headers: { 'X-Idempotency-Key': idempotencyKey },
         body: JSON.stringify({ status: 'SERVING' }),
-      }).catch(() => {});
+      })
+        .then(() => {
+          set({
+            lastActionToast: 'Đã mở khóa trạng thái bàn.',
+          });
+        })
+        .catch((err) => {
+          const reason = err instanceof Error ? err.message : 'Lỗi máy chủ khi mở khóa bàn';
+          set({
+            tables: prevTables,
+            lastActionToast: `Không thể mở khóa ${target.label}: ${reason}. Vui lòng thử lại.`,
+          });
+        });
     }
   },
 
@@ -1627,21 +1697,39 @@ export const usePosStore = create<PosStoreState>((set, get) => ({
     const { tables } = get();
     const table = tables.find((t) => t.id === tableId);
     if (!table) return;
+
+    const prevTables = tables.map((t) => ({ ...t }));
+    const isUuidTable = UUID_V4_REGEX.test(tableId);
+
     set({
       tables: tables.map((t) =>
         t.id === tableId
           ? { ...t, status: 'IDLE', staff: '', guests: 0, seatedMin: 0, items: [] }
           : t
       ),
-      lastActionToast: `${table.label} đã dọn xong và sẵn sàng đón khách mới.`,
+      lastActionToast: isUuidTable
+        ? `Đang xác nhận dọn xong ${table.label} với máy chủ...`
+        : `${table.label} đã dọn xong và sẵn sàng đón khách mới.`,
     });
 
-    if (UUID_V4_REGEX.test(tableId)) {
+    if (isUuidTable) {
       fetchApi(`/tables/${tableId}/status`, {
         method: 'PATCH',
         headers: { 'X-Idempotency-Key': idempotencyKey },
         body: JSON.stringify({ status: 'VACANT' }),
-      }).catch(() => {});
+      })
+        .then(() => {
+          set({
+            lastActionToast: `${table.label} đã dọn xong và sẵn sàng đón khách mới.`,
+          });
+        })
+        .catch((err) => {
+          const reason = err instanceof Error ? err.message : 'Lỗi máy chủ khi cập nhật dọn bàn';
+          set({
+            tables: prevTables,
+            lastActionToast: `Không thể xác nhận dọn bàn ${table.label}: ${reason}. Vui lòng thử lại.`,
+          });
+        });
     }
   },
 
