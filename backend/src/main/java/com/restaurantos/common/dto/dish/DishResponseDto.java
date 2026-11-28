@@ -69,14 +69,6 @@ public record DishResponseDto(
         this(id, name, description, price, category, categoryId, imageUrl, isAvailable, isCombo, soldOutReason, createdAt, updatedAt, comboItems, java.util.Collections.emptyList());
     }
 
-    public static DishResponseDto fromEntity(DishEntity entity) {
-        return fromEntity(entity, null, null);
-    }
-
-    public static DishResponseDto fromEntity(DishEntity entity, java.util.List<ComboItemResponse> comboItems) {
-        return fromEntity(entity, comboItems, null);
-    }
-
     public static DishResponseDto fromEntity(
             DishEntity entity,
             java.util.List<ComboItemResponse> comboItems,

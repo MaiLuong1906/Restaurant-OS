@@ -43,7 +43,7 @@ public record UpdateDishRequest(
 
         @Schema(description = "Danh sách các nhóm tùy chọn (Kích cỡ, Độ cay, Topping)")
         @com.fasterxml.jackson.annotation.JsonAlias({"optionGroups", "options"})
-        java.util.List<DishOptionGroupDto> options
+        java.util.List<@jakarta.validation.Valid DishOptionGroupDto> options
 ) {
     // Secondary constructor giữ tương thích ngược với code cũ và unit tests
     public UpdateDishRequest(

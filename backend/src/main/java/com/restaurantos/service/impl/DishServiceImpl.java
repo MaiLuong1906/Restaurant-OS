@@ -7,6 +7,7 @@ import com.restaurantos.common.dto.dish.ComboItemRequest;
 import com.restaurantos.common.dto.dish.ComboItemResponse;
 import com.restaurantos.common.dto.dish.CreateDishRequest;
 import com.restaurantos.common.dto.dish.DishOptionGroupDto;
+import com.restaurantos.common.dto.dish.DishOptionItemDto;
 import com.restaurantos.common.dto.dish.DishResponseDto;
 import com.restaurantos.common.dto.dish.UpdateDishAvailabilityRequest;
 import com.restaurantos.common.dto.dish.UpdateDishRequest;
@@ -136,6 +137,8 @@ public class DishServiceImpl implements DishService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Danh mục không hợp lệ: '" + request.category() + "'. Danh mục hợp lệ: " + Arrays.toString(DishCategory.values())));
 
+        validateAndNormalizeOptions(request.options());
+
         Instant now = Instant.now();
         DishEntity dish = DishEntity.builder()
                 .id(UUID.randomUUID())
@@ -202,6 +205,7 @@ public class DishServiceImpl implements DishService {
         }
 
         if (request.options() != null) {
+            validateAndNormalizeOptions(request.options());
             dish.setOptions(serializeOptions(request.options()));
         }
 
@@ -244,7 +248,7 @@ public class DishServiceImpl implements DishService {
                 updated.getId(), updated.getIsAvailable(), updated.getSoldOutReason());
 
         List<ComboItemResponse> comboItems = Boolean.TRUE.equals(updated.getIsCombo()) ? loadComboItems(id) : Collections.emptyList();
-        return DishResponseDto.fromEntity(updated, comboItems);
+        return DishResponseDto.fromEntity(updated, comboItems, parseOptions(updated.getOptions()));
     }
 
     @Override
@@ -346,5 +350,68 @@ public class DishServiceImpl implements DishService {
             return null;
         }
         return search.trim();
+    }
+
+    private void validateAndNormalizeOptions(List<DishOptionGroupDto> options) {
+        if (options == null || options.isEmpty()) {
+            return;
+        }
+
+        Set<String> groupIds = new HashSet<>();
+        for (DishOptionGroupDto group : options) {
+            if (group.id() == null || group.id().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID nhóm tùy chọn không được để trống");
+            }
+            if (!groupIds.add(group.id())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trùng ID nhóm tùy chọn: " + group.id());
+            }
+            if (group.name() == null || group.name().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên nhóm tùy chọn không được để trống");
+            }
+
+            int minSel = group.minSelections() != null ? group.minSelections() : (Boolean.TRUE.equals(group.isRequired()) ? 1 : 0);
+            int maxSel = group.maxSelections() != null ? group.maxSelections() : 1;
+
+            if (minSel < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minSelections không được nhỏ hơn 0");
+            }
+            if (maxSel < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxSelections phải từ 1 trở lên");
+            }
+            if (maxSel < minSel) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxSelections không được nhỏ hơn minSelections");
+            }
+            if (Boolean.TRUE.equals(group.isRequired()) && minSel < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nhóm bắt buộc chọn phải có minSelections >= 1");
+            }
+
+            if (group.items() == null || group.items().isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nhóm tùy chọn '" + group.name() + "' phải có ít nhất 1 lựa chọn con");
+            }
+
+            Set<String> itemIds = new HashSet<>();
+            int defaultCount = 0;
+            for (DishOptionItemDto item : group.items()) {
+                if (item.id() == null || item.id().isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID lựa chọn không được để trống");
+                }
+                if (!itemIds.add(item.id())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trùng ID lựa chọn trong cùng một nhóm: " + item.id());
+                }
+                if (item.name() == null || item.name().isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên lựa chọn con không được để trống");
+                }
+                if (item.extraPrice() == null || item.extraPrice() < 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Giá phụ thu không được âm");
+                }
+                if (Boolean.TRUE.equals(item.isDefault())) {
+                    defaultCount++;
+                }
+            }
+
+            if (maxSel == 1 && defaultCount > 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nhóm chọn 1 duy nhất không được có quá 1 lựa chọn mặc định");
+            }
+        }
     }
 }
