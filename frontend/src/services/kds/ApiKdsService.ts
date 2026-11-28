@@ -107,19 +107,74 @@ export class ApiKdsService implements KdsService {
   }
 
   async listDishAvailability(): Promise<DishAvailability[]> {
-    return [];
+    interface BackendDishItem {
+      id: string;
+      name: string;
+      category?: string;
+      isAvailable: boolean;
+      soldOutReason?: string | null;
+    }
+    const dishes = await fetchApi<BackendDishItem[]>('/dishes');
+    return dishes.map((d) => ({
+      dishId: d.id,
+      dishName: d.name,
+      status: d.isAvailable ? 'AVAILABLE' : 'SOLD_OUT',
+      remainingPortions: d.isAvailable ? 1 : 0,
+      waitingTables: [],
+    }));
   }
 
-  async markSoldOut(_dishId: string, _idempotencyKey: string): Promise<DishAvailability> {
-    throw new Error('markSoldOut chưa được hỗ trợ ở live mode');
+  async markSoldOut(dishId: string, idempotencyKey: string): Promise<DishAvailability> {
+    interface BackendDishItem {
+      id: string;
+      name: string;
+      isAvailable: boolean;
+      soldOutReason?: string | null;
+    }
+    const d = await fetchApi<BackendDishItem>(`/dishes/${dishId}/availability`, {
+      method: 'PATCH',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        isAvailable: false,
+        soldOutReason: 'Bếp báo hết món',
+      }),
+    });
+    return {
+      dishId: d.id,
+      dishName: d.name,
+      status: d.isAvailable ? 'AVAILABLE' : 'SOLD_OUT',
+      remainingPortions: 0,
+      waitingTables: [],
+      soldOutAt: new Date().toISOString(),
+    };
   }
 
   async reopenDish(
-    _dishId: string,
-    _quantity: number,
-    _idempotencyKey: string
+    dishId: string,
+    quantity: number,
+    idempotencyKey: string
   ): Promise<DishAvailability> {
-    throw new Error('reopenDish chưa được hỗ trợ ở live mode');
+    interface BackendDishItem {
+      id: string;
+      name: string;
+      isAvailable: boolean;
+      soldOutReason?: string | null;
+    }
+    const d = await fetchApi<BackendDishItem>(`/dishes/${dishId}/availability`, {
+      method: 'PATCH',
+      headers: { 'X-Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        isAvailable: true,
+        soldOutReason: null,
+      }),
+    });
+    return {
+      dishId: d.id,
+      dishName: d.name,
+      status: d.isAvailable ? 'AVAILABLE' : 'SOLD_OUT',
+      remainingPortions: quantity,
+      waitingTables: [],
+    };
   }
 
   async getWasteDishOptions(): Promise<WasteDishOption[]> {
