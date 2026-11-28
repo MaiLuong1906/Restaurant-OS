@@ -2,6 +2,7 @@ package com.restaurantos.service;
 
 import com.restaurantos.dto.OrderDtos;
 import com.restaurantos.entity.*;
+import com.restaurantos.enums.TableStatus;
 import com.restaurantos.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -69,9 +71,11 @@ public class OrderService {
             tableRepository.save(table);
             publishRealtimeEventAfterCommit(TableService.POS_TABLES_TOPIC, Map.of(
                     "eventType", "TABLE_STATUS_UPDATED",
+                    "type", "TABLE_STATUS_CHANGED",
                     "tableId", table.getId(),
                     "tableNumber", table.getTableNumber(),
                     "status", "SERVING",
+                    "tableStatus", "SERVING",
                     "timestamp", tableNow
             ));
         }
@@ -203,6 +207,26 @@ public class OrderService {
         // Lấy tất cả items của order (bao gồm các món cũ + món mới)
         List<OrderItemEntity> allItems = orderItemRepository.findByOrderId(orderId);
 
+        TableStatus resolvedTableStatus;
+        try {
+            resolvedTableStatus = table.getStatus() != null
+                    ? TableStatus.valueOf(table.getStatus().trim().toUpperCase(Locale.ROOT))
+                    : TableStatus.SERVING;
+        } catch (IllegalArgumentException ex) {
+            resolvedTableStatus = TableStatus.SERVING;
+        }
+
+        Map<String, Object> orderUpdatedEvent = new LinkedHashMap<>();
+        orderUpdatedEvent.put("eventType", "ORDER_UPDATED");
+        orderUpdatedEvent.put("type", "ORDER_UPDATED");
+        orderUpdatedEvent.put("orderId", orderId);
+        orderUpdatedEvent.put("tableId", table.getId());
+        orderUpdatedEvent.put("tableNumber", table.getTableNumber());
+        orderUpdatedEvent.put("status", resolvedTableStatus.name());
+        orderUpdatedEvent.put("tableStatus", resolvedTableStatus.name());
+        orderUpdatedEvent.put("timestamp", now);
+        publishRealtimeEventAfterCommit(TableService.POS_TABLES_TOPIC, orderUpdatedEvent);
+
         return toOrderResponse(order, allItems);
     }
 
@@ -299,6 +323,7 @@ public class OrderService {
 
         Map<String, Object> servedEvent = new LinkedHashMap<>();
         servedEvent.put("eventType", "ORDER_ITEM_SERVED");
+        servedEvent.put("type", "ORDER_ITEM_SERVED");
         servedEvent.put("orderId", item.getOrderId());
         servedEvent.put("itemId", item.getId());
         servedEvent.put("status", "SERVED");

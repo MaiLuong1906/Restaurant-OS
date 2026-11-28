@@ -65,7 +65,7 @@ public class TableController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("BAD_REQUEST", "Table ID không hợp lệ: " + id, null));
         }
-        OrderDtos.TableResponse updated = tableService.updateTableStatus(tableId, request.status());
+        OrderDtos.TableResponse updated = tableService.updateTableStatus(tableId, request != null ? request.status() : null);
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái bàn thành công"));
     }
 }

@@ -1,9 +1,11 @@
 package com.restaurantos.service;
 
 import com.restaurantos.dto.OrderDtos;
+import com.restaurantos.entity.DiningZoneEntity;
 import com.restaurantos.entity.OrderEntity;
 import com.restaurantos.entity.OrderItemEntity;
 import com.restaurantos.entity.TableEntity;
+import com.restaurantos.repository.DiningZoneRepository;
 import com.restaurantos.repository.OrderItemRepository;
 import com.restaurantos.repository.OrderRepository;
 import com.restaurantos.repository.TableRepository;
@@ -19,8 +21,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -34,34 +38,52 @@ public class TableService {
 
     public static final String POS_TABLES_TOPIC = "/topic/pos/tables";
 
+    private static final List<String> ACTIVE_ORDER_STATUSES = List.of("PLACED", "CONFIRMED", "SERVED");
+    private static final Set<String> ALLOWED_TABLE_STATUSES =
+            Set.of("VACANT", "RESERVED", "SERVING", "BILLING", "CLEANING");
+
     private final TableRepository tableRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final ObjectProvider<DiningZoneRepository> diningZoneRepositoryProvider;
     private final ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
 
-    private static final List<String> ACTIVE_ORDER_STATUSES = List.of("PLACED", "CONFIRMED", "SERVED");
-    private static final Set<String> ALLOWED_TABLE_STATUSES = Set.of("VACANT", "RESERVED", "SERVING", "BILLING", "CLEANING");
-
     /**
-     * Lấy danh sách tất cả bàn trong nhà hàng.
-     * Tối ưu gom active orders để tránh N+1 query khi tra cứu currentOrderId.
+     * Lấy danh sách tất cả bàn trong nhà hàng kèm thông tin phân khu (zoneName) và đơn đang mở (currentOrderId).
+     * Tối ưu gom active orders và zones để tránh N+1 query.
      */
     @Transactional(readOnly = true)
     public List<OrderDtos.TableResponse> getAllTables() {
         List<TableEntity> tables = tableRepository.findAll();
         List<OrderEntity> activeOrders = orderRepository.findByStatusIn(ACTIVE_ORDER_STATUSES);
 
-        // Map tableId -> currentOrderId (lấy order đầu tiên nếu có)
-        Map<UUID, UUID> tableOrderMap = activeOrders.stream()
+        DiningZoneRepository zoneRepo = diningZoneRepositoryProvider != null
+                ? diningZoneRepositoryProvider.getIfAvailable()
+                : null;
+        Map<UUID, String> zoneNameById = zoneRepo != null
+                ? zoneRepo.findAll().stream()
+                        .collect(Collectors.toMap(DiningZoneEntity::getId, DiningZoneEntity::getName, (a, b) -> a))
+                : Collections.emptyMap();
+
+        // Map tableId -> active OrderEntity (lấy order đầu tiên nếu có)
+        Map<UUID, OrderEntity> tableOrderMap = activeOrders.stream()
                 .filter(o -> o.getTableId() != null)
                 .collect(Collectors.toMap(
                         OrderEntity::getTableId,
-                        OrderEntity::getId,
+                        o -> o,
                         (existing, replacement) -> existing
                 ));
 
         return tables.stream()
-                .map(t -> toTableResponse(t, tableOrderMap.get(t.getId())))
+                .map(t -> {
+                    OrderEntity order = tableOrderMap.get(t.getId());
+                    UUID currentOrderId = order != null ? order.getId() : null;
+                    Instant occupiedAt = order != null && order.getOpenedAt() != null
+                            ? order.getOpenedAt()
+                            : t.getOccupiedAt();
+                    String zoneName = t.getZoneId() != null ? zoneNameById.get(t.getZoneId()) : null;
+                    return toTableResponse(t, currentOrderId, zoneName, occupiedAt);
+                })
                 .toList();
     }
 
@@ -71,26 +93,31 @@ public class TableService {
     @Transactional(readOnly = true)
     public Optional<OrderDtos.TableResponse> getTableById(UUID id) {
         return tableRepository.findById(id).map(t -> {
-            UUID currentOrderId = orderRepository.findByTableIdAndStatusIn(t.getId(), ACTIVE_ORDER_STATUSES)
+            OrderEntity activeOrder = orderRepository.findByTableIdAndStatusIn(t.getId(), ACTIVE_ORDER_STATUSES)
                     .stream()
                     .findFirst()
-                    .map(OrderEntity::getId)
                     .orElse(null);
-            return toTableResponse(t, currentOrderId);
+            UUID currentOrderId = activeOrder != null ? activeOrder.getId() : null;
+            Instant occupiedAt = activeOrder != null && activeOrder.getOpenedAt() != null
+                    ? activeOrder.getOpenedAt()
+                    : t.getOccupiedAt();
+            String zoneName = resolveZoneName(t.getZoneId());
+            return toTableResponse(t, currentOrderId, zoneName, occupiedAt);
         });
     }
 
     /**
      * Cập nhật trạng thái bàn với kiểm tra nghiệp vụ và chống race condition.
-     * - Chặn chuyển về VACANT khi bàn vẫn còn đơn đang hoạt động hoặc còn món WAITING/READY chưa phục vụ.
+     * - Chặn chuyển về VACANT/CLEANING khi bàn vẫn còn đơn đang hoạt động hoặc còn món WAITING/READY chưa phục vụ.
      * - Chặn chuyển sang BILLING khi bàn đang VACANT hoặc CLEANING.
+     * - Phát sự kiện STOMP /topic/pos/tables sau khi transaction commit thành công.
      */
     @Transactional
     public OrderDtos.TableResponse updateTableStatus(UUID tableId, String rawTargetStatus) {
         if (rawTargetStatus == null || rawTargetStatus.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trạng thái bàn không được để trống.");
         }
-        String targetStatus = rawTargetStatus.trim().toUpperCase();
+        String targetStatus = rawTargetStatus.trim().toUpperCase(Locale.ROOT);
         if (!ALLOWED_TABLE_STATUSES.contains(targetStatus)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Trạng thái bàn không hợp lệ: " + rawTargetStatus);
@@ -100,12 +127,17 @@ public class TableService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Không tìm thấy bàn: " + tableId));
 
-        String currentStatus = table.getStatus() != null ? table.getStatus().toUpperCase() : "VACANT";
+        String currentStatus = table.getStatus() != null ? table.getStatus().toUpperCase(Locale.ROOT) : "VACANT";
         List<OrderEntity> activeOrders = orderRepository.findByTableIdAndStatusIn(tableId, ACTIVE_ORDER_STATUSES);
-        UUID currentOrderId = activeOrders.stream().findFirst().map(OrderEntity::getId).orElse(null);
+        OrderEntity firstActiveOrder = activeOrders.stream().findFirst().orElse(null);
+        UUID currentOrderId = firstActiveOrder != null ? firstActiveOrder.getId() : null;
+        String zoneName = resolveZoneName(table.getZoneId());
 
         if (currentStatus.equals(targetStatus)) {
-            return toTableResponse(table, currentOrderId);
+            Instant occupiedAt = firstActiveOrder != null && firstActiveOrder.getOpenedAt() != null
+                    ? firstActiveOrder.getOpenedAt()
+                    : table.getOccupiedAt();
+            return toTableResponse(table, currentOrderId, zoneName, occupiedAt);
         }
 
         // Chặn xung đột với luồng Đặt bàn (ReservationService)
@@ -127,7 +159,9 @@ public class TableService {
                             || ("BILLING".equals(currentStatus) && "SERVING".equals(targetStatus));
             if (!allowedWhileActive) {
                 List<UUID> orderIds = activeOrders.stream().map(OrderEntity::getId).toList();
-                List<OrderItemEntity> items = orderItemRepository.findByOrderIdIn(orderIds);
+                List<OrderItemEntity> items = orderItemRepository != null
+                        ? orderItemRepository.findByOrderIdIn(orderIds)
+                        : Collections.emptyList();
                 boolean hasUnservedItems = items.stream()
                         .anyMatch(i -> "WAITING".equalsIgnoreCase(i.getStatus())
                                 || "READY".equalsIgnoreCase(i.getStatus()));
@@ -173,7 +207,22 @@ public class TableService {
         table.setUpdatedAt(now);
 
         publishTableStatusEventAfterCommit(table, currentOrderId, now);
-        return toTableResponse(table, currentOrderId);
+
+        Instant resolvedOccupiedAt = firstActiveOrder != null && firstActiveOrder.getOpenedAt() != null
+                ? firstActiveOrder.getOpenedAt()
+                : nextOccupiedAt;
+        return toTableResponse(table, currentOrderId, zoneName, resolvedOccupiedAt);
+    }
+
+    private String resolveZoneName(UUID zoneId) {
+        if (zoneId == null || diningZoneRepositoryProvider == null) {
+            return null;
+        }
+        DiningZoneRepository zoneRepo = diningZoneRepositoryProvider.getIfAvailable();
+        if (zoneRepo == null) {
+            return null;
+        }
+        return zoneRepo.findById(zoneId).map(DiningZoneEntity::getName).orElse(null);
     }
 
     private void publishTableStatusEventAfterCommit(TableEntity table, UUID currentOrderId, Instant timestamp) {
@@ -186,9 +235,11 @@ public class TableService {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("eventType", "TABLE_STATUS_UPDATED");
+        payload.put("type", "TABLE_STATUS_CHANGED");
         payload.put("tableId", table.getId());
         payload.put("tableNumber", table.getTableNumber());
         payload.put("status", table.getStatus());
+        payload.put("tableStatus", table.getStatus());
         payload.put("currentOrderId", currentOrderId);
         payload.put("timestamp", timestamp);
 
@@ -212,13 +263,21 @@ public class TableService {
         }
     }
 
-    private OrderDtos.TableResponse toTableResponse(TableEntity t, UUID currentOrderId) {
+    private OrderDtos.TableResponse toTableResponse(
+            TableEntity t,
+            UUID currentOrderId,
+            String zoneName,
+            Instant occupiedAt
+    ) {
         return new OrderDtos.TableResponse(
                 t.getId(),
                 t.getTableNumber(),
                 t.getCapacity(),
                 t.getStatus(),
-                currentOrderId
+                currentOrderId,
+                t.getZoneId(),
+                zoneName,
+                occupiedAt
         );
     }
 }

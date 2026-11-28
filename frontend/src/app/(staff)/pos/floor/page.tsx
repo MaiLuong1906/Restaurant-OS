@@ -2,11 +2,13 @@
 
 import * as React from 'react';
 import {
+  AlertTriangle,
   CreditCard,
   GitMerge,
   Lock,
   LockOpen,
   Printer,
+  RefreshCw,
   Sparkles,
   Tag,
   UserCheck,
@@ -73,7 +75,10 @@ export default function PosFloorPage() {
     reservations,
     selectedTableId,
     lastPrintedReceipt,
+    isLoading,
+    syncError,
     selectTable,
+    syncWithBackend,
     syncRealtimeClockSeed,
     initializeWebSocket,
     checkInReservation,
@@ -169,6 +174,18 @@ export default function PosFloorPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                disabled={isLoading}
+                onClick={() => {
+                  void syncWithBackend();
+                }}
+                className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-sand-300 bg-white px-3 text-xs font-bold text-ink hover:bg-cream disabled:opacity-60"
+                title="Đồng bộ dữ liệu bàn & đơn hàng mới nhất từ máy chủ"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>{isLoading ? 'Đang đồng bộ...' : 'Đồng bộ bàn'}</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   router.push('/pos/reservation');
                 }}
@@ -189,6 +206,26 @@ export default function PosFloorPage() {
               </button>
             </div>
           </div>
+
+          {/* Cảnh báo nếu chưa đồng bộ được dữ liệu bàn với Backend */}
+          {syncError ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-200 bg-kds-overdue-bg px-4 py-3 text-xs text-danger-600">
+              <div className="flex items-center gap-2 font-semibold">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{syncError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void syncWithBackend();
+                }}
+                className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-danger-300 bg-white px-3 font-bold text-danger-600 hover:bg-cream"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Thử đồng bộ lại</span>
+              </button>
+            </div>
+          ) : null}
 
           {/* Bộ lọc khu vực & trạng thái */}
           <div className="flex flex-col gap-3 rounded-2xl border border-sand-200 bg-white p-4 shadow-warm">
@@ -240,6 +277,47 @@ export default function PosFloorPage() {
           </div>
 
           {/* Lưới thẻ bàn */}
+          {isLoading && tables.length === 0 ? (
+            <div className="rounded-2xl border border-sand-200 bg-white p-10 text-center text-sm font-semibold text-muted shadow-warm">
+              Đang tải sơ đồ bàn và đơn hàng trực tiếp từ máy chủ...
+            </div>
+          ) : filteredTables.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-sand-300 bg-white p-10 text-center shadow-warm">
+              <p className="text-sm font-bold text-ink">
+                {tables.length === 0
+                  ? 'Chưa có dữ liệu bàn từ máy chủ'
+                  : 'Không có bàn nào khớp với bộ lọc hiện tại'}
+              </p>
+              <p className="max-w-md text-xs text-muted">
+                {tables.length === 0
+                  ? 'Vui lòng đảm bảo máy chủ Backend đang chạy và bấm nút "Đồng bộ bàn" để nạp danh sách bàn thực tế.'
+                  : 'Hãy chọn "Tất cả khu vực" hoặc đổi bộ lọc trạng thái để xem các bàn khác.'}
+              </p>
+              {tables.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void syncWithBackend();
+                  }}
+                  className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-primary-500 px-4 text-xs font-bold text-white shadow-warm-sm hover:bg-primary-600"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Tải sơ đồ bàn từ máy chủ</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAreaFilter('ALL');
+                    setStatusFilter('ALL');
+                  }}
+                  className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-sand-300 bg-cream px-3.5 text-xs font-bold text-ink hover:bg-cream-dark"
+                >
+                  <span>Xóa bộ lọc</span>
+                </button>
+              )}
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
             {filteredTables.map((t) => {
               const cfg = STATUS_CONFIG[t.status];
@@ -319,6 +397,7 @@ export default function PosFloorPage() {
               );
             })}
           </div>
+          )}
         </section>
 
         {/* CỘT PHẢI (5 cols): Chi tiết Hóa đơn Bàn & Toàn bộ Thao tác Use Case */}
@@ -336,7 +415,7 @@ export default function PosFloorPage() {
                   </h2>
                   <p className="mt-0.5 text-xs text-muted">
                     Sức chứa {selectedTable.seats} ghế • Đang ngồi:{' '}
-                    <strong>{selectedTable.guests} khách</strong> • Phục vụ:{' '}
+                    <strong>{selectedTable.guests > 0 ? `${selectedTable.guests} khách` : '—'}</strong> • Phục vụ:{' '}
                     <strong>{selectedTable.staff || '—'}</strong>
                   </p>
                 </div>
@@ -348,6 +427,17 @@ export default function PosFloorPage() {
                   {STATUS_CONFIG[selectedTable.status].label}
                 </span>
               </div>
+
+              {/* Cảnh báo dị ứng thực phẩm trên bàn (nếu có) */}
+              {selectedTable.allergyAlert ? (
+                <div className="flex items-start gap-2.5 rounded-xl border border-danger-200 bg-kds-overdue-bg p-3.5 text-xs text-danger-600">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-bold uppercase tracking-wider">Cảnh báo dị ứng / Lưu ý đặc biệt</p>
+                    <p className="mt-0.5 font-semibold text-ink">{selectedTable.allergyAlert}</p>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Nếu là bàn ĐÃ ĐẶT TRƯỚC (UC2: Check-in Reserved Table) */}
               {selectedTable.status === 'RESERVED' && linkedReservation ? (
@@ -473,27 +563,47 @@ export default function PosFloorPage() {
                   </div>
                 ) : (
                   <ul className="divide-y divide-sand-200/80 rounded-xl border border-sand-200 bg-cream/30 px-4">
-                    {selectedTable.items.map((item) => (
-                      <li
-                        key={item.id}
-                        className="flex items-baseline justify-between gap-2 py-3 text-sm"
-                      >
-                        <div>
-                          <span className="font-bold text-ink">{item.name}</span>
-                          <span className="ops-nums ml-1.5 text-xs font-semibold text-muted">
-                            ×{item.qty}
+                    {selectedTable.items.map((item) => {
+                      const isRejected = item.status === 'REJECTED';
+                      return (
+                        <li
+                          key={item.id}
+                          className={`flex items-baseline justify-between gap-2 py-3 text-sm ${
+                            isRejected ? 'opacity-65' : ''
+                          }`}
+                        >
+                          <div>
+                            <span
+                              className={`font-bold ${
+                                isRejected ? 'text-muted line-through' : 'text-ink'
+                              }`}
+                            >
+                              {item.name}
+                            </span>
+                            <span className="ops-nums ml-1.5 text-xs font-semibold text-muted">
+                              ×{item.qty}
+                            </span>
+                            {isRejected ? (
+                              <span className="ml-2 inline-flex rounded bg-kds-overdue-bg px-1.5 py-0.5 text-[10px] font-bold text-danger-600">
+                                Bếp báo hủy
+                              </span>
+                            ) : null}
+                            {item.note ? (
+                              <p className="text-xs font-medium text-danger-600">
+                                Ghi chú: {item.note}
+                              </p>
+                            ) : null}
+                          </div>
+                          <span
+                            className={`ops-nums shrink-0 font-bold ${
+                              isRejected ? 'text-muted line-through' : 'text-ink'
+                            }`}
+                          >
+                            {isRejected ? '0 ₫' : formatVND(item.qty * item.unitPrice)}
                           </span>
-                          {item.note ? (
-                            <p className="text-xs font-medium text-danger-600">
-                              Ghi chú: {item.note}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span className="ops-nums shrink-0 font-bold text-ink">
-                          {formatVND(item.qty * item.unitPrice)}
-                        </span>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
