@@ -33,12 +33,17 @@ export function WaiterOrderView() {
   const openSendKitchenModal = useWaiterStore((s) => s.openSendKitchenModal);
   const setActiveTab = useWaiterStore((s) => s.setActiveTab);
   const showToast = useWaiterStore((s) => s.showToast);
+  const syncFromBackend = useWaiterStore((s) => s.syncFromBackend);
+
+  React.useEffect(() => {
+    void syncFromBackend();
+  }, [syncFromBackend]);
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState<string>('Tất cả');
   const [mobileCartDrawerOpen, setMobileCartDrawerOpen] = React.useState(false);
 
-  const currentTable = tables[selectedTableId] || tables['04'];
+  const currentTable = tables[selectedTableId] || Object.values(tables)[0];
   const pendingItems = currentTable?.pendingItems || [];
   const confirmedItems = currentTable?.confirmedItems || [];
 

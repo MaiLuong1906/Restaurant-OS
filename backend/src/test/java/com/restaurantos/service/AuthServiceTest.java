@@ -112,6 +112,24 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("Đăng nhập KDS PIN 4 số '1234' thành công (trả token KDS), PIN sai 4 số trả 401")
+    void loginKdsPin_seeded4Digits1234_succeedsAndWrong4DigitsThrows401() {
+        UserEntity managerWithSeedPin = buildUser("MANAGER", "mgr1", "0903333333", "admin123", "1234", true);
+        when(userRepository.findActiveUsersWithPinByRoleCodes(List.of("CHEF", "MANAGER", "OWNER")))
+                .thenReturn(List.of(managerWithSeedPin));
+
+        KdsSessionResponse session = authService.loginKdsPin(new KdsPinLoginRequest("1234", "tablet-1"));
+        assertThat(session.accessToken()).isNotBlank();
+        assertThat(session.roleCode()).isEqualTo("MANAGER");
+        assertThat(session.permissions()).contains(Permission.KDS_QUEUE_VIEW.getAuthority());
+
+        assertThatThrownBy(() -> authService.loginKdsPin(new KdsPinLoginRequest("9999", "tablet-1")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     @DisplayName("Verify Manager PIN: MANAGER duyệt được <= 20%, bị chặn 403 nếu yêu cầu 30% (chỉ OWNER duyệt được)")
     void verifyManagerPin_enforcesDiscountCeiling() {
         UserEntity manager = buildUser("MANAGER", "mgr1", "0903333333", "pass", "8841", true);

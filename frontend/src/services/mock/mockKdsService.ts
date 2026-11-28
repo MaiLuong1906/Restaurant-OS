@@ -302,6 +302,32 @@ export class MockKdsService implements KdsService {
 
     return deepClone(ticket);
   }
+
+  async completeBatch(itemIds: string[], _idempotencyKey: string): Promise<Ticket[]> {
+    await simulateLatency(150);
+    const targetIds = new Set(itemIds);
+    const affectedTickets: Ticket[] = [];
+
+    for (const ticket of this.tickets) {
+      let touched = false;
+      for (const item of ticket.items) {
+        if (targetIds.has(item.id)) {
+          touched = true;
+          if (item.status === 'WAITING') {
+            item.status = 'READY';
+          }
+        }
+      }
+      if (touched) {
+        if (ticket.items.every((i) => i.status === 'READY' || i.status === 'SERVED')) {
+          ticket.status = 'READY';
+        }
+        affectedTickets.push(deepClone(ticket));
+      }
+    }
+
+    return affectedTickets;
+  }
 }
 
 export const kdsService = new MockKdsService();

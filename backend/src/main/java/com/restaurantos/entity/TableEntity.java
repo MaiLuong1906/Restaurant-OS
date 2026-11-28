@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -36,4 +37,10 @@ public class TableEntity {
 
     @Column(name = "zone_id", nullable = false)
     private UUID zoneId;
+
+    @Column(name = "occupied_at")
+    private Instant occupiedAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 }

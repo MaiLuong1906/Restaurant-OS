@@ -11,7 +11,7 @@ export function WaiterSendKitchenModal() {
   const selectedTableId = useWaiterStore((s) => s.selectedTableId);
   const tables = useWaiterStore((s) => s.tables);
   const sendPendingOrderToKitchen = useWaiterStore((s) => s.sendPendingOrderToKitchen);
-  const showToast = useWaiterStore((s) => s.showToast);
+  const isSendingOrder = useWaiterStore((s) => s.isSendingOrder);
 
   const [kitchenNote, setKitchenNote] = React.useState('');
 
@@ -24,10 +24,11 @@ export function WaiterSendKitchenModal() {
 
   const totalPendingQty = pendingItems.reduce((acc, i) => acc + i.qty, 0);
 
-  const handleConfirmSend = () => {
-    const sentCount = sendPendingOrderToKitchen(selectedTableId, kitchenNote);
-    showToast(`Đã gửi đơn (${sentCount} món / ${totalPendingQty} phần) vào Bếp thành công!`);
-    setKitchenNote('');
+  const handleConfirmSend = async () => {
+    const sentCount = await sendPendingOrderToKitchen(selectedTableId, kitchenNote);
+    if (sentCount > 0) {
+      setKitchenNote('');
+    }
   };
 
   return (
@@ -142,11 +143,12 @@ export function WaiterSendKitchenModal() {
 
           <button
             type="button"
-            onClick={handleConfirmSend}
-            className="flex items-center gap-1.5 rounded-xl bg-ops-brand hover:bg-ops-brand-dark px-5 py-2 text-xs font-bold text-white shadow-xs transition-colors"
+            disabled={isSendingOrder}
+            onClick={() => void handleConfirmSend()}
+            className="flex items-center gap-1.5 rounded-xl bg-ops-brand hover:bg-ops-brand-dark disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 text-xs font-bold text-white shadow-xs transition-colors"
           >
             <Send className="h-4 w-4" />
-            <span>Xác nhận gửi vào Bếp</span>
+            <span>{isSendingOrder ? 'Đang gửi vào Bếp...' : 'Xác nhận gửi vào Bếp'}</span>
           </button>
         </div>
       </div>

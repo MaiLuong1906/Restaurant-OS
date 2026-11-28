@@ -73,6 +73,9 @@ public class OrderItemEntity {
     @Column(name = "expedited_at")
     private Instant expeditedAt;
 
+    @Column(name = "served_at")
+    private Instant servedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
