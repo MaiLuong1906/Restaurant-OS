@@ -23,9 +23,16 @@ export function WaiterFloorPlan() {
   const setSelectedTable = useWaiterStore((s) => s.setSelectedTable);
   const activeZoneFilter = useWaiterStore((s) => s.activeZoneFilter);
   const setZoneFilter = useWaiterStore((s) => s.setZoneFilter);
-  const updateTableStatus = useWaiterStore((s) => s.updateTableStatus);
+  const updateTableStatusApi = useWaiterStore((s) => s.updateTableStatusApi);
+  const syncFromBackend = useWaiterStore((s) => s.syncFromBackend);
+  const isSyncing = useWaiterStore((s) => s.isSyncing);
+  const syncError = useWaiterStore((s) => s.syncError);
   const setActiveTab = useWaiterStore((s) => s.setActiveTab);
   const showToast = useWaiterStore((s) => s.showToast);
+
+  React.useEffect(() => {
+    void syncFromBackend();
+  }, [syncFromBackend]);
 
   const [mobileSheetOpen, setMobileSheetOpen] = React.useState(false);
 
@@ -37,6 +44,7 @@ export function WaiterFloorPlan() {
       all: tableList.length,
       serving: tableList.filter((t) => t.status === 'serving').length,
       vacant: tableList.filter((t) => t.status === 'vacant').length,
+      reserved: tableList.filter((t) => t.status === 'reserved').length,
       billing: tableList.filter((t) => t.status === 'billing').length,
       cleaning: tableList.filter((t) => t.status === 'cleaning').length,
     };
@@ -48,7 +56,7 @@ export function WaiterFloorPlan() {
     return tableList.filter((t) => t.status === activeZoneFilter);
   }, [tableList, activeZoneFilter]);
 
-  const selectedTable: WaiterTable = tables[selectedTableId] || tables['04'] || tableList[0];
+  const selectedTable: WaiterTable | undefined = tables[selectedTableId] || tableList[0];
 
   const handleSelectTable = (id: string) => {
     setSelectedTable(id);
@@ -63,6 +71,29 @@ export function WaiterFloorPlan() {
   }, [selectedTable]);
 
   const servedCount = allDishes.filter((d) => d.status === 'served').length;
+
+  if (!selectedTable) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3 bg-white rounded-xl border border-ops-border p-8 text-center">
+        {syncError ? (
+          <>
+            <p className="text-sm font-semibold text-rose-600">{syncError}</p>
+            <button
+              type="button"
+              onClick={() => void syncFromBackend()}
+              className="px-4 py-2 rounded-lg bg-ops-brand text-white text-xs font-bold hover:bg-ops-brand-dark"
+            >
+              Thử tải lại sơ đồ bàn
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-ops-muted">
+            {isSyncing ? 'Đang tải sơ đồ bàn thực tế từ máy chủ...' : 'Chưa có dữ liệu bàn nào trong hệ thống.'}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
@@ -178,6 +209,28 @@ export function WaiterFloorPlan() {
               {counts.cleaning}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setZoneFilter('reserved')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5 shadow-xs',
+              activeZoneFilter === 'reserved'
+                ? 'bg-ops-ink text-white border-ops-ink'
+                : 'bg-white text-ops-muted border-ops-border hover:bg-ops-bg'
+            )}
+          >
+            <span className="w-2 h-2 rounded-full bg-violet-500" />
+            <span>Đã đặt trước</span>
+            <span
+              className={cn(
+                'text-[10px] px-1.5 py-0.2 rounded-full font-bold',
+                activeZoneFilter === 'reserved' ? 'bg-white/20 text-white' : 'bg-sand-100 text-ops-muted'
+              )}
+            >
+              {counts.reserved}
+            </span>
+          </button>
         </div>
 
         {/* TABLE CARDS GRID */}
@@ -189,9 +242,11 @@ export function WaiterFloorPlan() {
               const isBilling = table.status === 'billing';
               const isCleaning = table.status === 'cleaning';
               const isVacant = table.status === 'vacant';
+              const isReserved = table.status === 'reserved';
 
               let borderStyle = 'border-ops-border hover:border-sand-400';
               if (isBilling) borderStyle = 'border-amber-300 hover:border-amber-400';
+              if (isReserved) borderStyle = 'border-violet-300 hover:border-violet-400';
               if (isSelected) {
                 borderStyle = 'border-2 border-ops-brand ring-2 ring-ops-brand/10 shadow-xs';
               }
@@ -224,6 +279,7 @@ export function WaiterFloorPlan() {
                           'w-1.5 h-1.5 rounded-full',
                           isServing && 'bg-ops-ink',
                           isVacant && 'bg-emerald-500',
+                          isReserved && 'bg-violet-500',
                           isBilling && 'bg-amber-500',
                           isCleaning && 'bg-sand-400'
                         )}
@@ -271,6 +327,7 @@ export function WaiterFloorPlan() {
                 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border',
                 selectedTable.status === 'serving' && 'border-sand-300 bg-sand-100 text-ink',
                 selectedTable.status === 'billing' && 'border-amber-200 bg-amber-50 text-amber-800',
+                selectedTable.status === 'reserved' && 'border-violet-200 bg-violet-50 text-violet-800',
                 selectedTable.status === 'cleaning' && 'border-sand-300 bg-ops-bg text-ops-muted',
                 selectedTable.status === 'vacant' && 'border-emerald-200 bg-emerald-50 text-emerald-800'
               )}
@@ -280,6 +337,7 @@ export function WaiterFloorPlan() {
                   'w-2 h-2 rounded-full',
                   selectedTable.status === 'serving' && 'bg-ops-ink',
                   selectedTable.status === 'billing' && 'bg-amber-500',
+                  selectedTable.status === 'reserved' && 'bg-violet-500',
                   selectedTable.status === 'cleaning' && 'bg-sand-400',
                   selectedTable.status === 'vacant' && 'bg-emerald-500'
                 )}
@@ -310,18 +368,17 @@ export function WaiterFloorPlan() {
             <div className="grid grid-cols-2 gap-1.5">
               {(
                 [
-                  { id: 'serving', label: 'Đang dùng' },
-                  { id: 'billing', label: 'Chờ tính tiền' },
-                  { id: 'cleaning', label: 'Cần dọn' },
-                  { id: 'vacant', label: 'Bàn trống' },
+                  { id: 'serving', apiStatus: 'SERVING', label: 'Đang dùng' },
+                  { id: 'billing', apiStatus: 'BILLING', label: 'Chờ tính tiền' },
+                  { id: 'cleaning', apiStatus: 'CLEANING', label: 'Cần dọn' },
+                  { id: 'vacant', apiStatus: 'VACANT', label: 'Bàn trống' },
                 ] as const
               ).map((st) => (
                 <button
                   key={st.id}
                   type="button"
                   onClick={() => {
-                    updateTableStatus(selectedTable.id, st.id);
-                    showToast(`Đã chuyển ${selectedTable.name} sang "${st.label}"`);
+                    void updateTableStatusApi(selectedTable.id, st.apiStatus);
                   }}
                   className={cn(
                     'py-1.5 px-2 text-xs font-semibold rounded-lg border text-center transition-all',
@@ -425,7 +482,7 @@ export function WaiterFloorPlan() {
               }}
               className="w-full py-2.5 px-4 rounded-xl bg-ops-brand hover:bg-ops-brand-dark text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors"
             >
-              <span>Tạo / Chỉnh sửa Order Bàn {selectedTable.id}</span>
+              <span>Tạo / Chỉnh sửa Order {selectedTable.name}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
 
@@ -504,7 +561,7 @@ export function WaiterFloorPlan() {
                 }}
                 className="w-full py-3 rounded-xl bg-ops-brand text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs"
               >
-                <span>Gọi món cho Bàn {selectedTable.id}</span>
+                <span>Gọi món cho {selectedTable.name}</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
 
@@ -519,7 +576,7 @@ export function WaiterFloorPlan() {
                 }}
                 className="w-full py-2.5 rounded-xl border border-ops-border bg-white text-ink font-semibold text-xs flex items-center justify-center gap-2"
               >
-                <span>Xem tiến độ bếp Bàn {selectedTable.id}</span>
+                <span>Xem tiến độ bếp {selectedTable.name}</span>
               </button>
             </div>
           </div>
