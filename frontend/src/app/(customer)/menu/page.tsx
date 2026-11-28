@@ -4,7 +4,6 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import {
-  PHO_CO_DISHES,
   CustomerDish,
   FALLBACK_DISH_IMAGE,
   triggerHaptic,
@@ -36,6 +35,9 @@ import {
   Coffee,
   Cake,
   X,
+  AlertCircle,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 type CategoryFilter = 'ALL' | 'APPETIZER' | 'MAIN' | 'SOUP' | 'DESSERT' | 'DRINK';
@@ -108,8 +110,9 @@ function MenuCustomerContent() {
   const [isCallStaffOpen, setIsCallStaffOpen] = useState(false);
 
   // Danh sách thực đơn kết nối API thật từ Backend
-  const [dishes, setDishes] = useState<CustomerDish[]>(PHO_CO_DISHES);
+  const [dishes, setDishes] = useState<CustomerDish[]>([]);
   const [loadingDishes, setLoadingDishes] = useState(true);
+  const [menuError, setMenuError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -117,13 +120,13 @@ function MenuCustomerContent() {
   }, []);
 
   const fetchDishes = async () => {
+    setLoadingDishes(true);
+    setMenuError(null);
     try {
       const data = await customerMenuService.getPublicDishes();
-      if (data && data.length > 0) {
-        setDishes(data);
-      }
+      setDishes(data || []);
     } catch {
-      // Fallback tự động giữ PHO_CO_DISHES nếu offline
+      setMenuError('Không thể đồng bộ thực đơn từ máy chủ nhà hàng. Vui lòng thử lại.');
     } finally {
       setLoadingDishes(false);
     }
@@ -254,12 +257,12 @@ function MenuCustomerContent() {
             className={`h-full w-full object-cover ${!isAvailable ? 'grayscale-[35%]' : ''}`}
           />
           {!isAvailable ? (
-            <span className="absolute top-1.5 left-1.5 flex items-center rounded-md bg-stone-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs tracking-tight uppercase whitespace-nowrap z-10">
+            <span className="absolute top-1.5 left-1.5 flex items-center rounded-md bg-stone-700/90 px-2 py-0.5 text-xs font-bold text-white shadow-xs tracking-tight uppercase whitespace-nowrap z-10">
               Hết món
             </span>
           ) : dish.badge ? (
             <span
-              className={`absolute top-1.5 left-1.5 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-tight uppercase shadow-xs whitespace-nowrap z-10 ${
+              className={`absolute top-1.5 left-1.5 flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold tracking-tight uppercase shadow-xs whitespace-nowrap z-10 ${
                 dish.badgeVariant === 'recommend'
                   ? 'bg-[#00873a] text-white'
                   : dish.badgeVariant === 'bestseller'
@@ -288,7 +291,7 @@ function MenuCustomerContent() {
             <h3 className={`line-clamp-2 leading-snug font-display text-sm font-bold ${!isAvailable ? 'text-stone-500 line-through' : 'text-[#1e1b1a]'}`}>
               {dish.name}
             </h3>
-            <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-[#56423c]">
+            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[#56423c]">
               {dish.description}
             </p>
           </div>
@@ -299,7 +302,7 @@ function MenuCustomerContent() {
             </span>
 
             {!isAvailable ? (
-              <span className="inline-flex min-h-[30px] items-center rounded-full bg-stone-200 px-2.5 py-1 text-[10px] font-semibold text-stone-600">
+              <span className="inline-flex min-h-[30px] items-center rounded-full bg-stone-200 px-2.5 py-1 text-xs font-semibold text-stone-600">
                 Tạm hết
               </span>
             ) : qtyInCart > 0 ? (
@@ -388,10 +391,10 @@ function MenuCustomerContent() {
                   <Utensils className="h-3.5 w-3.5 text-[#9a401c]" />
                   <span>Đang phục vụ {displayTable} • Tầng 1</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#00873a]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${loadingDishes ? 'bg-amber-500 animate-pulse' : 'bg-[#00873a]'}`} />
-                  <span className={loadingDishes ? 'text-amber-700' : 'text-[#00873a]'}>
-                    {loadingDishes ? 'Đang đồng bộ thực đơn...' : 'Bếp sẵn sàng'}
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <span className={`h-1.5 w-1.5 rounded-full ${loadingDishes ? 'bg-amber-500 animate-pulse' : menuError ? 'bg-rose-500' : 'bg-[#00873a]'}`} />
+                  <span className={loadingDishes ? 'text-amber-700' : menuError ? 'text-rose-700' : 'text-[#00873a]'}>
+                    {loadingDishes ? 'Đang đồng bộ thực đơn...' : menuError ? 'Mất kết nối' : 'Bếp sẵn sàng'}
                   </span>
                 </div>
               </div>
@@ -466,7 +469,7 @@ function MenuCustomerContent() {
                       <span>{cat.label}</span>
                       {cat.count ? (
                         <span
-                          className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                          className={`rounded-full px-1.5 py-0.2 text-xs font-bold ${
                             isActive
                               ? 'bg-[#ba5831] text-white'
                               : 'bg-[#efe6e4] text-[#56423c]'
@@ -504,7 +507,7 @@ function MenuCustomerContent() {
                             {sec.subtitle}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-[#ffdbcf] px-2.5 py-1 text-[11px] font-bold text-[#380d00]">
+                        <span className="shrink-0 rounded-full bg-[#ffdbcf] px-2.5 py-1 text-xs font-bold text-[#380d00]">
                           {sec.badgeText}
                         </span>
                       </div>
@@ -520,7 +523,7 @@ function MenuCustomerContent() {
                           {sec.subtitle}
                         </span>
                       </div>
-                      <span className="shrink-0 text-[11px] font-bold text-[#9a401c]">
+                      <span className="shrink-0 text-xs font-bold text-[#9a401c]">
                         {sectionDishes.length} món
                       </span>
                     </div>
@@ -533,7 +536,36 @@ function MenuCustomerContent() {
               );
             })}
 
-            {menuDishes.length === 0 && (
+            {loadingDishes && dishes.length === 0 && (
+              <div className="py-16 px-4 text-center space-y-3">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#9a401c]" />
+                <p className="text-xs font-semibold text-[#56423c]">
+                  Đang đồng bộ thực đơn trực tiếp từ nhà hàng...
+                </p>
+              </div>
+            )}
+
+            {!loadingDishes && menuError && dishes.length === 0 && (
+              <div className="py-12 px-6 text-center space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <h3 className="font-display text-base font-bold text-[#1e1b1a]">Không thể kết nối thực đơn</h3>
+                <p className="text-xs text-[#56423c] max-w-xs mx-auto">
+                  {menuError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fetchDishes()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#9a401c] text-white font-bold text-xs shadow-md active:scale-95 transition-transform"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Thử lại</span>
+                </button>
+              </div>
+            )}
+
+            {!loadingDishes && !menuError && menuDishes.length === 0 && (
               <div className="py-12 px-4 text-center space-y-3">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f5ecea] text-[#9a401c]">
                   <Utensils className="h-6 w-6" />

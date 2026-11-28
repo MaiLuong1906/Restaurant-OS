@@ -71,13 +71,29 @@ function TableQrEntryContent() {
       try {
         const info = await customerMenuService.getTableInfo(tableId);
         if (isMounted) {
+          const status = info.status ? info.status.toUpperCase() : 'VACANT';
+          if (status === 'CLEANING') {
+            setError('Bàn này đang được nhân viên dọn dẹp và chuẩn bị. Quý khách vui lòng đợi giây lát hoặc liên hệ nhân viên phục vụ.');
+            return;
+          }
+          if (status === 'RESERVED') {
+            setError('Bàn này đã được khách hàng khác đặt trước. Quý khách vui lòng liên hệ nhân viên phục vụ để được sắp xếp bàn mới.');
+            return;
+          }
+          if (status === 'BILLING') {
+            setError('Bàn này đang trong quá trình thanh toán. Quý khách vui lòng liên hệ nhân viên phục vụ.');
+            return;
+          }
+
           setTableInfo(info);
           setTable(info.id, info.tableNumber, token || null);
         }
       } catch (err: unknown) {
         if (isMounted) {
           const apiErr = err as { status?: number; message?: string };
-          if (apiErr.status === 404) {
+          if (apiErr.status === 400) {
+            setError('Mã QR bàn không đúng định dạng. Quý khách vui lòng quét lại mã QR tại bàn.');
+          } else if (apiErr.status === 404) {
             setError('Bàn không khả dụng hoặc đã bị thay đổi mã QR. Vui lòng liên hệ nhân viên phục vụ để được hỗ trợ.');
           } else {
             setError('Không thể kết nối máy chủ nhà hàng. Vui lòng thử lại.');
@@ -193,7 +209,7 @@ function TableQrEntryContent() {
               <span className="text-[#9a401c]">{tableInfo.tableNumber}</span>
             </h1>
 
-            <div className="flex items-center gap-2 text-[11px] font-semibold text-[#56423c] mb-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#56423c] mb-4">
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
                 <span>Sức chứa: {tableInfo.capacity} khách</span>
@@ -217,7 +233,7 @@ function TableQrEntryContent() {
             </button>
 
             {/* Countdown info */}
-            <p className="mt-3 text-[11px] font-medium text-[#89726a] flex items-center justify-center gap-1">
+            <p className="mt-3 text-xs font-medium text-[#89726a] flex items-center justify-center gap-1">
               <span>Tự động vào thực đơn sau</span>
               <span className="font-bold text-[#9a401c] px-1 py-0.5 rounded bg-[#faebe6] ops-nums">
                 {countdown}s
@@ -225,7 +241,7 @@ function TableQrEntryContent() {
               <span>hoặc bấm nút ở trên</span>
             </p>
 
-            <p className="mt-3 text-[11px] font-medium text-[#56423c]">
+            <p className="mt-3 text-xs font-medium text-[#56423c]">
               Đặc sản hôm nay: Bún chả than hoa • Chả cá Lã Vọng • Lẩu riêu cua
             </p>
           </>

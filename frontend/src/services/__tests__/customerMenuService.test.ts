@@ -6,7 +6,9 @@ import {
   formatTableName,
   customerMenuService,
   CustomerDishDto,
+  TableInfoDto,
 } from '../customerMenuService';
+import * as apiClient from '../../lib/api-client';
 import { FALLBACK_DISH_IMAGE } from '../../lib/customer-menu-data';
 
 describe('customerMenuService & Mapper Test Suite', () => {
@@ -127,12 +129,80 @@ describe('customerMenuService & Mapper Test Suite', () => {
   });
 
   describe('getTableInfo', () => {
-    it('returns quick demo format for non-UUID slug tables without calling API', async () => {
-      const table = await customerMenuService.getTableInfo('ban-04');
-      expect(table.id).toBe('ban-04');
-      expect(table.tableNumber).toBe('Bàn 04');
-      expect(table.capacity).toBe(4);
-      expect(table.status).toBe('SERVING');
+    it('throws 400 ApiError for non-UUID table IDs', async () => {
+      await expect(customerMenuService.getTableInfo('ban-04')).rejects.toThrow(
+        'Mã QR bàn không đúng định dạng UUID'
+      );
+    });
+
+    it('fetches table info from API for valid UUID', async () => {
+      const mockTable: TableInfoDto = {
+        id: '00000000-0000-0000-0000-000000000001',
+        tableNumber: 'Bàn 01',
+        capacity: 4,
+        status: 'VACANT',
+      };
+      vi.spyOn(apiClient, 'fetchApi').mockResolvedValueOnce(mockTable);
+
+      const result = await customerMenuService.getTableInfo(
+        '00000000-0000-0000-0000-000000000001'
+      );
+      expect(result).toEqual(mockTable);
+      expect(apiClient.fetchApi).toHaveBeenCalledWith(
+        '/tables/00000000-0000-0000-0000-000000000001'
+      );
+    });
+  });
+
+  describe('getPublicDishes', () => {
+    it('queries both available and sold-out dishes in parallel when isAvailable is not provided', async () => {
+      const availableDish: CustomerDishDto = {
+        id: 'd-1',
+        name: 'Phở Bò Tái',
+        price: 75000,
+        category: 'MON_CHINH',
+        isAvailable: true,
+      };
+      const soldOutDish: CustomerDishDto = {
+        id: 'd-2',
+        name: 'Chả Cá Lã Vọng',
+        price: 180000,
+        category: 'MON_CHINH',
+        isAvailable: false,
+      };
+
+      const spy = vi
+        .spyOn(apiClient, 'fetchApi')
+        .mockImplementation(async (endpoint: string) => {
+          if (endpoint.includes('isAvailable=true')) {
+            return [availableDish];
+          }
+          if (endpoint.includes('isAvailable=false')) {
+            return [soldOutDish];
+          }
+          return [];
+        });
+
+      const dishes = await customerMenuService.getPublicDishes();
+      expect(dishes).toHaveLength(2);
+      expect(dishes[0].name).toBe('Phở Bò Tái');
+      expect(dishes[0].isAvailable).toBe(true);
+      expect(dishes[1].name).toBe('Chả Cá Lã Vọng');
+      expect(dishes[1].isAvailable).toBe(false);
+      expect(spy).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns empty array when API returns empty array', async () => {
+      vi.spyOn(apiClient, 'fetchApi').mockResolvedValue([]);
+      const dishes = await customerMenuService.getPublicDishes();
+      expect(dishes).toEqual([]);
+    });
+
+    it('throws error when API fails instead of silently returning mock', async () => {
+      vi.spyOn(apiClient, 'fetchApi').mockRejectedValueOnce(
+        new apiClient.ApiError('HTTP_500', 'Server Error', 500)
+      );
+      await expect(customerMenuService.getPublicDishes()).rejects.toThrow('Server Error');
     });
   });
 });

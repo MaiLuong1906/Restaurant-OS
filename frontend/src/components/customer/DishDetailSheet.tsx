@@ -198,7 +198,7 @@ export function DishDetailSheet({
                 {formatVND(dish.price)}
               </span>
               {dish.badge ? (
-                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                   !isAvailable
                     ? 'bg-amber-100 text-amber-800'
                     : 'bg-[#efe6e4] text-[#56423c]'

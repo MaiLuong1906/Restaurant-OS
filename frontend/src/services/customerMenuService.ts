@@ -2,7 +2,6 @@ import { fetchApi, ApiError } from '../lib/api-client';
 import {
   CustomerDish,
   FALLBACK_DISH_IMAGE,
-  PHO_CO_DISHES,
 } from '../lib/customer-menu-data';
 
 export interface ComboItemDto {
@@ -121,14 +120,16 @@ export function mapDtoToCustomerDish(dto: CustomerDishDto): CustomerDish {
 export const customerMenuService = {
   /**
    * Lấy danh sách thực đơn công khai cho khách hàng (UC02)
-   * Nối REST API GET /api/v1/dishes, có fallback mượt sang mock nếu server chưa bật
+   * Nối REST API GET /api/v1/dishes.
+   * Để nhận cả món còn phục vụ và món hết hàng (do contract BE mặc định lọc isAvailable=true nếu vắng mặt),
+   * khi params.isAvailable undefined sẽ gọi song song cả 2 trạng thái và gộp lại.
    */
   async getPublicDishes(params?: {
     category?: string;
     search?: string;
     isAvailable?: boolean;
   }): Promise<CustomerDish[]> {
-    try {
+    const fetchWithAvailable = async (available?: boolean): Promise<CustomerDishDto[]> => {
       const query = new URLSearchParams();
       if (params?.category && params.category !== 'ALL') {
         query.set('category', params.category);
@@ -136,45 +137,46 @@ export const customerMenuService = {
       if (params?.search && params.search.trim()) {
         query.set('search', params.search.trim());
       }
-      if (params?.isAvailable !== undefined) {
-        query.set('isAvailable', String(params.isAvailable));
+      if (available !== undefined) {
+        query.set('isAvailable', String(available));
       }
 
       const qs = query.toString();
       const endpoint = `/dishes${qs ? `?${qs}` : ''}`;
       const dtos = await fetchApi<CustomerDishDto[]>(endpoint);
+      return Array.isArray(dtos) ? dtos : [];
+    };
 
-      if (Array.isArray(dtos) && dtos.length > 0) {
-        return dtos.map(mapDtoToCustomerDish);
-      }
-      return PHO_CO_DISHES;
-    } catch (error) {
-      // Khi gặp lỗi mạng (ví dụ Backend chưa khởi động ở môi trường demo preview),
-      // tự động fallback về PHO_CO_DISHES để giao diện khách hàng không bị sập
-      if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
-        return PHO_CO_DISHES;
-      }
-      // Nếu là lỗi khác, thử lọc trên mock
-      return PHO_CO_DISHES;
+    let allDtos: CustomerDishDto[];
+    if (params?.isAvailable !== undefined) {
+      allDtos = await fetchWithAvailable(params.isAvailable);
+    } else {
+      const [availableDtos, soldOutDtos] = await Promise.all([
+        fetchWithAvailable(true),
+        fetchWithAvailable(false),
+      ]);
+      allDtos = [...availableDtos, ...soldOutDtos];
     }
+
+    if (!Array.isArray(allDtos) || allDtos.length === 0) {
+      return [];
+    }
+
+    return allDtos.map(mapDtoToCustomerDish);
   },
 
   /**
    * Lấy chi tiết món ăn theo ID (UC02)
    */
   async getDishById(id: string): Promise<CustomerDish | null> {
-    try {
-      if (isUuid(id)) {
-        const dto = await fetchApi<CustomerDishDto>(`/dishes/${id}`);
-        if (dto) {
-          return mapDtoToCustomerDish(dto);
-        }
-      }
-      const foundInMock = PHO_CO_DISHES.find((d) => d.id === id);
-      return foundInMock || null;
-    } catch {
-      return PHO_CO_DISHES.find((d) => d.id === id) || null;
+    if (!isUuid(id)) {
+      throw new ApiError('INVALID_ID', 'Mã món ăn không hợp lệ', 400);
     }
+    const dto = await fetchApi<CustomerDishDto>(`/dishes/${id}`);
+    if (dto) {
+      return mapDtoToCustomerDish(dto);
+    }
+    return null;
   },
 
   /**
@@ -183,29 +185,9 @@ export const customerMenuService = {
    */
   async getTableInfo(tableId: string): Promise<TableInfoDto> {
     if (!isUuid(tableId)) {
-      // Mã bàn dạng text như 'ban-04', 'ban-01' phục vụ demo tĩnh
-      return {
-        id: tableId,
-        tableNumber: formatTableName(tableId),
-        capacity: 4,
-        status: 'SERVING',
-      };
+      throw new ApiError('INVALID_TABLE_ID', 'Mã QR bàn không đúng định dạng UUID', 400);
     }
-
-    try {
-      const info = await fetchApi<TableInfoDto>(`/tables/${tableId}`);
-      return info;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        throw error;
-      }
-      // Fallback nếu server local tạm thời offline
-      return {
-        id: tableId,
-        tableNumber: formatTableName(tableId),
-        capacity: 4,
-        status: 'SERVING',
-      };
-    }
+    const info = await fetchApi<TableInfoDto>(`/tables/${tableId}`);
+    return info;
   },
 };
