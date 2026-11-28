@@ -261,6 +261,27 @@ class KdsServiceTest {
 
         assertThat(result).isPresent();
         verify(orderItemRepository, never()).saveAll(any());
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("K3 completeTicket: converts 3 WAITING items to READY and broadcasts 3 STOMP UPDATE_STATUS events")
+    void testCompleteTicket_threeWaitingItems_broadcastsThreeEvents() {
+        OrderItemEntity item1 = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemEntity item2 = createItem("WAITING", null, now.plus(Duration.ofMinutes(8)));
+        OrderItemEntity item3 = createItem("WAITING", null, now.plus(Duration.ofMinutes(5)));
+
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId())).thenReturn(List.of(item1, item2, item3));
+
+        Optional<KdsTicketDto> result = kdsService.completeTicket(order.getId(), null);
+
+        assertThat(result).isPresent();
+        ArgumentCaptor<KdsService.KdsOrderEvent> captor = ArgumentCaptor.forClass(KdsService.KdsOrderEvent.class);
+        verify(messagingTemplate, times(3)).convertAndSend(eq("/topic/kds/orders"), captor.capture());
+        assertThat(captor.getAllValues()).extracting(e -> e.data().id())
+                .containsExactly(item1.getId(), item2.getId(), item3.getId());
+        assertThat(captor.getAllValues()).allMatch(e -> "UPDATE_STATUS".equals(e.action()) && "READY".equals(e.data().status()));
     }
 
     @Test
@@ -275,6 +296,12 @@ class KdsServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().status()).isEqualTo("READY");
         assertThat(item.getStatus()).isEqualTo("READY");
+
+        ArgumentCaptor<KdsService.KdsOrderEvent> captor = ArgumentCaptor.forClass(KdsService.KdsOrderEvent.class);
+        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/kds/orders"), captor.capture());
+        assertThat(captor.getValue().action()).isEqualTo("UPDATE_STATUS");
+        assertThat(captor.getValue().data().id()).isEqualTo(item.getId());
+        assertThat(captor.getValue().data().status()).isEqualTo("READY");
     }
 
     @Test
@@ -289,6 +316,12 @@ class KdsServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().status()).isEqualTo("REJECTED");
         assertThat(item.getStatus()).isEqualTo("REJECTED");
+
+        ArgumentCaptor<KdsService.KdsOrderEvent> captor = ArgumentCaptor.forClass(KdsService.KdsOrderEvent.class);
+        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/kds/orders"), captor.capture());
+        assertThat(captor.getValue().action()).isEqualTo("UPDATE_STATUS");
+        assertThat(captor.getValue().data().id()).isEqualTo(item.getId());
+        assertThat(captor.getValue().data().status()).isEqualTo("REJECTED");
     }
 
     @Test
@@ -359,6 +392,26 @@ class KdsServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().status()).isEqualTo("READY");
         verify(orderItemRepository, never()).save(any());
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("K4 updateItemStatus: 404/409 do not broadcast STOMP and broker error does not rollback")
+    void testUpdateItemStatus_errorAndBrokerFailure_behavior() {
+        UUID missingId = UUID.randomUUID();
+        when(orderItemRepository.findById(missingId)).thenReturn(Optional.empty());
+        assertThat(kdsService.updateItemStatus(missingId, new UpdateItemStatusRequest("READY", null))).isEmpty();
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+
+        OrderItemEntity item = createItem("WAITING", null, null);
+        when(orderItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(orderItemRepository.save(any(OrderItemEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new RuntimeException("Broker down"))
+                .when(messagingTemplate).convertAndSend(eq("/topic/kds/orders"), any(KdsService.KdsOrderEvent.class));
+
+        Optional<KdsItemDto> res = kdsService.updateItemStatus(item.getId(), new UpdateItemStatusRequest("READY", null));
+        assertThat(res).isPresent();
+        assertThat(res.get().status()).isEqualTo("READY");
     }
 
     @Test
