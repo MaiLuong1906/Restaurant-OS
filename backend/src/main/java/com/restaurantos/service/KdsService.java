@@ -2,12 +2,15 @@ package com.restaurantos.service;
 
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.OrderChangeAlertDto;
 import com.restaurantos.dto.CompleteBatchRequest;
 import com.restaurantos.dto.CompleteTicketRequest;
 import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.entity.OrderEntity;
 import com.restaurantos.entity.OrderItemEntity;
+import com.restaurantos.entity.OrderItemVoidEntity;
 import com.restaurantos.repository.OrderItemRepository;
+import com.restaurantos.repository.OrderItemVoidRepository;
 import com.restaurantos.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,7 +50,13 @@ public class KdsService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OrderItemVoidRepository orderItemVoidRepository;
     private final SimpMessagingTemplate messagingTemplate;
+
+    /**
+     * Lưu ID các cảnh báo đã được bếp xác nhận (in-memory, không thêm cột/migration mới).
+     */
+    private final Set<UUID> acknowledgedAlertIds = ConcurrentHashMap.newKeySet();
 
     /**
      * K1: Lấy danh sách ticket còn việc hiển thị trên KDS.
@@ -372,5 +383,59 @@ public class KdsService {
 
         Instant baseTime = order.getCreatedAt() != null ? order.getCreatedAt() : Instant.now();
         return baseTime.plus(Duration.ofMinutes(15));
+    }
+
+    /**
+     * A6: Lấy danh sách cảnh báo hủy/sửa đơn chờ bếp xác nhận từ bảng order_item_voids.
+     */
+    public List<OrderChangeAlertDto> getPendingOrderChanges() {
+        return orderItemVoidRepository.findAllWithOrderDetailsOrderByApprovedAtDesc().stream()
+                .filter(v -> !acknowledgedAlertIds.contains(v.getId()))
+                .map(v -> toOrderChangeAlertDto(v, false))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * A6: Bếp xác nhận cảnh báo -> đánh dấu đã xác nhận để không còn trong danh sách chờ.
+     */
+    public Optional<OrderChangeAlertDto> acknowledgeOrderChange(UUID alertId) {
+        return orderItemVoidRepository.findById(alertId)
+                .map(v -> {
+                    acknowledgedAlertIds.add(alertId);
+                    return toOrderChangeAlertDto(v, true);
+                });
+    }
+
+    /**
+     * A6: Bếp hoãn cảnh báo -> giữ nguyên trong danh sách chờ.
+     */
+    public Optional<OrderChangeAlertDto> deferOrderChange(UUID alertId) {
+        return orderItemVoidRepository.findById(alertId)
+                .map(v -> toOrderChangeAlertDto(v, acknowledgedAlertIds.contains(alertId)));
+    }
+
+    private OrderChangeAlertDto toOrderChangeAlertDto(OrderItemVoidEntity v, boolean acknowledged) {
+        OrderItemEntity item = v.getOrderItem();
+        OrderEntity order = item != null ? item.getOrder() : null;
+        String tableNo = "Bàn";
+        if (order != null) {
+            if (order.getTable() != null && order.getTable().getTableNumber() != null) {
+                tableNo = order.getTable().getTableNumber();
+            } else if (order.getOrderCode() != null) {
+                tableNo = order.getOrderCode();
+            }
+        }
+        return OrderChangeAlertDto.builder()
+                .id(v.getId())
+                .ticketId(order != null ? order.getId() : null)
+                .itemId(v.getOrderItemId())
+                .dishName(item != null ? item.getDishNameSnapshot() : "Món ăn")
+                .tableNo(tableNo)
+                .quantity(v.getQuantityVoided())
+                .variant("CANCEL_ITEM")
+                .reason(v.getReason())
+                .acknowledged(acknowledged)
+                .createdAt(v.getApprovedAt())
+                .build();
     }
 }

@@ -2,14 +2,17 @@ package com.restaurantos.service;
 
 import com.restaurantos.dto.KdsItemDto;
 import com.restaurantos.dto.KdsTicketDto;
+import com.restaurantos.dto.OrderChangeAlertDto;
 import com.restaurantos.dto.CompleteBatchRequest;
 import com.restaurantos.dto.CompleteTicketRequest;
 import com.restaurantos.dto.UpdateItemStatusRequest;
 import com.restaurantos.entity.DishEntity;
 import com.restaurantos.entity.OrderEntity;
 import com.restaurantos.entity.OrderItemEntity;
+import com.restaurantos.entity.OrderItemVoidEntity;
 import com.restaurantos.entity.TableEntity;
 import com.restaurantos.repository.OrderItemRepository;
+import com.restaurantos.repository.OrderItemVoidRepository;
 import com.restaurantos.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +51,9 @@ class KdsServiceTest {
 
     @Mock
     private OrderItemRepository orderItemRepository;
+
+    @Mock
+    private OrderItemVoidRepository orderItemVoidRepository;
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
@@ -616,5 +622,94 @@ class KdsServiceTest {
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
+    }
+
+    @Test
+    @DisplayName("A6: getPendingOrderChanges trả về danh sách cảnh báo hủy món từ order_item_voids")
+    void getPendingOrderChanges_returnsVoidAlerts() {
+        UUID voidId = UUID.randomUUID();
+        OrderItemEntity item = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemVoidEntity voidEntity = OrderItemVoidEntity.builder()
+                .id(voidId)
+                .orderItemId(item.getId())
+                .orderItem(item)
+                .quantityVoided(1)
+                .reason("Khách đổi món")
+                .wasted(false)
+                .requestedBy(UUID.randomUUID())
+                .approvedBy(UUID.randomUUID())
+                .approvedAt(now)
+                .isPostCooking(false)
+                .build();
+
+        when(orderItemVoidRepository.findAllWithOrderDetailsOrderByApprovedAtDesc()).thenReturn(List.of(voidEntity));
+
+        List<OrderChangeAlertDto> result = kdsService.getPendingOrderChanges();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(voidId);
+        assertThat(result.get(0).getDishName()).isEqualTo("Phở Bò Đặc Biệt");
+        assertThat(result.get(0).getTableNo()).isEqualTo("Bàn 04");
+        assertThat(result.get(0).getReason()).isEqualTo("Khách đổi món");
+        assertThat(result.get(0).getVariant()).isEqualTo("CANCEL_ITEM");
+        assertThat(result.get(0).getAcknowledged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("A6: acknowledgeOrderChange đánh dấu đã xác nhận và loại khỏi danh sách chờ")
+    void acknowledgeOrderChange_removesFromPendingList() {
+        UUID voidId = UUID.randomUUID();
+        OrderItemEntity item = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemVoidEntity voidEntity = OrderItemVoidEntity.builder()
+                .id(voidId)
+                .orderItemId(item.getId())
+                .orderItem(item)
+                .quantityVoided(2)
+                .reason("Khách hủy món")
+                .wasted(false)
+                .requestedBy(UUID.randomUUID())
+                .approvedBy(UUID.randomUUID())
+                .approvedAt(now)
+                .isPostCooking(false)
+                .build();
+
+        when(orderItemVoidRepository.findById(voidId)).thenReturn(Optional.of(voidEntity));
+        when(orderItemVoidRepository.findAllWithOrderDetailsOrderByApprovedAtDesc()).thenReturn(List.of(voidEntity));
+
+        Optional<OrderChangeAlertDto> ackResult = kdsService.acknowledgeOrderChange(voidId);
+        assertThat(ackResult).isPresent();
+        assertThat(ackResult.get().getAcknowledged()).isTrue();
+
+        List<OrderChangeAlertDto> pendingAfterAck = kdsService.getPendingOrderChanges();
+        assertThat(pendingAfterAck).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A6: deferOrderChange giữ nguyên cảnh báo trong danh sách chờ")
+    void deferOrderChange_keepsInPendingList() {
+        UUID voidId = UUID.randomUUID();
+        OrderItemEntity item = createItem("WAITING", null, now.plus(Duration.ofMinutes(10)));
+        OrderItemVoidEntity voidEntity = OrderItemVoidEntity.builder()
+                .id(voidId)
+                .orderItemId(item.getId())
+                .orderItem(item)
+                .quantityVoided(1)
+                .reason("Khách bớt phần")
+                .wasted(false)
+                .requestedBy(UUID.randomUUID())
+                .approvedBy(UUID.randomUUID())
+                .approvedAt(now)
+                .isPostCooking(false)
+                .build();
+
+        when(orderItemVoidRepository.findById(voidId)).thenReturn(Optional.of(voidEntity));
+        when(orderItemVoidRepository.findAllWithOrderDetailsOrderByApprovedAtDesc()).thenReturn(List.of(voidEntity));
+
+        Optional<OrderChangeAlertDto> deferResult = kdsService.deferOrderChange(voidId);
+        assertThat(deferResult).isPresent();
+        assertThat(deferResult.get().getAcknowledged()).isFalse();
+
+        List<OrderChangeAlertDto> pendingAfterDefer = kdsService.getPendingOrderChanges();
+        assertThat(pendingAfterDefer).hasSize(1);
     }
 }
