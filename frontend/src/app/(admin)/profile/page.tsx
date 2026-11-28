@@ -19,8 +19,6 @@ import {
   Percent,
   Cpu,
   Clock,
-  Eye,
-  EyeOff,
   AlertCircle,
   ArrowRight,
   LogOut,
@@ -51,21 +49,11 @@ function ProfileContent() {
 
   const [copiedId, setCopiedId] = React.useState(false);
 
-  // Form đổi mật khẩu
-  const [currentPassword, setCurrentPassword] = React.useState('');
-  const [newPassword, setNewPassword] = React.useState('');
-  const [confirmPassword, setConfirmPassword] = React.useState('');
-  const [showCurrentPw, setShowCurrentPw] = React.useState(false);
-  const [showNewPw, setShowNewPw] = React.useState(false);
-  const [showConfirmPw, setShowConfirmPw] = React.useState(false);
-  const [pwError, setPwError] = React.useState<string | null>(null);
-  const [pwSuccess, setPwSuccess] = React.useState(false);
-  const [isSubmittingPw, setIsSubmittingPw] = React.useState(false);
-
   // Dữ liệu Phiếu lương & Tip cá nhân
   const [payslips, setPayslips] = React.useState<Payslip[]>([]);
   const [tipMonths, setTipMonths] = React.useState<TipMonthSummary[]>([]);
   const [isLoadingPayroll, setIsLoadingPayroll] = React.useState(false);
+  const [payrollError, setPayrollError] = React.useState<string | null>(null);
 
   // Toast message
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
@@ -80,6 +68,7 @@ function ProfileContent() {
     let isMounted = true;
     async function loadPersonalPayroll() {
       setIsLoadingPayroll(true);
+      setPayrollError(null);
       try {
         const [ps, tms] = await Promise.all([
           staffLeavePayrollService.getPayslips(),
@@ -89,8 +78,10 @@ function ProfileContent() {
           setPayslips(ps);
           setTipMonths(tms);
         }
-      } catch {
-        // Fallback im lặng
+      } catch (err: unknown) {
+        if (isMounted) {
+          setPayrollError('Không thể tải thông tin phiếu lương. Vui lòng thử lại sau.');
+        }
       } finally {
         if (isMounted) setIsLoadingPayroll(false);
       }
@@ -150,35 +141,6 @@ function ProfileContent() {
     } catch {
       // Fallback
     }
-  };
-
-  const handleChangePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPwError(null);
-    setPwSuccess(false);
-
-    if (!currentPassword) {
-      setPwError('Vui lòng nhập mật khẩu hiện tại');
-      return;
-    }
-    if (!newPassword || newPassword.length < 6) {
-      setPwError('Mật khẩu mới phải có ít nhất 6 ký tự');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPwError('Mật khẩu xác nhận không trùng khớp');
-      return;
-    }
-
-    setIsSubmittingPw(true);
-    setTimeout(() => {
-      setIsSubmittingPw(false);
-      setPwSuccess(true);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      showToast('Cập nhật mật khẩu thành công!');
-    }, 400);
   };
 
   const handleLogout = () => {
@@ -381,102 +343,70 @@ function ProfileContent() {
 
           {/* Cột phải (1/3): Đổi mật khẩu & Phiên kết nối */}
           <div className="space-y-6">
-            {/* Form đổi mật khẩu trực tiếp */}
+            {/* Form đổi mật khẩu trực tiếp (Tạm vô hiệu hóa - chờ Backend cung cấp API ở Sprint tới) */}
             <div className="bg-white rounded-xl border border-stone-200 shadow-2xs p-5 sm:p-6 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-stone-100">
-                <KeyRound className="w-4 h-4 text-ops-brand" />
-                <h3 className="font-ops text-sm font-bold text-stone-900">Đổi Mật Khẩu</h3>
+              <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-ops-brand" />
+                  <h3 className="font-ops text-sm font-bold text-stone-900">Đổi Mật Khẩu</h3>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-stone-100 text-stone-600 font-semibold border border-stone-200">
+                  Sắp có (Sprint tới)
+                </span>
               </div>
 
-              <form onSubmit={handleChangePassword} className="space-y-3">
-                {pwError && (
-                  <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-start gap-1.5">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{pwError}</span>
-                  </div>
-                )}
+              <div className="p-3 bg-stone-50 border border-stone-200/80 rounded-xl space-y-1.5 text-xs text-stone-600">
+                <p className="font-semibold text-stone-800">Tính năng đang trong lộ trình phát triển</p>
+                <p className="text-[11px] text-stone-500 leading-relaxed">
+                  Để đảm bảo an toàn bảo mật tài khoản, chức năng đổi mật khẩu trực tiếp sẽ được kích hoạt ngay khi Backend hoàn tất endpoint xác thực ở Sprint tiếp theo.
+                </p>
+              </div>
 
-                {pwSuccess && (
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg flex items-start gap-1.5">
-                    <Check className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>Mật khẩu đã được cập nhật thành công!</span>
-                  </div>
-                )}
-
+              <div className="space-y-3 opacity-60">
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  <label className="block text-xs font-semibold text-stone-400 mb-1">
                     Mật khẩu hiện tại
                   </label>
-                  <div className="relative">
-                    <input
-                      type={showCurrentPw ? 'text' : 'password'}
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full p-2.5 pr-9 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPw(!showCurrentPw)}
-                      className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-700 cursor-pointer"
-                    >
-                      {showCurrentPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
+                  <input
+                    type="password"
+                    disabled
+                    placeholder="••••••••"
+                    className="w-full p-2.5 bg-stone-100 border border-stone-200 rounded-lg text-xs cursor-not-allowed select-none"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  <label className="block text-xs font-semibold text-stone-400 mb-1">
                     Mật khẩu mới
                   </label>
-                  <div className="relative">
-                    <input
-                      type={showNewPw ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Tối thiểu 6 ký tự"
-                      className="w-full p-2.5 pr-9 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPw(!showNewPw)}
-                      className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-700 cursor-pointer"
-                    >
-                      {showNewPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
+                  <input
+                    type="password"
+                    disabled
+                    placeholder="Tối thiểu 6 ký tự"
+                    className="w-full p-2.5 bg-stone-100 border border-stone-200 rounded-lg text-xs cursor-not-allowed select-none"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  <label className="block text-xs font-semibold text-stone-400 mb-1">
                     Xác nhận mật khẩu mới
                   </label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPw ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Nhập lại mật khẩu mới"
-                      className="w-full p-2.5 pr-9 bg-stone-50 border border-stone-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-ops-brand"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPw(!showConfirmPw)}
-                      className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-700 cursor-pointer"
-                    >
-                      {showConfirmPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
+                  <input
+                    type="password"
+                    disabled
+                    placeholder="Nhập lại mật khẩu mới"
+                    className="w-full p-2.5 bg-stone-100 border border-stone-200 rounded-lg text-xs cursor-not-allowed select-none"
+                  />
                 </div>
 
                 <button
-                  type="submit"
-                  disabled={isSubmittingPw}
-                  className="w-full py-2.5 bg-ops-brand hover:bg-ops-brand-dark disabled:opacity-50 text-white rounded-lg font-mono text-xs uppercase font-bold shadow-xs transition-colors cursor-pointer"
+                  type="button"
+                  disabled
+                  className="w-full py-2.5 bg-stone-200 text-stone-500 rounded-lg font-mono text-xs uppercase font-bold cursor-not-allowed shadow-none"
                 >
-                  {isSubmittingPw ? 'Đang Xử Lý...' : 'Lưu Mật Khẩu'}
+                  Chức Năng Sắp Ra Mắt
                 </button>
-              </form>
+              </div>
             </div>
 
             {/* Trạng thái kết nối trạm */}
@@ -508,6 +438,23 @@ function ProfileContent() {
               <Clock className="w-6 h-6 animate-spin mx-auto text-ops-brand mb-2" />
               <span>Đang tải thông tin thu nhập và phiếu lương của bạn...</span>
             </div>
+          ) : payrollError ? (
+            <div className="p-8 text-center text-rose-700 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
+              <AlertCircle className="w-6 h-6 mx-auto text-rose-600" />
+              <p className="text-sm font-semibold">{payrollError}</p>
+            </div>
+          ) : !latestPayslip ? (
+            <div className="bg-white rounded-xl border border-stone-200 p-8 sm:p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center mx-auto">
+                <Wallet className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-stone-900">Chưa có phiếu lương kỳ này</h3>
+                <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                  Dữ liệu phiếu lương của bạn sẽ hiển thị tại đây sau khi Ban Quản Lý chốt và quyết toán kỳ lương.
+                </p>
+              </div>
+            </div>
           ) : (
             <>
               {/* Thẻ Lương Tháng Gần Nhất */}
@@ -519,15 +466,15 @@ function ProfileContent() {
                     </div>
                     <div>
                       <h2 className="text-base font-bold text-stone-900">
-                        Phiếu Lương Kỳ {latestPayslip?.monthLabel || 'Tháng 11/2026'}
+                        Phiếu Lương Kỳ {latestPayslip.monthLabel || '—'}
                       </h2>
                       <span className="text-xs text-stone-500 font-mono">
-                        {latestPayslip?.periodLabel || 'Kỳ quyết toán: 01/11 - 30/11/2026'}
+                        {latestPayslip.periodLabel || 'Kỳ quyết toán'}
                       </span>
                     </div>
                   </div>
                   <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full w-fit">
-                    {latestPayslip?.paymentStatus || 'ĐÃ QUYẾT TOÁN'}
+                    {latestPayslip.paymentStatus || 'CHỜ QUYẾT TOÁN'}
                   </span>
                 </div>
 
@@ -538,14 +485,14 @@ function ProfileContent() {
                       Thu Nhập Thực Lĩnh (Net Salary)
                     </span>
                     <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-white mt-1 block">
-                      {formatVND(latestPayslip?.netSalary || 14850000)}
+                      {formatVND(latestPayslip.netSalary ?? 0)}
                     </span>
                   </div>
                   <div className="text-xs text-emerald-200/80 space-y-1 sm:text-right">
                     <div>
                       Ngày chi trả:{' '}
                       <span className="font-semibold text-white">
-                        {latestPayslip?.paymentDateLabel || '05/12/2026'}
+                        {latestPayslip.paymentDateLabel || '—'}
                       </span>
                     </div>
                     <div>
@@ -560,10 +507,10 @@ function ProfileContent() {
                   <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 space-y-1">
                     <span className="text-stone-500 block">Lương cơ bản / Giờ</span>
                     <span className="text-base font-mono font-bold text-stone-900 block">
-                      {formatVND(latestPayslip?.baseSalary || 12000000)}
+                      {formatVND(latestPayslip.baseSalary ?? 0)}
                     </span>
                     <span className="text-[11px] text-stone-500">
-                      {latestPayslip?.workedHours || 176} giờ công thực tế
+                      {latestPayslip.workedHours ?? 0} giờ công thực tế
                     </span>
                   </div>
 
@@ -573,17 +520,15 @@ function ProfileContent() {
                       Tiền Tip ca trực
                     </span>
                     <span className="text-base font-mono font-bold text-amber-900 block">
-                      {formatVND(latestPayslip?.tipAmount || 2150000)}
+                      {formatVND(latestPayslip.tipAmount ?? 0)}
                     </span>
-                    <span className="text-[11px] text-amber-700">Điểm phân bổ: 42 điểm</span>
+                    <span className="text-[11px] text-amber-700">Theo phân bổ ca trực</span>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 space-y-1">
                     <span className="text-stone-500 block">Phụ cấp &amp; Thưởng</span>
                     <span className="text-base font-mono font-bold text-stone-900 block">
-                      {formatVND(
-                        (latestPayslip?.allowance || 1200000) + (latestPayslip?.bonus || 0)
-                      )}
+                      {formatVND((latestPayslip.allowance ?? 0) + (latestPayslip.bonus ?? 0))}
                     </span>
                     <span className="text-[11px] text-stone-500">Phụ cấp trách nhiệm ca</span>
                   </div>
@@ -591,9 +536,9 @@ function ProfileContent() {
                   <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 space-y-1">
                     <span className="text-stone-500 block">Các khoản giảm trừ</span>
                     <span className="text-base font-mono font-bold text-rose-700 block">
-                      -{formatVND(latestPayslip?.deductions || 500000)}
+                      -{formatVND(latestPayslip.deductions ?? 0)}
                     </span>
-                    <span className="text-[11px] text-stone-500">BHXH &amp; Công đoàn</span>
+                    <span className="text-[11px] text-stone-500">BHXH &amp; Giảm trừ</span>
                   </div>
                 </div>
               </div>
@@ -606,11 +551,11 @@ function ProfileContent() {
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-ops-brand" />
                       <h3 className="text-sm font-bold text-stone-900">
-                        Quỹ Tip Tháng {latestTipMonth?.monthLabel || '11/2026'}
+                        Quỹ Tip Tháng {latestTipMonth?.monthLabel || '—'}
                       </h3>
                     </div>
                     <span className="text-xs font-mono font-bold text-ops-brand">
-                      {formatVND(latestTipMonth?.totalAmount || 2150000)}
+                      {latestTipMonth ? formatVND(latestTipMonth.totalAmount ?? 0) : '—'}
                     </span>
                   </div>
                   <p className="text-xs text-stone-600">
@@ -618,8 +563,8 @@ function ProfileContent() {
                     ca trực đã hoàn thành.
                   </p>
                   <div className="pt-1 flex items-center justify-between text-xs text-stone-500 font-mono">
-                    <span>Số ca nhận Tip: 22 ca</span>
-                    <span>Hiệu suất chia: 100%</span>
+                    <span>Số ca nhận Tip: {latestTipMonth?.dailyEntries?.length ?? '—'}</span>
+                    <span>Trạng thái: {latestTipMonth?.paymentStatus === 'PAID' ? 'Đã chi trả' : 'Chờ phân bổ'}</span>
                   </div>
                 </div>
 
@@ -631,7 +576,7 @@ function ProfileContent() {
                   </div>
                   <p className="text-xs text-stone-600">
                     Nếu phát hiện sai sót về số giờ công hoặc tiền Tip phân bổ, vui lòng gửi phản hồi
-                    trực tiếp cho Chủ Nhà Hàng trước ngày 03 hàng tháng.
+                    trực tiếp cho Quản lý hoặc Chủ Nhà Hàng.
                   </p>
                   <div className="pt-1 text-xs text-stone-500 font-mono">
                     Hotline quản trị nội bộ: <span className="font-bold text-stone-800">1900 8841</span>

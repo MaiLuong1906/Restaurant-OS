@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { canAccessRoute, PERMISSIONS } from '@/lib/rbac';
+import { canAccessRoute } from '@/lib/rbac';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { authService } from '@/lib/auth-service';
 import { ApiError } from '@/lib/api-client';
@@ -174,17 +174,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
     setPinVerifying(true);
     try {
-      if (process.env.NEXT_PUBLIC_AUTH_MODE === 'live') {
-        const res = await authService.verifyManagerPin({ pin: pinInput });
-        showToast(`Mã PIN hợp lệ! Xác thực bởi ${res.approverName} (${res.approverRole}): ${pinPurpose}`);
-      } else {
-        if (pinInput === '8841' || pinInput === '9999') {
-          showToast(`[Mock] Mã PIN hợp lệ! Đã xác thực: ${pinPurpose}`);
-        } else {
-          showToast('Mã PIN không đúng! Vui lòng thử lại.');
-          return;
-        }
-      }
+      const res = await authService.verifyManagerPin({ pin: pinInput });
+      showToast(`Mã PIN hợp lệ! Xác thực bởi ${res.approverName} (${res.approverRole}): ${pinPurpose}`);
       setPinModalOpen(false);
       setPinInput('');
     } catch (err: unknown) {
@@ -221,7 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-ops-bg text-ops-ink font-ops antialiased flex flex-col selection:bg-ops-brand/10 selection:text-ops-brand">
-      
+
       {/* Mobile Drawer Backdrop */}
       {mobileMenuOpen && (
         <div
@@ -328,7 +319,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* =================================================================== */}
       <div className="pl-0 lg:pl-72 transition-[padding] duration-300 min-h-screen flex flex-col">
         <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-ops-border z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 shadow-2xs transition-[left] duration-300">
-          
+
           {/* Left: Mobile hamburger + Location Badge + Role Switcher */}
           <div className="flex items-center gap-2 sm:gap-4">
             <button
@@ -495,13 +486,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* 3. MAIN CONTENT ROUTE AREA                                          */}
         {/* =================================================================== */}
         <main className="relative pt-16 bg-ops-bg min-h-screen flex-1">
-          <RoleGuard
-            requiredPermissions={[
-              PERMISSIONS.REPORT_OPERATIONS_KPI_VIEW,
-              PERMISSIONS.USER_ACCOUNT_VIEW,
-              PERMISSIONS.REPORT_FINANCE_PNL_BCG_VIEW,
-            ]}
-          >
+          <RoleGuard>
             {children}
           </RoleGuard>
         </main>
@@ -558,7 +543,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
               <div className="flex items-center justify-between text-[11px] text-ops-muted">
                 <span>Quên mã PIN? Liên hệ Chủ quán</span>
-                <span className="font-mono text-ops-brand font-semibold">Gợi ý: 8841 / 9999</span>
               </div>
 
               <div className="pt-2 flex items-center gap-2">

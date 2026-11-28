@@ -62,7 +62,9 @@ describe('Frontend RBAC Permission Catalog & Route Guards', () => {
     expect(canAccessRoute('/menu-bom', 'WAITER')).toBe(false);
     expect(canAccessRoute('/menu-bom', null)).toBe(false);
     expect(canAccessRoute('/users', 'OWNER')).toBe(true);
-    expect(canAccessRoute('/users', 'MANAGER')).toBe(false);
+    expect(canAccessRoute('/users', 'MANAGER')).toBe(true);
+    expect(canAccessRoute('/users', 'CASHIER')).toBe(false);
+    expect(canAccessRoute('/users', 'WAITER')).toBe(false);
     expect(canAccessRoute('/ai-hub', 'OWNER')).toBe(true);
     expect(canAccessRoute('/ai-hub', 'MANAGER')).toBe(false);
 

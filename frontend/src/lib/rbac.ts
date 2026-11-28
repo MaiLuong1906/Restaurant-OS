@@ -293,7 +293,7 @@ export const ROUTE_REQUIRED_PERMISSIONS: { prefix: string; anyOf: PermissionCode
   { prefix: '/bcg', anyOf: [PERMISSIONS.REPORT_FINANCE_PNL_BCG_VIEW] },
   { prefix: '/payroll', anyOf: [PERMISSIONS.HR_PAYROLL_TIP_POOL_APPROVE] },
   { prefix: '/ai-hub', anyOf: [PERMISSIONS.SYS_STORE_PROFILE_LAN_UPDATE] },
-  { prefix: '/users', anyOf: [PERMISSIONS.USER_ACCOUNT_DELETE] },
+  { prefix: '/users', anyOf: [PERMISSIONS.USER_ACCOUNT_VIEW] },
   // Khối Admin / Manager vận hành
   { prefix: '/profile', anyOf: [PERMISSIONS.REPORT_OPERATIONS_KPI_VIEW, PERMISSIONS.AUTH_STAFF_PORTAL_EXECUTE] },
   { prefix: '/dashboard', anyOf: [PERMISSIONS.REPORT_OPERATIONS_KPI_VIEW] },

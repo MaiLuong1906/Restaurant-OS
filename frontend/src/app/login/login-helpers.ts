@@ -1,9 +1,9 @@
 export function homeHrefForRole(role?: string): string {
   switch (role) {
     case 'OWNER':
+    case 'MANAGER':
       return '/dashboard';
     case 'CHEF':
-    case 'MANAGER':
       return '/chef';
     case 'CASHIER':
       return '/pos';
@@ -11,6 +11,6 @@ export function homeHrefForRole(role?: string): string {
       return '/wait';
     case 'STAFF':
     default:
-      return '/chef';
+      return '/staff';
   }
 }
