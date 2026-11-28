@@ -1,6 +1,7 @@
 import { ApiResponse } from '../types';
 import { generateIdempotencyKey } from './utils';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useCartStore } from '../stores/useCartStore';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -26,14 +27,27 @@ export async function fetchApi<T>(
   // SECURITY: Tự động gắn Authorization Bearer token từ useAuthStore nếu có
   const token = useAuthStore.getState().getAccessToken();
 
+  // AUTH: Gắn X-Table-Token cho request của khách hàng nếu có trong store và không phải endpoint nội bộ nhân sự
+  const isStaffEndpoint =
+    endpoint.startsWith('/admin') ||
+    endpoint.startsWith('/staff') ||
+    endpoint.startsWith('/kds') ||
+    endpoint.startsWith('/pos');
+
+  const tableToken = !isStaffEndpoint ? useCartStore.getState().tableToken : null;
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Request-ID': requestId,
     ...(options.headers as Record<string, string>),
   };
 
-  if (token) {
+  if (token && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (tableToken && !headers['X-Table-Token']) {
+    headers['X-Table-Token'] = tableToken;
   }
 
   try {

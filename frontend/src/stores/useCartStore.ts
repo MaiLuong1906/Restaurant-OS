@@ -56,6 +56,7 @@ const safeLocalStorage: StateStorage = {
 interface CartState {
   tableId: string | null;
   tableNumber: string | null;
+  tableToken?: string | null;
   items: CartItem[];
   customerNotes: string;
   placedBatches: PlacedBatch[];
@@ -63,7 +64,7 @@ interface CartState {
   hasMemberPromo: boolean;
   lastPaymentMethod: CustomerPaymentMethod;
   lastPaidTotal: number;
-  setTable: (tableId: string, tableNumber: string) => void;
+  setTable: (tableId: string, tableNumber: string, tableToken?: string | null) => void;
   addItem: (
     dish: Dish,
     selectedModifiers?: { name: string; selected: string; extraPrice: number }[],
@@ -100,6 +101,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       tableId: 'ban-04',
       tableNumber: 'Bàn 04',
+      tableToken: null,
       items: [],
       customerNotes: '',
       placedBatches: [],
@@ -108,7 +110,12 @@ export const useCartStore = create<CartState>()(
       lastPaymentMethod: 'vietqr',
       lastPaidTotal: 0,
 
-      setTable: (tableId, tableNumber) => set({ tableId, tableNumber }),
+      setTable: (tableId, tableNumber, tableToken) =>
+        set((state) => ({
+          tableId,
+          tableNumber,
+          tableToken: tableToken !== undefined ? tableToken : state.tableToken,
+        })),
 
       addItem: (dish, selectedModifiers = [], note = '', quantity = 1) => {
         set((state) => {
@@ -334,6 +341,7 @@ export const useCartStore = create<CartState>()(
       partialize: (state) => ({
         tableId: state.tableId,
         tableNumber: state.tableNumber,
+        tableToken: state.tableToken,
         items: state.items,
         customerNotes: state.customerNotes,
         placedBatches: state.placedBatches,
