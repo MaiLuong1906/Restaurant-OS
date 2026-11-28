@@ -73,18 +73,37 @@ export class ApiKdsService implements KdsService {
   }
 
   async getPendingOrderChanges(): Promise<OrderChangeAlertData[]> {
-    return [];
+    return fetchApi<OrderChangeAlertData[]>('/kds/order-changes');
   }
 
   async acknowledgeOrderChange(
-    _alertId: string,
-    _idempotencyKey?: string
+    alertId: string,
+    idempotencyKey?: string
   ): Promise<{ alert: OrderChangeAlertData; ticket: Ticket }> {
-    throw new Error('acknowledgeOrderChange chưa được hỗ trợ ở live mode');
+    const alert = await fetchApi<OrderChangeAlertData>(`/kds/order-changes/${alertId}/acknowledge`, {
+      method: 'POST',
+      headers: idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : undefined,
+    });
+    let ticket: Ticket;
+    try {
+      ticket = await this.getTicketById(alert.ticketId);
+    } catch {
+      ticket = {
+        id: alert.ticketId,
+        tableNo: alert.tableNo,
+        items: [],
+        status: 'WAITING',
+        createdAt: alert.createdAt ?? new Date().toISOString(),
+        slaMinutes: 15,
+      } as unknown as Ticket;
+    }
+    return { alert, ticket };
   }
 
-  async deferOrderChange(_alertId: string): Promise<void> {
-    // No-op
+  async deferOrderChange(alertId: string): Promise<void> {
+    await fetchApi<OrderChangeAlertData>(`/kds/order-changes/${alertId}/defer`, {
+      method: 'POST',
+    });
   }
 
   async listDishAvailability(): Promise<DishAvailability[]> {
